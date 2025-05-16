@@ -2,7 +2,7 @@ module Tests where
 
 import Data.Ratio
 
-import Instances
+import CompReal
 
 --the leibniz series for pi converges slowly, making it useful for benchmarking
 piLeibniz :: (CompReal r) => r

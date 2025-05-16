@@ -1,76 +1,11 @@
 {-# LANGUAGE TypeFamilies #-}
 
-module Taylor where
+module Solver.Taylor where
 
-import Deriv
+import Solver.Deriv
+import Solver.Interval
+
 import Data.Proxy
-
---class of types with a defined concept of closed intervals
---The Fractional a restriction is only used for the default implementations, it's not really needed
-class (Fractional a) => Intervalable a where
-    type Interval a :: *
-    (<~>) :: a -> a -> Interval a --closed interval [min(x,y),max(x,y)]
-    lower  :: Interval a -> a
-    upper  :: Interval a -> a
-    center :: Interval a -> a
-    radius :: Interval a -> a
-    --union        :: Interval a -> Interval a -> Interval a
-    --intersection :: Interval a -> Interval a -> Interval a
-
-    upper i = center i + radius i
-    lower i = center i - radius i
-    center i = (lower i + upper i) / 2
-    radius i = (upper i - lower i) / 2
-    --TODO: remove center and radius (and Frac a =>) if I end up not using them
-
-    {-# MINIMAL (<~>), (upper, lower | center, radius) #-}
-
-singleton :: (Intervalable a) => a -> Interval a
-singleton x = x <~> x --TODO: put inside class?
-
-instance Intervalable Double where
-    type Interval Double = (Double, Double)
-    x <~> y = (min x y, max x y)
-    lower = fst
-    upper = snd
-
-instance (Intervalable a) => Intervalable [a] where
-    type Interval [a] = [Interval a]
-    (<~>) = zipWith (<~>)
-    upper = map upper
-    lower = map lower
-    center = map center
-    radius = map radius
-
-ivalCase :: (Num a, Ord a) => (a, a) -> b -> b -> b -> b
-ivalCase (l,u) pos neg zer
-  | l >= 0 = pos
-  | u <= 0 = neg
-  | otherwise = zer
-
-instance (Num a, Ord a) => Num (a, a) where
-    (xl, xu) + (yl, yu) = (xl + yl, xu + yu)
-    x@(xl,xu) * y@(yl,yu) = 
-        ivalCase x
-            (f (xl*yl,xu*yu) (xu*yl,xl*yu) (xu*yl,xu*yu))
-            (f (xl*yu,xu*yl) (xu*yu,xl*yl) (xl*yu,xl*yl))
-            (f (xl*yu,xu*yu) (xu*yl,xl*yu) (min (xl*yu) (xu*yl),max (xl*yl) (xu*yu)))
-        where f a b c = ivalCase y a b c
-    negate (l, u) = (negate u, negate l)
-    abs x@(l, u) = ivalCase x x (-x) (0, max (-l) u)
-    signum x = ivalCase x 1 (-1) (error "signum of interval containing 0")
-    fromInteger i = let z = fromInteger i in (z, z)
-
-instance (Fractional a, Ord a) => Fractional (a, a) where
-    recip x@(l, u) = ivalCase x (recip u, recip l) (recip u, recip l) (error "signum of interval containing 0")
-    fromRational r = let z = fromRational r in (z, z)
-
-instance (Powers a, Ord a) => Powers (a, a) where
-    pow x = (powers x !!)
-    powers (l, u) = aux
-        where aux = (1, 1) : (l, u) : (l, u) * (l, u) : map (\(yl, yu) -> (l2 * yl, u2 * yu)) (tail aux)
-              l2 = l * l
-              u2 = u * u
 
 
 varTerms :: (Powers a) => [a] -> Deriv a

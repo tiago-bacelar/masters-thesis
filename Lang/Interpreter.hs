@@ -1,16 +1,18 @@
-module Interpreter where
+module Lang.Interpreter where
+
+import Lang.Hybrid
+import Lang.Parser
 
 import Prelude hiding (Ordering(..))
 import Data.Ratio
 import Data.Map (Map, (!), empty, insert)
 
-import Hybrid
-import Parser
 
 --TODO: errors (operation limit exceeded for zeno points, and precision limit exceeded for comparisons)
 --the comparisons problem should be studied closer later on (probably need two modes: strict comparison, which guarantees
 --correctness but throws PLE, and a parametrized lax mode that assumes equality after specified precision is exhausted)
 
+--TODO: change state to list/vector
 type State r = Map Ident r
 type RunnableProgram r = HProgram r (State r) --State r -> Hybrid r (State r)
 
@@ -65,12 +67,3 @@ run p = eval (p empty)
 
 query :: RunnableProgram r -> r -> Ident -> r
 query p = (!) . run p
-
-
-
-playI :: IO (Double -> State Double)
-playI = do
-       input <- readFile "input.txt"
-       case fmap (flip interpret empty) (parseJaguar input) of
-              Failed err -> error (show err)
-              Ok ans -> return (eval ans)

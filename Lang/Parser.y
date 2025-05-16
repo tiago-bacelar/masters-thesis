@@ -1,5 +1,5 @@
 {
-module Parser (parseJaguar, ParseResult(..), Program(..), BTerm(..), Comparator(..), Expr(..), Operator(..), Function(..), AnyFloat(..), Ident) where
+module Lang.Parser (parseJaguar, ParseResult(..), Program(..), BTerm(..), Comparator(..), Expr(..), Operator(..), Function(..), AnyFloat(..), Ident) where
 
 import Prelude hiding (Ordering(..))
 import Data.Char
@@ -99,6 +99,7 @@ newtype AnyFloat = AnyFloat { anyFloat :: forall a. Floating a => a}
 instance Show AnyFloat where
     show x = show (anyFloat x :: Double)
 
+--TODO: sqrt (and other roots?)
 data Function = Neg | Exp | Ln | Sin | Cos | Tan deriving (Show)
 data Operator = Add | Sub | Mult | Div | Pow | Log deriving (Show)
 data Expr = Var Ident

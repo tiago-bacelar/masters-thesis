@@ -1,7 +1,6 @@
 module Lang where
 
 import Prelude hiding (Ordering(..))
-
 import Data.Ratio
 import Data.List
 import Control.Applicative((<*))

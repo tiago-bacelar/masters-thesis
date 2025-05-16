@@ -1,18 +1,18 @@
 [submodule "comparison/aern2"]
-	path = comparison/aern2
+	path = implementations/aern2
 	url = git@github.com:michalkonecny/aern2.git
 [submodule "comparison/cdar-mbound"]
-	path = comparison/cdar-mbound
+	path = implementations/cdar-mbound
 	url = git@github.com:michalkonecny/cdar.git
 [submodule "comparison/cdar"]
-	path = comparison/cdar
+	path = implementations/cdar
 	url = git@github.com:jensblanck/cdar.git
 [submodule "comparison/exact-real"]
-	path = comparison/exact-real
+	path = implementations/exact-real
 	url = git@github.com:expipiplus1/exact-real.git
 [submodule "comparison/haskell-fast-reals"]
-	path = comparison/haskell-fast-reals
+	path = implementations/haskell-fast-reals
 	url = git@github.com:comius/haskell-fast-reals.git
 [submodule "comparison/ireal"]
-	path = comparison/ireal
+	path = implementations/ireal
 	url = git@github.com:sydow/ireal.git

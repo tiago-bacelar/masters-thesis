@@ -3,7 +3,7 @@
 
 --module Benchmarking where
 
-import Instances
+import CompReal
 import Tests
 
 import Data.Ratio

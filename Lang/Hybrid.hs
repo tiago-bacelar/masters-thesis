@@ -1,4 +1,4 @@
-module Hybrid where
+module Lang.Hybrid where
 
 import Control.Monad (ap)
 
