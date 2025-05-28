@@ -1,9 +1,12 @@
 {
-module Lang.Parser (parseJaguar, ParseResult(..), Program(..), BTerm(..), Comparator(..), Expr(..), Operator(..), Function(..), AnyFloat(..), Ident) where
+module Lang.Parser (parseJaguar, ParseResult(..), Program(..), BTerm(..), Comparator(..), Expr(..), Operator(..), Function(..), Var(..), AnyFloat(..), Ident) where
 
 import Prelude hiding (Ordering(..))
 import Data.Char
 import GHC.Real
+
+--TODO: validate for statements (can't have repeated var, can't use those vars in expr for time)
+--TODO: validate var usage (unassigned vars)
 }
 
 %name parser
@@ -31,6 +34,7 @@ import GHC.Real
       ':='      { TokenAssign }
       '='       { TokenEquals }
       for       { TokenFor }
+      forever   { TokenForever }
       wait      { TokenWait }
       if        { TokenIf }
       then      { TokenThen }
@@ -54,9 +58,11 @@ import GHC.Real
 %%
 
 Program     :: { Program }
-    : var ':=' Expr                         { Assign $1 $3 }
-    | For for Expr                          { For (reverse $1) $3 }
-    | wait Expr                             { For [] $2 }
+    : var ':=' Expr                         {% case $1 of {T -> failP "Can't assign to time"; V v -> returnP (Assign v $3)}}
+    | For for Expr                          { For (reverse $1) (Just $3) }
+    | For forever                           { For (reverse $1) Nothing }
+    | wait Expr                             { For [] (Just $2) }
+    | wait forever                          { For [] Nothing }
     | if BTerm then Program else Program    { IfThenElse $2 $4 $6 }
     | if BTerm then Program                 { IfThenElse $2 $4 Nop }
     | while BTerm do Program                { WhileDo $2 $4 }
@@ -70,7 +76,7 @@ For         :: { [(Ident, Expr)] }
     | For ',' DifEq         { $3 : $1 }
 
 DifEq       :: { (Ident, Expr) }
-    : var '\'' '=' Expr     { ($1, $4) }
+    : var '\'' '=' Expr     {% case $1 of {T -> failP "Can't alter evolution rate of time"; V v -> returnP (v, $4)}}
 
 
 BTerm       :: { BTerm }
@@ -100,9 +106,10 @@ instance Show AnyFloat where
     show x = show (anyFloat x :: Double)
 
 --TODO: sqrt (and other roots?)
+data Var = T | V Ident deriving (Show)
 data Function = Neg | Exp | Ln | Sin | Cos | Tan deriving (Show)
 data Operator = Add | Sub | Mult | Div | Pow | Log deriving (Show)
-data Expr = Var Ident
+data Expr = Var Var
             | Num AnyFloat
             | Func Function Expr
             | Op Operator Expr Expr
@@ -113,7 +120,7 @@ data BTerm = BConst Bool | Comp Comparator Expr Expr deriving (Show)
 --TODO: BExpr (and, or, not)
 
 data Program = Assign Ident Expr
-                | For [(Ident, Expr)] Expr
+                | For [(Ident, Expr)] (Maybe Expr)
                 | IfThenElse BTerm Program Program
                 | WhileDo BTerm Program
                 | Seq Program Program
@@ -122,7 +129,7 @@ data Program = Assign Ident Expr
 
 
 
-data Token = TokenVar Ident
+data Token = TokenVar Var
             | TokenNum AnyFloat
             | TokenDot
             | TokenFunc Function
@@ -136,6 +143,7 @@ data Token = TokenVar Ident
             | TokenAssign
             | TokenEquals
             | TokenFor
+            | TokenForever
             | TokenWait
             | TokenIf
             | TokenThen
@@ -178,6 +186,8 @@ lexer cont s =
         '^':cs      -> cont (TokenOp Pow) cs . moveColumn 1
         '(':cs      -> cont TokenOB cs . moveColumn 1
         ')':cs      -> cont TokenCB cs . moveColumn 1
+        '\'':cs     -> cont TokenDeriv cs . moveColumn 1
+        ',':cs      -> cont TokenComma cs . moveColumn 1
         '<':cs      -> cont (TokenComp LT) cs . moveColumn 1
         '>':cs      -> cont (TokenComp GT) cs . moveColumn 1
         '<':'=':cs  -> cont (TokenComp LEQ) cs . moveColumn 2
@@ -222,13 +232,15 @@ lexAlpha "tan"      = TokenFunc Tan
 lexAlpha "true"     = TokenBool True
 lexAlpha "false"    = TokenBool False
 lexAlpha "for"      = TokenFor
+lexAlpha "forever"  = TokenForever
 lexAlpha "wait"     = TokenWait
 lexAlpha "if"       = TokenIf
 lexAlpha "then"     = TokenThen
 lexAlpha "else"     = TokenElse
 lexAlpha "while"    = TokenWhile
 lexAlpha "do"       = TokenDo
-lexAlpha var        = TokenVar var
+lexAlpha "t"        = TokenVar T
+lexAlpha var        = TokenVar (V var)
 
 
 

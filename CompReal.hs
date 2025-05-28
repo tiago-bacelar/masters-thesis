@@ -1,4 +1,4 @@
-{-# LANGUAGE DefaultSignatures #-}
+{-# LANGUAGE TypeFamilies, DefaultSignatures #-}
 
 module CompReal where
 
@@ -6,21 +6,24 @@ import Solver.Interval
 import Solver.Powers
 
 import qualified Data.CDAR as CDAR
-import qualified AERN2.Real as AERN2
+--import qualified AERN2.Real as AERN2
 import qualified ERA.CReal as ERA --available in stdlib as Data.Numbers.CReal, but that version doesn't export CR, making it kinda useless
 import qualified Data.Number.IReal as IReal
 import qualified Data.Number.IReal.IReal as IReal(ir, appr)
 import qualified Data.Number.IReal.IntegerInterval as IReal(lowerI, upperI, radI) 
 
+import GHC.Num
+import Data.Bits
 import Data.List
 import Data.Maybe
 import Data.Ratio
-import Data.Bits
 import Control.Applicative
-
 
 pow2 :: Int -> Integer
 pow2 = shiftL 1
+
+lg2 :: Integer -> Int
+lg2 = fromIntegral . GHC.Num.integerLogBase 2
 
 --TODO: partial comparison?
 class (Floating r) => CompReal r where
@@ -101,6 +104,21 @@ listLimitRatioFromListLimit = listLimit . map fromRational
 --listLimitRatioFromLimitRatio s a = limitRatio ...     TODO
 
 
+-- (<!) x y p = snd (bound x p) < fst (bound y p)
+-- x >! y = y <! x
+
+{-
+instance (CompReal r) => CompOrd r where
+    mCompare x y p | ux < ly                            = Just LT
+                   | lx > uy                            = Just GT
+                   | lx == ux && ly == uy && lx == ly   = Just EQ
+                   | otherwise                          = Nothing
+        where (lx, ux) = bound x p
+              (ly, uy) = bound y p
+
+    (<!) x y p = snd (bound x p) < fst (bound y p)
+    x >! y = y <! x
+-}
 
 --calculates the sum of a series through its modulus of convergence
 seriesSum :: (CompReal r) => [r] -> (Int -> Int) -> r
@@ -110,14 +128,6 @@ seriesSumRatio :: (CompReal r) => [Rational] -> (Int -> Int) -> r
 seriesSumRatio = listLimitRatio . scanl1 (+)
 
 
-(<!) :: (CompReal r) => r -> r -> Int -> Bool
-(<!) x y p = snd (bound x p) < fst (bound y p)
-
-(>!) :: (CompReal r) => r -> r -> Int -> Bool
-x >! y = y <! x
-
-
-{-
 instance CompReal CDAR.CR where
     approx r n = toRational $ fromJust $ CDAR.centre $ CDAR.require n r
 
@@ -128,22 +138,25 @@ instance CompReal CDAR.CR where
 instance Intervalable CDAR.CR where
     type Interval CDAR.CR = CDAR.CR
     x <~> y = CDAR.CR $ ZipList $ zipWith CDAR.unionA (getZipList $ CDAR.unCR x) (getZipList $ CDAR.unCR y)
-    lower = 
-    upper = 
--}
+    lower = undefined
+    upper = undefined
+
+instance Powers CDAR.CR
+
+
 
 instance CompReal ERA.CReal where
     approx (ERA.CR r) n = r n % pow2 n --TODO: something fishy here... (correctionPi pi)
-    limit f = ERA.CR (\i -> let ERA.CR g = f (i+1) in ERA.round_uk (g (i + 1) % 2))
+    --limit f = ERA.CR (\i -> let ERA.CR g = f (i+1) in ERA.round_uk (g (i + 1) % 2))
 
-instance Intervalable ERA.CReal where
-    type Interval ERA.CReal = (ERA.CReal, ERA.CReal)
-    (<~>) = (,)
-    lower = fst
-    upper = snd
+instance Intervalable ERA.CReal
+instance Powers ERA.CReal
+
+
 
 --instance CompReal AERN.RealNumber where
 --    approx 
+
 
 
 --ireal is a bit unique, because it explicitely uses IReals to represent open real intervals
@@ -157,7 +170,7 @@ instance CompReal IReal.IReal where
     boundLimit rs = IReal.ir (\p -> last (take (p+1) ans) p)
         where ans = aux 0 (zip [0..] rs)
               aux p [(i, r)] = [\p -> IReal.appr r p]
-              aux p ((i,r):rs) | IReal.radI a < pow2 (i-p+1) = const a : aux (p+1) ((i,r):rs) --TODO: mess with slope of diagonal limit?
+              aux p ((i,r):rs) | IReal.radI a < pow2 (i-p+1) = const a : aux (p+1) ((i,r):rs) --TODO: test properly
                                | otherwise = aux p rs
                             where a = IReal.appr r i
 
@@ -167,4 +180,12 @@ instance Intervalable IReal.IReal where
     lower = IReal.lower
     upper = IReal.upper
 
-instance Powers IReal.IReal --TODO
+instance Powers IReal.IReal where
+    pow x 0 = 1
+    pow x n = IReal.ir f
+        where x0 = IReal.appr x 0
+              f p = IReal.scale (IReal.pow xp n) (p - n*q)
+                where xp = IReal.appr x q
+                      q = p + ceiling (logBase 2 (fromIntegral n) :: Double) 
+                            + (n-1) * lg2 (IReal.upperI (abs x0)) + n
+    --TODO: powers

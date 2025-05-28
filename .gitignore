@@ -1,0 +1,10 @@
+#binaries
+bin/
+
+#executables
+bench
+jaguar
+
+#testing
+input.txt
+output.png

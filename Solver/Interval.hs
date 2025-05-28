@@ -1,4 +1,4 @@
-{-# LANGUAGE DefaultSignatures, TypeFamilies #-}
+{-# LANGUAGE TypeFamilies, DefaultSignatures #-}
 
 module Solver.Interval where
 
@@ -27,13 +27,6 @@ class Intervalable a where
     default upper :: (Interval a ~ IPair a) => Interval a -> a
     upper = snd . getPair
 
-singleton :: (Intervalable a) => a -> Interval a
-singleton x = x <~> x --TODO: put inside class?
-
-center, radius :: (Intervalable a, Fractional a) => Interval a -> a
-center i = (lower i + upper i) / 2
-radius i = (upper i - lower i) / 2
-
 instance Intervalable Double
 
 {-
@@ -44,6 +37,15 @@ instance (Intervalable a) => Intervalable [a] where
     lower = map lower
 -}
 
+
+singleton :: (Intervalable a) => a -> Interval a
+singleton x = x <~> x --TODO: put inside class?
+
+center, radius :: (Intervalable a, Fractional a) => Interval a -> a
+center i = (lower i + upper i) / 2
+radius i = (upper i - lower i) / 2
+
+--TODO: use CompOrd
 ivalCase :: (Num a, Ord a) => IPair a -> b -> b -> b -> b
 ivalCase (IPair (l,u)) pos neg zer
   | l >= 0 = pos
