@@ -2,6 +2,7 @@
 
 module CompReal where
 
+import CompOrd
 import Solver.Interval
 import Solver.Powers
 
@@ -26,7 +27,7 @@ lg2 :: Integer -> Int
 lg2 = fromIntegral . GHC.Num.integerLogBase 2
 
 --TODO: partial comparison?
-class (Floating r) => CompReal r where
+class (Floating r, CompOrd r) => CompReal r where
     --receives the desired accuracy and returns an approximation of r
     --formally, |approx n r - r| <= 2^(-n-1)
     approx :: r -> Int -> Rational
@@ -104,21 +105,14 @@ listLimitRatioFromListLimit = listLimit . map fromRational
 --listLimitRatioFromLimitRatio s a = limitRatio ...     TODO
 
 
--- (<!) x y p = snd (bound x p) < fst (bound y p)
--- x >! y = y <! x
+mCompareDef :: (CompReal r) => r -> r -> Int -> Maybe Ordering
+mCompareDef x y p | ux < ly                            = Just LT
+                  | lx > uy                            = Just GT
+                  | lx == ux && ly == uy && lx == ly   = Just EQ
+                  | otherwise                          = Nothing
+    where (lx, ux) = bound x p
+          (ly, uy) = bound y p
 
-{-
-instance (CompReal r) => CompOrd r where
-    mCompare x y p | ux < ly                            = Just LT
-                   | lx > uy                            = Just GT
-                   | lx == ux && ly == uy && lx == ly   = Just EQ
-                   | otherwise                          = Nothing
-        where (lx, ux) = bound x p
-              (ly, uy) = bound y p
-
-    (<!) x y p = snd (bound x p) < fst (bound y p)
-    x >! y = y <! x
--}
 
 --calculates the sum of a series through its modulus of convergence
 seriesSum :: (CompReal r) => [r] -> (Int -> Int) -> r
@@ -135,13 +129,16 @@ instance CompReal CDAR.CR where
                          --because it looks at the first 70 terms to produce the first Approx
     limitRatio f = CDAR.CR $ ZipList [CDAR.toApprox i (f i) + CDAR.toApprox i 0 | i <- [0..]]
 
+instance CompOrd CDAR.CR where
+    mCompare = mCompareDef
+
+instance Powers CDAR.CR
+
 instance Intervalable CDAR.CR where
     type Interval CDAR.CR = CDAR.CR
     x <~> y = CDAR.CR $ ZipList $ zipWith CDAR.unionA (getZipList $ CDAR.unCR x) (getZipList $ CDAR.unCR y)
     lower = undefined
     upper = undefined
-
-instance Powers CDAR.CR
 
 
 
@@ -149,8 +146,11 @@ instance CompReal ERA.CReal where
     approx (ERA.CR r) n = r n % pow2 n --TODO: something fishy here... (correctionPi pi)
     --limit f = ERA.CR (\i -> let ERA.CR g = f (i+1) in ERA.round_uk (g (i + 1) % 2))
 
-instance Intervalable ERA.CReal
+instance CompOrd ERA.CReal where
+    mCompare = mCompareDef
+
 instance Powers ERA.CReal
+instance Intervalable ERA.CReal
 
 
 
@@ -174,11 +174,10 @@ instance CompReal IReal.IReal where
                                | otherwise = aux p rs
                             where a = IReal.appr r i
 
-instance Intervalable IReal.IReal where
-    type Interval IReal.IReal = IReal.IReal
-    (<~>) = (IReal.-+-)
-    lower = IReal.lower
-    upper = IReal.upper
+instance CompOrd IReal.IReal where
+    mCompare = mCompareDef
+    (<!) = (IReal.<!)
+    (>!) = (IReal.>!)
 
 instance Powers IReal.IReal where
     pow x 0 = 1
@@ -188,4 +187,9 @@ instance Powers IReal.IReal where
                 where xp = IReal.appr x q
                       q = p + ceiling (logBase 2 (fromIntegral n) :: Double) 
                             + (n-1) * lg2 (IReal.upperI (abs x0)) + n
-    --TODO: powers
+
+instance Intervalable IReal.IReal where
+    type Interval IReal.IReal = IReal.IReal
+    (<~>) = (IReal.-+-)
+    lower = IReal.lower
+    upper = IReal.upper

@@ -39,7 +39,7 @@ boundDouble n r = let (l, u) = bound r n in (fromRational l, fromRational u)
 
 plotHybridCR :: (CompReal a, CompReal b) => [String] -> Hybrid a [b] -> Int -> IO ()
 plotHybridCR vars h n = toFile def "output.png" $ do
-    let samples = 200
+    let samples = 300
     --TODO: precision of the time????
     let tf = fromJust (duration h) --only supports finite programs
     let ts = map ((0.0001+) . (tf*) . fromRational . (% samples)) $ reverse [0..samples] --TODO: order of evals and epsilon
