@@ -17,8 +17,10 @@ import Prelude hiding (Ordering(..))
 import Data.Char
 import GHC.Real
 
---TODO: validate for statements (can't have repeated var, can't use those vars in expr for time)
+--TODO: make ; after CB optional? (after while loops for example)
+--TODO: validate for statements (can't have repeated var)
 --TODO: validate var usage (unassigned vars)
+--TODO: warnings? (using changing var or time in for statement for time)
 import qualified Data.Function as Happy_Prelude
 import qualified Data.Bool as Happy_Prelude
 import qualified Data.Function as Happy_Prelude
@@ -587,16 +589,16 @@ lexer cont s =
         '*':cs      -> cont (TokenOp Mult) cs . moveColumn 1
         '/':cs      -> cont (TokenOp Div) cs . moveColumn 1
         '^':cs      -> cont (TokenOp Pow) cs . moveColumn 1
-        '(':cs      -> cont TokenOB cs . moveColumn 1
-        ')':cs      -> cont TokenCB cs . moveColumn 1
+        '(':cs      -> cont TokenOP cs . moveColumn 1
+        ')':cs      -> cont TokenCP cs . moveColumn 1
         '\'':cs     -> cont TokenDeriv cs . moveColumn 1
         ',':cs      -> cont TokenComma cs . moveColumn 1
-        '<':cs      -> cont (TokenComp LT) cs . moveColumn 1
-        '>':cs      -> cont (TokenComp GT) cs . moveColumn 1
         '<':'=':cs  -> cont (TokenComp LEQ) cs . moveColumn 2
         '>':'=':cs  -> cont (TokenComp GEQ) cs . moveColumn 2
         '=':'=':cs  -> cont (TokenComp EQ) cs . moveColumn 2
         '!':'=':cs  -> cont (TokenComp NEQ) cs . moveColumn 2
+        '<':cs      -> cont (TokenComp LT) cs . moveColumn 1
+        '>':cs      -> cont (TokenComp GT) cs . moveColumn 1
         '=':cs      -> cont TokenEquals cs . moveColumn 1
         ':':'=':cs  -> cont TokenAssign cs . moveColumn 2
         ';':cs      -> cont TokenSep cs . moveColumn 1

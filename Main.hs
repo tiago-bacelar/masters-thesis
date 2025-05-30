@@ -1,33 +1,37 @@
+import CompOrd
 import Lang.Parser
 import Lang.Interpreter
 import Lang.Hybrid
 import Solver.Powers
 import Plot
 
-import Data.Map (Map, (!))
+import Prelude hiding (lookup)
+import Data.Map (Map, lookup)
 import Data.Number.IReal (IReal)
 
 --for quick testing with ghci
-test :: (Floating a, Powers a, Ord a) => IO (RunnableProgram a)
+test :: (Floating a, Powers a, CompOrd a, Show a) => IO (RunnableProgram a)
 test = do
     input <- readFile "input.txt"
     case parseJaguar input of
             Failed err -> error ("Parse error: " ++ show err) --parse error
             Ok ans -> return (interpret ans)
 
-play :: IO (IReal -> Map Ident IReal)
-play = fmap run test
+play :: IO (IReal -> RunResult (Map Ident IReal))
+play = fmap (`run` (10, 100)) test
 
 plot :: IO ()
 plot = do
-    p <- test :: IO (RunnableProgram Double)
-    let h = fmap snd (p initial)
     let vars = ["y", "v"]
-    plotHybrid vars (fmap (\st -> map (st!) vars) h)
+    --p <- test :: IO (RunnableProgram Double)
+    p <- test :: IO (RunnableProgram IReal)
+    let h = evalE (fmap (\(_,st) -> map (`lookup` st) vars) $ p initial) (10, 100)
+    --plotHybrid vars h
+    plotHybridCR vars h 8
 
 
 
-main :: IO () --TODO
+main :: IO () --TODO: cmd line args, etc etc
 main = do
     f <- play
     plot
