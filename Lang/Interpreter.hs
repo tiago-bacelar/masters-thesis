@@ -159,9 +159,8 @@ interpret (WhileDo c p) s      = do { b <- evalB c s; if b then decIter >> inter
 interpret (Seq p q) s          = E $ do
     h <- runE (interpret p s)
     (cmp,_) <- get
-    let fuseWith = return . fmap (either id (\(x,y) -> Und (allVals x ++ allVals y) (maybeError y)) . ($ cmp)) . joinComp h
     case mEndpoint h of
-        Just (Val s2)  -> runE (interpret q s2) >>= fuseWith
+        Just (Val s2)  -> runE (interpret q s2) >>= return . fmap (either id (\(x,y) -> Und (allVals x ++ allVals y) (maybeError y)) . ($ cmp)) . joinComp h
         Just (Err e)   -> return h
         Just (Und _ _) -> error "an endpoint should never be undecided"
         Nothing        -> return h
