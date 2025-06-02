@@ -18,9 +18,9 @@ import Data.Ratio
 import Data.Map as Map (Map, (!), empty, insert)
 import qualified Data.Map as Map (map)
 
---the comparisons problem should be studied closer later on (probably need two modes: strict comparison, which guarantees
---correctness but throws PLE, and a parametrized lax mode that assumes equality after specified precision is exhausted)
---the Und should also be a function to allow the used to increase the precision of a specific point independently
+--the comparisons problem should be studied closer later on (probably need two kinds of comparison operators: strict
+--comparison, which guarantees correctness but throws PLE, and lax comparators that return false if precision is exhausted)
+--the Und should also be a function to allow the user to increase the precision of a specific point independently
 
 type Error = String
 data RunResult a = Val a | Und [a] (Maybe Error) | Err Error deriving (Show, Functor, Foldable)
@@ -54,9 +54,6 @@ instance (Num r) => Monad (E r) where
               liftF (Just (Err e))   = failE e
               liftF (Just (Und _ _)) = error "wtf"
               liftF Nothing          = error "wtf"
-
-evalE :: E r a -> EState -> (Hybrid r (RunResult a))
-evalE e = evalState (runE e)
 
 failE :: (Num r) => String -> E r a
 failE = E . return . instant . Err
@@ -147,7 +144,7 @@ validateT d = do
     then return ()  --fails if the time step is verifiably negative (preferrable for small time steps)
     else failE ("Time step is not verifiably positive (comparison precision exhausted): " ++ show d)
 
-interpret :: forall r. (Floating r, Powers r, CompOrd r, Show r) => Program -> RunnableProgram r
+interpret :: (Floating r, Powers r, CompOrd r, Show r) => Program -> RunnableProgram r
 interpret Nop s                = return s
 interpret (Assign v e) s       = return (fst s, insert v (evalExpr e s) $ snd s)
 interpret (For [] (Just t)) s  = let d = evalExpr t s in do { validateT d; fromHybrid $ waitE d s }
@@ -165,5 +162,9 @@ interpret (Seq p q) s          = E $ do
         Just (Und _ _) -> error "an endpoint should never be undecided"
         Nothing        -> return h
 
-run :: (Num r) => RunnableProgram r -> EState -> r -> RunResult (Map Ident r)
-run p es = fmap snd . eval (evalE (p initial) es)
+
+run :: (Num r) => RunnableProgram r -> EState -> Hybrid r (RunResult (Map Ident r))
+run p = fmap (fmap snd) . evalState (runE (p initial))
+
+query :: (Num r) => RunnableProgram r -> EState -> r -> RunResult (Map Ident r)
+query p es = eval (run p es)

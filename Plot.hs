@@ -13,7 +13,7 @@ import Prelude hiding (lines)
 import Control.Applicative (ZipList(..))
 import Data.Ratio ((%))
 import Data.List (transpose)
-import Data.Maybe (isNothing, fromJust)
+import Data.Maybe (isJust, fromJust)
 
 
 sampleNo :: Integer
@@ -23,27 +23,37 @@ samples :: (Fractional a) => a -> [a]
 samples tf = map ((tf*) . fromRational . (% sampleNo)) [0..sampleNo]
 
 
+
 setLayout = do
     layout_title .= "System Evolution"
     layout_x_axis . laxis_title .= "time"
 
-points color vs = liftEC $ do
-    plot_points_style .= hollowCircles 2 1 color
+lineStyle n colour = line_width .~ n
+                   $ line_color .~ colour
+                   $ def
+
+lines caption color vss = plot $ liftEC $ do
+    plot_lines_title .= caption
+    plot_lines_style .= lineStyle 1 color
+    plot_lines_values .= vss
+
+fillBetween caption color vss = capt >> sequence_ (map fill vss)
+    where tcolor = dissolve 0.4 color
+          capt = plot $ liftEC $ do
+                            plot_fillbetween_style .= solidFillStyle tcolor
+                            plot_fillbetween_title .= caption
+          fill vs = plot $ liftEC $ do
+                                plot_fillbetween_style .= solidFillStyle tcolor
+                                plot_fillbetween_values .= vs
+
+points color vs = plot $ liftEC $ do
+    plot_points_style .= hollowCircles 3 1 color
     plot_points_values .= vs
 
-lines caption color vs = liftEC $ do
-    plot_lines_title .= caption
-    plot_lines_style .= LineStyle { _line_width = 1
-        , _line_color  = color
-        , _line_dashes = []
-        , _line_cap    = LineCapButt
-        , _line_join   = LineJoinBevel}
-    plot_lines_values .= vs
-
-fillBetween caption color vs = liftEC $ do
-    plot_fillbetween_title .= caption
-    plot_fillbetween_style .= solidFillStyle color
-    plot_fillbetween_values .= vs
+candles color vs = plot $ liftEC $ do
+    plot_candle_line_style  .= lineStyle 1 color
+    plot_candle_width .= 2
+    plot_candle_values .= [ Candle t l l 0 u u | (t,(l,u)) <- vs]
 
 
 fstVal :: RunResult a -> a
@@ -70,11 +80,18 @@ printResult :: (Show a, Show b) => a -> [String] -> RunResult [b] -> IO ()
 printResult t vars (Val x) = sequence_ $ putStrLn ("System terminated at t=" ++ show t ++ " with following state:") : [putStrLn (var ++ ": " ++ show val) | (var, val) <- zip vars x]
 printResult t vars (Err e) = putStrLn ("System terminated at t=" ++ show t ++ " with error: " ++ e)
 
+lineSegments :: [(a, RunResult (Maybe b))] -> [[(a, b)]]
+lineSegments evol = [[fmap (fromJust . lastVal) l, fmap (fromJust . fstVal) r] | (l, r) <- consec evol, isJust $ lastVal $ snd l, not $ isErr $ snd r]
+
+undPoints :: [(a, RunResult (Maybe b))] -> [(a, b)]
+undPoints evol = [(t, fromJust x) | (t,rr) <- evol, isUnd rr, x <- allVals rr, isJust x]
+
+
 
 toDouble :: (Real a) => a -> Double
 toDouble = fromRational . toRational
 
-plotHybrid :: (RealFrac a, Show a, Real b, Show b) => [String] -> Hybrid a (RunResult [b]) -> IO ()
+plotHybrid :: (RealFrac a, Show a, Real b, Show b) => [String] -> Hybrid a (RunResult [Maybe b]) -> IO ()
 plotHybrid vars h = do
     let tf = maybe (error "Only finite systems support plotting") id (duration h)
     let system = transpose [map (toDouble t,) $ getZipList $ sequenceA $ fmap ZipList $ eval h t | t <- samples tf]
@@ -83,8 +100,8 @@ plotHybrid vars h = do
         setLayout
         sequence_ $ (<$> zip vars system) $ \(var, evol) -> do
             color <- takeColor
-            plot $ lines var color [[fmap (toDouble . lastVal) l, fmap (toDouble . fstVal) r] | (l, r) <- consec evol, not $ isErr $ snd r]
-            plot $ points color [(t, toDouble x) | (t,rr) <- evol, isUnd rr, x <- allVals rr]
+            lines var color $ map (map $ fmap toDouble) $ lineSegments evol
+            points color $ map (fmap toDouble) $ undPoints evol
 
     printResult tf vars (endpoint h)
 
@@ -105,9 +122,10 @@ plotHybridCR vars h n = do
         setLayout
         sequence_ $ (<$> zip vars system) $ \(var, evol) -> do
             color <- takeColor
-            plot $ lines var color [[fmap (approxDouble n . fromJust . lastVal) l, fmap (approxDouble n . fromJust . fstVal) r] | (l, r) <- consec evol, not $ isErr $ snd r, not $ isNothing $ lastVal $ snd l] 
-            --TODO: fillBetween and candles instead of lines
-            --plot $ fillBetween var color $ map (fmap boundDouble) evol
-            --plot $ line var $ [map (fmap (approxDouble . fst)) evol]
+
+            fillBetween var color $ (map $ map $ fmap $ boundDouble n) $ lineSegments evol
+            lines var color $ map (map $ fmap $ approxDouble n) $ lineSegments evol
+            candles color $ map (fmap $ boundDouble n) $ undPoints evol
+            
 
     printResult tf vars (endpoint h)
