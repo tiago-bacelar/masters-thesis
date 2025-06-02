@@ -3,6 +3,7 @@ module Tests where
 import Data.Ratio
 import Data.Map((!))
 
+import CompOrd
 import CompReal
 import Solver.Powers
 import Solver.Interval
@@ -25,9 +26,9 @@ correctionRational r q = map (contains . bound r) [0..]
     where contains (l,u) = l <= q && q <= u
 
 
-ballBounce :: (CompReal r, Powers r, Ord r, Intervalable r, Num (Interval r)) => Rational -> r
-ballBounce t = run (interpret prog) (fromRational t) ! "y"
+ballBounce :: (CompOrd r, CompReal r, Powers r, Show r) => Rational -> r
+ballBounce t = fromVal (query (interpret prog) (16, 100) (fromRational t)) ! "y"
     where prog = Seq (Assign "y" (Num $ AnyFloat 0)) $ Seq (Assign "v" (Num $ AnyFloat 1)) $ loop
-          loop = WhileDo (BConst True) (Seq arc bounce)
-          arc = For [("y", Var $ V "v"), ("v", Num $ AnyFloat -1)] (Op Mult (Num $ AnyFloat 2) (Var $ V "v"))
-          bounce = Assign "v" (Op Mult (Num $ AnyFloat -0.8) (Var $ V "v"))
+          loop = WhileDo (Term $ BConst True) (Seq arc bounce)
+          arc = For [("y", Var $ V "v"), ("v", Num $ AnyFloat $ -1)] (Just $ Op Mult (Num $ AnyFloat 2) (Var $ V "v"))
+          bounce = Assign "v" (Op Mult (Num $ AnyFloat $ -0.8) (Var $ V "v"))

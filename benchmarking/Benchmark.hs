@@ -4,6 +4,7 @@
 
 import Solver.Powers
 import Solver.Interval
+import CompOrd
 import CompReal
 import Tests
 
@@ -24,8 +25,9 @@ run :: (CompReal r) => (() -> r) -> Int -> Benchmarkable
 run r n = nf (uncurry (approx . r)) ((),n)
 
 --a test groups together runs for every implementation and every precision
-test :: String -> [Int] -> (forall r. (CompReal r, Powers r, Ord r, Intervalable r, Num (Interval r)) => r) -> Benchmark
+test :: String -> [Int] -> (forall r. (CompOrd r, CompReal r, Powers r, Show r) => r) -> Benchmark
 test name precisions r = bgroup name [
+        --TODO: include Double as a "control"
         --iRun "CDAR"  (\() -> (r :: CDAR.CR)),       --we do this stupid lambda thing here to prevent sharing
         --iRun "AERN2" (\() -> (r :: AERN2.CReal)),   --in the run function after resolving the polymorphism
         iRun "ERA"   (\() -> (r :: ERA.CReal)),

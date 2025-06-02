@@ -18,14 +18,14 @@ test = do
             Ok ans -> return (interpret ans)
 
 play :: IO (IReal -> RunResult (Map Ident IReal))
-play = fmap (`query` (10, 100)) test
+play = fmap (`query` (20, 300)) test
 
 plot :: IO ()
 plot = do
-    let vars = ["y", "v", "a"]
+    let vars = ["a", "b", "cols"]
     --p <- test :: IO (RunnableProgram Double)
     p <- test :: IO (RunnableProgram IReal)
-    let h = fmap (fmap (\st -> map (`lookup` st) vars)) $ run p (10, 100)
+    let h = fmap (fmap (\st -> map (`lookup` st) vars)) $ run p (20, 300)
     --plotHybrid vars h
     plotHybridCR vars h 4
 

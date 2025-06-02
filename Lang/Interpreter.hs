@@ -30,6 +30,9 @@ instance Traversable RunResult where
     sequenceA (Und xs e) = fmap (flip Und e) (sequenceA xs)
     sequenceA (Err e)    = pure (Err e)
 
+fromVal :: RunResult a -> a
+fromVal (Val x) = x
+
 allVals :: RunResult a -> [a]
 allVals (Val x)    = [x]
 allVals (Und xs _) = xs
@@ -114,14 +117,23 @@ evalComp Lang.LEQ x y = fmap (GT /=) . mCompare x y
 evalComp Lang.GEQ x y = fmap (LT /=) . mCompare x y
 evalComp Lang.EQ  x y = fmap (EQ ==) . mCompare x y
 evalComp Lang.NEQ x y = fmap (EQ /=) . mCompare x y
+evalComp Lang.LLT x y = Just . (x <! y)
+evalComp Lang.LGT x y = Just . (x >! y)
 
-evalB :: (Floating r, Powers r, CompOrd r) => BTerm -> PState r -> E r Bool
-evalB (BConst b) s   = return b
-evalB (Comp c a b) s = do
+evalBTerm :: (Floating r, Powers r, CompOrd r) => BTerm -> PState r -> E r Bool
+evalBTerm (BConst b) s   = return b
+evalBTerm (Comp c a b) s = do
     cmp <- getCmp
     case evalComp c (evalExpr a s) (evalExpr b s) cmp of
         Just b  -> return b
         Nothing -> failE "Comparison precision exhausted"
+
+evalBExpr :: (Floating r, Powers r, CompOrd r) => BExpr -> PState r -> E r Bool
+evalBExpr (Term b)  s = evalBTerm b s
+evalBExpr (Not b)   s = fmap not (evalBExpr b s)
+evalBExpr (And b c) s = liftA2 (&&) (evalBExpr b s) (evalBExpr c s)
+evalBExpr (Or b c)  s = liftA2 (||) (evalBExpr b s) (evalBExpr c s)
+
 
 --TODO: optimization? identify common expressions and turn them into variables (or do it in the parsing step?)
 evalFor :: (Floating r, Powers r) => [(Ident, Expr)] -> PState r -> r -> PState r
@@ -151,8 +163,8 @@ interpret (For [] (Just t)) s  = let d = evalExpr t s in do { validateT d; fromH
 interpret (For [] Nothing) s   = fromHybrid $ endE s
 interpret (For rs (Just t)) s  = let d = evalExpr t s in do { validateT d; fromHybrid $ for (evalFor rs s) d }
 interpret (For rs Nothing) s   = fromHybrid $ forever $ (evalFor rs s)
-interpret (IfThenElse c p q) s = do { b <- evalB c s; if b then interpret p s else interpret q s }
-interpret (WhileDo c p) s      = do { b <- evalB c s; if b then decIter >> interpret (Seq p (WhileDo c p)) s else return s }
+interpret (IfThenElse c p q) s = do { b <- evalBExpr c s; if b then interpret p s else interpret q s }
+interpret (WhileDo c p) s      = do { b <- evalBExpr c s; if b then decIter >> interpret (Seq p (WhileDo c p)) s else return s }
 interpret (Seq p q) s          = E $ do
     h <- runE (interpret p s)
     (cmp,_) <- get

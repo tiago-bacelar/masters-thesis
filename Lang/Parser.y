@@ -1,14 +1,14 @@
 {
-module Lang.Parser (parseJaguar, ParseResult(..), Program(..), BTerm(..), Comparator(..), Expr(..), Operator(..), Function(..), Var(..), AnyFloat(..), Ident) where
+module Lang.Parser (parseJaguar, ParseResult(..), Program(..), Comparator(..), BTerm(..), BExpr(..), Expr(..), Operator(..), Function(..), Var(..), AnyFloat(..), Ident) where
 
 import Prelude hiding (Ordering(..))
 import Data.Char
 import GHC.Real
 
---TODO: make ; after CB optional? (after while loops for example)
---TODO: validate for statements (can't have repeated var)
+--TODO: make ; after CB optional (after while loops for example)
 --TODO: validate var usage (unassigned vars)
---TODO: warnings? (using changing var or time in for statement for time)
+--TODO: return position info along with Program to include in runtime error msgs
+--TODO: warnings? (using changing var or time in for statement for time, since its wrong, but could be misleading)
 }
 
 %name parser
@@ -33,6 +33,9 @@ import GHC.Real
       ','       { TokenComma }
       bconst    { TokenBool $$ }
       comp      { TokenComp $$ }
+      '!'       { TokenNot }
+      '&&'      { TokenAnd }
+      '||'      { TokenOr }
       ':='      { TokenAssign }
       '='       { TokenEquals }
       for       { TokenFor }
@@ -50,6 +53,9 @@ import GHC.Real
 %right ';'
 %nonassoc if then while do
 %left else
+%left '||'
+%left '&&'
+%right '!'
 %nonassoc comp
 %left '+' '-'
 %left '*' '/'
@@ -65,9 +71,9 @@ Program     :: { Program }
     | For forever                           { For (reverse $1) Nothing }
     | wait Expr                             { For [] (Just $2) }
     | wait forever                          { For [] Nothing }
-    | if BTerm then Program else Program    { IfThenElse $2 $4 $6 }
-    | if BTerm then Program                 { IfThenElse $2 $4 Nop }
-    | while BTerm do Program                { WhileDo $2 $4 }
+    | if BExpr then Program else Program    { IfThenElse $2 $4 $6 }
+    | if BExpr then Program                 { IfThenElse $2 $4 Nop }
+    | while BExpr do Program                { WhileDo $2 $4 }
     | Program ';' Program                   { Seq $1 $3 }
     | Program ';'                           { $1 }
     | '{' Program '}'                       { $2 }
@@ -75,11 +81,18 @@ Program     :: { Program }
 
 For         :: { [(Ident, Expr)] }
     : DifEq                 { [$1] }
-    | For ',' DifEq         { $3 : $1 }
+    | For ',' DifEq         {% if elem (fst $3) (map fst $1) then failP ("Multiple equations for variable " ++ show (fst $3)) else returnP ($3:$1) }
 
 DifEq       :: { (Ident, Expr) }
     : var '\'' '=' Expr     {% case $1 of {T -> failP "Can't alter evolution rate of time"; V v -> returnP (v, $4)}}
 
+
+BExpr       :: { BExpr }
+    : BTerm             { Term $1 }
+    | '!' BExpr         { Not $2 }
+    | BExpr '&&' BExpr  { And $1 $3 }
+    | BExpr '||' BExpr  { Or $1 $3 }
+    | '(' BExpr ')'     { $2 }
 
 BTerm       :: { BTerm }
     : bconst                { BConst $1 }
@@ -117,14 +130,14 @@ data Expr = Var Var
             | Op Operator Expr Expr
         deriving (Show)
 
-data Comparator = LT | GT | LEQ | GEQ | EQ | NEQ deriving (Show)
+data Comparator = LT | GT | LLT | LGT | LEQ | GEQ | EQ | NEQ deriving (Show)
 data BTerm = BConst Bool | Comp Comparator Expr Expr deriving (Show)
---TODO: BExpr (and, or, not)
+data BExpr = Term BTerm | Not BExpr | And BExpr BExpr | Or BExpr BExpr deriving (Show)
 
 data Program = Assign Ident Expr
                 | For [(Ident, Expr)] (Maybe Expr)
-                | IfThenElse BTerm Program Program
-                | WhileDo BTerm Program
+                | IfThenElse BExpr Program Program
+                | WhileDo BExpr Program
                 | Seq Program Program
                 | Nop
             deriving (Show)
@@ -142,6 +155,9 @@ data Token = TokenVar Var
             | TokenComma
             | TokenBool Bool
             | TokenComp Comparator
+            | TokenNot
+            | TokenAnd
+            | TokenOr
             | TokenAssign
             | TokenEquals
             | TokenFor
@@ -194,8 +210,13 @@ lexer cont s =
         '>':'=':cs  -> cont (TokenComp GEQ) cs . moveColumn 2
         '=':'=':cs  -> cont (TokenComp EQ) cs . moveColumn 2
         '!':'=':cs  -> cont (TokenComp NEQ) cs . moveColumn 2
+        '<':'!':cs  -> cont (TokenComp LLT) cs . moveColumn 2
+        '>':'!':cs  -> cont (TokenComp LGT) cs . moveColumn 2
         '<':cs      -> cont (TokenComp LT) cs . moveColumn 1
         '>':cs      -> cont (TokenComp GT) cs . moveColumn 1
+        '!':cs      -> cont (TokenNot) cs . moveColumn 1
+        '&':'&':cs  -> cont (TokenAnd) cs . moveColumn 2
+        '|':'|':cs  -> cont (TokenOr) cs . moveColumn 2
         '=':cs      -> cont TokenEquals cs . moveColumn 1
         ':':'=':cs  -> cont TokenAssign cs . moveColumn 2
         ';':cs      -> cont TokenSep cs . moveColumn 1

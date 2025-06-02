@@ -1,5 +1,6 @@
-#binaries
+#generated
 bin/
+Lang/Parser.hs
 
 #executables
 bench
