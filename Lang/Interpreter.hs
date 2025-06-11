@@ -79,7 +79,7 @@ type RunnableProgram r = PState r -> E r (PState r)
 initial :: (Num r) => PState r
 initial = (0, empty)
 
---Redefined wait and end to update time and return the right type TODO
+--Redefined wait and end to update time and return the right type
 waitE :: (Num r) => r -> HProgram r (PState r)
 waitE d (ti, vars) = for (\t -> (ti + t, vars)) d
 
@@ -95,20 +95,22 @@ evalFunc Sin = sin
 evalFunc Cos = cos
 evalFunc Tan = tan
 
-evalOp :: (Floating r, Powers r) => Operator -> r -> r -> r
+evalOp :: (Floating r) => Operator -> r -> r -> r
 evalOp Add  = (+)
 evalOp Sub  = (-)
 evalOp Mult = (*)
 evalOp Div  = (/)
-evalOp Pow  = (**) --TODO: pow with Powers class
+evalOp Pow  = (**)
 evalOp Log  = logBase
 
 evalExpr :: (Floating r, Powers r) => Expr -> PState r -> r
-evalExpr (Var T) s     = fst s
-evalExpr (Var (V v)) s = snd s ! v
-evalExpr (Num x) s     = anyFloat x
-evalExpr (Func f a) s  = evalFunc f (evalExpr a s)
-evalExpr (Op op a b) s = evalOp op (evalExpr a s) (evalExpr b s)
+evalExpr (Var T) s      = fst s
+evalExpr (Var (V v)) s  = snd s ! v
+evalExpr (Num x) s      = anyFloat x
+evalExpr (Func f a) s   = evalFunc f (evalExpr a s)
+evalExpr (Op op a b) s  = evalOp op (evalExpr a s) (evalExpr b s)
+evalExpr (NatPow a n) s | n > toInteger (maxBound :: Int) = error $ "Integer overflow: " ++ show n ++ " isn't a valid exponent"
+                        | otherwise = pow (evalExpr a s) (fromInteger n)
 
 evalComp :: (CompOrd r) => Lang.Comparator -> r -> r -> Int -> Maybe Bool
 evalComp Lang.LT  x y = fmap (LT ==) . mCompare x y
@@ -159,9 +161,9 @@ validateT d = do
 interpret :: (Floating r, Powers r, CompOrd r, Show r) => Program -> RunnableProgram r
 interpret Nop s                = return s
 interpret (Assign v e) s       = return (fst s, insert v (evalExpr e s) $ snd s)
-interpret (For [] (Just t)) s  = let d = evalExpr t s in do { validateT d; fromHybrid $ waitE d s }
+interpret (For [] (Just t)) s  = let d = evalExpr t s in validateT d >> fromHybrid (waitE d s)
 interpret (For [] Nothing) s   = fromHybrid $ endE s
-interpret (For rs (Just t)) s  = let d = evalExpr t s in do { validateT d; fromHybrid $ for (evalFor rs s) d }
+interpret (For rs (Just t)) s  = let d = evalExpr t s in validateT d >> fromHybrid (for (evalFor rs s) d)
 interpret (For rs Nothing) s   = fromHybrid $ forever $ (evalFor rs s)
 interpret (IfThenElse c p q) s = do { b <- evalBExpr c s; if b then interpret p s else interpret q s }
 interpret (WhileDo c p) s      = do { b <- evalBExpr c s; if b then decIter >> interpret (Seq p (WhileDo c p)) s else return s }

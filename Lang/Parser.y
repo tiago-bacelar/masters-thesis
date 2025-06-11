@@ -19,6 +19,7 @@ import GHC.Real
 
 %token
       var       { TokenVar $$ }
+      int       { TokenInt $$ }
       num       { TokenNum $$ }
       func      { TokenFunc $$ }
       '+'       { TokenOp Add }
@@ -62,6 +63,7 @@ import GHC.Real
 %left NEG
 %left log
 %right '^'
+%right NP
 %nonassoc func
 %%
 
@@ -101,6 +103,7 @@ BTerm       :: { BTerm }
 
 Expr :: { Expr }
     : var                   { Var $1 }
+    | int                   { Num (AnyFloat (fromInteger $1)) }
     | num                   { Num $1 }
     | func Expr             { Func $1 $2 }
     | Expr '+' Expr         { Op Add $1 $3 }
@@ -108,10 +111,10 @@ Expr :: { Expr }
     | Expr '*' Expr         { Op Mult $1 $3 }
     | Expr '/' Expr         { Op Div $1 $3 }
     | Expr '^' Expr         { Op Pow $1 $3 }
+    | Expr '^' int %prec NP { NatPow $1 $3 }
     | Expr log Expr         { Op Log $1 $3 }
     | '-' Expr %prec NEG    { Func Neg $2 }
     | '(' Expr ')'          { $2 }
-
 
 {
 type Ident = String
@@ -128,6 +131,7 @@ data Expr = Var Var
             | Num AnyFloat
             | Func Function Expr
             | Op Operator Expr Expr
+            | NatPow Expr Integer
         deriving (Show)
 
 data Comparator = LT | GT | LLT | LGT | LEQ | GEQ | EQ | NEQ deriving (Show)
@@ -145,6 +149,7 @@ data Program = Assign Ident Expr
 
 
 data Token = TokenVar Var
+            | TokenInt Integer
             | TokenNum AnyFloat
             | TokenDot
             | TokenFunc Function
@@ -224,24 +229,24 @@ lexer cont s =
         '}':cs      -> cont TokenCB cs . moveColumn 1
         '#':cs      -> let (comment, rest) = span (/= '\n') cs in lexer cont rest . moveColumn (length comment + 1)
         c:cs | isSpace c -> lexer cont cs . moveColumn 1
-             | isDigit c -> let (x, rest, n) = lexFloat s in cont (TokenNum x) rest . moveColumn n
+             | isDigit c -> let (x, rest, n) = lexFloat s in cont x rest . moveColumn n
              | isAlpha c -> let (word, rest) = span isAlpha s in cont (lexAlpha word) rest . moveColumn (length word)
              | otherwise -> \(line, col) -> Failed ("Unknown symbol " ++ show c ++ " at line " ++ show line ++ " column " ++ show col)
 
-lexFloat :: String -> (AnyFloat, String, Int)
+lexFloat :: String -> (Token, String, Int)
 lexFloat s =
     case s1 of
-        ('e':s2) -> let (e, s3, n3) = readDigits s2 in (AnyFloat $ fromInteger $ i * 10 ^ e, s3, n1 + n3 + 1)
-        ('.':s2) -> let (r, s3, n3) = readFrac s2 in
+        ('e':s2) -> let (e, s3, n3) = readDigits s2 in (TokenInt $ i * 10 ^ e, s3, n1 + n3 + 1)
+        ('.':s2) -> let (nr, s3, n3) = readDigits s2; r = nr % (10 ^ n3) in
             case s3 of
-                ('e':s4) -> let (e, s5, n5) = readDigits s4 in (AnyFloat $ (fromInteger i + fromRational r) * fromInteger (10 ^ e), s5, n1 + n3 + n5 + 2)
-                _        -> (AnyFloat $ fromInteger i + fromRational r, s3, n1 + n3 + 1)
-        _       -> (AnyFloat $ fromInteger i, s1, n1)
+                ('e':s4) -> let (e, s5, n5) = readDigits s4
+                            in if e >= n3
+                               then (TokenInt $ (i * 10 ^ n3 + nr) * 10 ^ (e - n3), s5, n1 + n3 + n5 + 2)
+                               else (TokenNum $ AnyFloat $ (fromInteger i + fromRational r) * fromInteger (10 ^ e), s5, n1 + n3 + n5 + 2)
+                _        -> (TokenNum $ AnyFloat $ fromInteger i + fromRational r, s3, n1 + n3 + 1)
+        _       -> (TokenInt i, s1, n1)
     where (i, s1, n1) = readDigits s
           readDigits s = let (di, s') = span isDigit s in (read di, s', length di)
-          readFrac s = (read dr % (10 ^ n), s', n)
-                where (dr, s') = span isDigit s
-                      n = length dr
 
 lexAlpha :: String -> Token
 lexAlpha "e"        = TokenNum $ AnyFloat $ exp 1

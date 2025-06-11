@@ -47,6 +47,9 @@ mEndpoint (Hybrid (_, m)) = fmap snd m
 takeH :: (Num t) => t -> Hybrid t a -> Hybrid t a
 takeH t h = for (eval h) t --TODO: t > duration h
 
+dropH :: (Num t) => t -> Hybrid t a -> Hybrid t a
+dropH t (Hybrid (f, m)) = Hybrid (f . (t+), fmap (\(d,e) -> (d-t,e)) m) --TODO: t > duration h
+
 join :: (Num t, Ord t) => Hybrid t a -> Hybrid t a -> Hybrid t a
 join x y = Hybrid (maybe (eval x) h (duration x), liftM2 joinDur (dur x) (dur y))
     where dur (Hybrid (_, m)) = m
