@@ -14,6 +14,7 @@ import Control.Applicative (ZipList(..))
 import Data.Ratio ((%))
 import Data.List (transpose)
 import Data.Maybe (isJust, fromJust)
+import GHC.Data.Maybe (orElse)
 
 
 sampleNo :: Integer
@@ -50,6 +51,8 @@ points color vs = plot $ liftEC $ do
     plot_points_style .= hollowCircles 3 1 color
     plot_points_values .= vs
 
+--should have a min height, but sadly that's not possible. That makes
+--them useless for high precisions, as they become just horizontal lines
 candles color vs = plot $ liftEC $ do
     plot_candle_line_style  .= lineStyle 1 color
     plot_candle_width .= 2
@@ -77,8 +80,10 @@ isErr (Err _) = True
 isErr _       = False
 
 printResult :: (Show a, Show b) => a -> [String] -> RunResult [b] -> IO ()
-printResult t vars (Val x) = sequence_ $ putStrLn ("System terminated at t=" ++ show t ++ " with following state:") : [putStrLn (var ++ ": " ++ show val) | (var, val) <- zip vars x]
-printResult t vars (Err e) = putStrLn ("System terminated at t=" ++ show t ++ " with error: " ++ e)
+printResult t vars (Val x) = do
+    putStrLn $ "System terminated at t=" ++ show t ++ " with following state:"
+    sequence_ [putStrLn (var ++ ": " ++ show val) | (var, val) <- zip vars x]
+printResult t vars (Err e) = putStrLn $ "System terminated at t=" ++ show t ++ " with error: " ++ show e
 
 lineSegments :: [(a, RunResult (Maybe b))] -> [[(a, b)]]
 lineSegments evol = [[fmap (fromJust . lastVal) l, fmap (fromJust . fstVal) r] | (l, r) <- consec evol, isJust $ lastVal $ snd l, not $ isErr $ snd r]
@@ -91,9 +96,9 @@ undPoints evol = [(t, fromJust x) | (t,rr) <- evol, isUnd rr, x <- allVals rr, i
 toDouble :: (Real a) => a -> Double
 toDouble = fromRational . toRational
 
-plotHybrid :: (RealFrac a, Show a, Real b, Show b) => [String] -> Hybrid a (RunResult [Maybe b]) -> IO ()
-plotHybrid vars h = do
-    let tf = maybe (error "Only finite systems support plotting") id (duration h)
+plotHybrid :: (RealFrac a, Show a, Real b, Show b) => [String] -> Hybrid a (RunResult [Maybe b]) -> [(a, [Maybe b], [Maybe b])] -> IO ()
+plotHybrid vars h discs = do
+    let tf = duration h `orElse` error "Only finite systems support plotting"
     let system = transpose [map (toDouble t,) $ getZipList $ sequenceA $ fmap ZipList $ eval h t | t <- samples tf]
     
     toFile def "output.png" $ do
@@ -112,9 +117,9 @@ approxDouble n r = fromRational $ approx r n
 boundDouble :: (CompReal r) => Int -> r -> (Double, Double)
 boundDouble n r = let (l, u) = bound r n in (fromRational l, fromRational u)
 
-plotHybridCR :: (CompReal a, Show a, CompReal b, Show b) => [String] -> Hybrid a (RunResult [Maybe b]) -> Int -> IO ()
-plotHybridCR vars h n = do
-    let tf = maybe (error "Only finite systems support plotting") id (duration h)
+plotHybridCR :: (CompReal a, Show a, CompReal b, Show b) => [String] -> Hybrid a (RunResult [Maybe b]) -> [(a, [Maybe b], [Maybe b])] -> Int -> IO ()
+plotHybridCR vars h discs n = do
+    let tf = duration h `orElse` error "Only finite systems support plotting"
     let system = transpose [map (approxDouble n t,) $ getZipList $ sequenceA $ fmap ZipList $ eval h t | t <- samples tf]
     --TODO: time bound?
 
@@ -125,7 +130,8 @@ plotHybridCR vars h n = do
 
             fillBetween var color $ (map $ map $ fmap $ boundDouble n) $ lineSegments evol
             lines var color $ map (map $ fmap $ approxDouble n) $ lineSegments evol
-            candles color $ map (fmap $ boundDouble n) $ undPoints evol
+            points color $ map (fmap $ approxDouble n) $ undPoints evol
+            --candles color $ map (fmap $ boundDouble n) $ undPoints evol
             
 
     printResult tf vars (endpoint h)

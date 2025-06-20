@@ -12,15 +12,18 @@ import qualified Lang.Parser as Lang
 
 import Control.Applicative (liftA2)
 import Control.Monad (ap)
-import Control.Monad.State.Lazy (evalState, get, put)
-import qualified Control.Monad.State.Lazy as MS (State)
-import Data.Ratio
+import Control.Monad.State.Lazy as MS (State, runState, evalState, get, put)
+import Data.Ratio ((%))
 import Data.Map as Map (Map, (!), empty, insert)
 import qualified Data.Map as Map (map)
 
---the comparisons problem should be studied closer later on (probably need two kinds of comparison operators: strict
---comparison, which guarantees correctness but throws PLE, and lax comparators that return false if precision is exhausted)
---the Und should also be a function to allow the user to increase the precision of a specific point independently
+
+fstOf4 :: (a, b, c, d) -> a
+fstOf4 (x,_,_,_) = x
+
+
+--TODO: make Und a function of desired precision
+--TODO: add line and expression of errors
 
 type Error = String
 data RunResult a = Val a | Und [a] (Maybe Error) | Err Error deriving (Show, Functor, Foldable)
@@ -43,14 +46,20 @@ maybeError (Und _ e) = e
 maybeError (Err e)   = Just e
 maybeError _         = Nothing
 
-
-type EState = (Int, Int) --comparison precision, loop iterations
-newtype E r a = E { runE :: MS.State EState (Hybrid r (RunResult a)) } deriving (Functor)
+--EState: (comparison precision, loop iterations, current discontinuity, discontinuities list)
+--the discontinuities use the ShowS trick for efficiency
+type DifList a = [a] -> [a]
+type EState r = (Int, Int, Maybe (PState r, PState r), DifList (PState r, PState r))
+newtype E r a = E { runE :: MS.State (EState r) (Hybrid r (RunResult a)) } deriving (Functor)
 
 instance (Num r) => Applicative (E r) where
     pure = E . return . instant . Val
     (<*>) = ap
 
+--This is a dirty instance of Monad, used only for the benefit of the do notation.
+--A true instance needs a Comp r restriction to join the Hybrids, which we can't provide
+--Instead, this instance only looks at the endpoint of the hybrid x, which is fine as long
+--as the hybrid x is instantaneous (has duration 0)
 instance (Num r) => Monad (E r) where
     x >>= f = E $ do { v <- runE x; runE (liftF $ mEndpoint v) }
         where liftF (Just (Val x))   = f x
@@ -58,18 +67,35 @@ instance (Num r) => Monad (E r) where
               liftF (Just (Und _ _)) = error "wtf"
               liftF Nothing          = error "wtf"
 
-failE :: (Num r) => String -> E r a
+failE :: (Num r) => Error -> E r a
 failE = E . return . instant . Err
 
 getCmp :: (Num r) => E r Int
-getCmp = E $ fmap (instant . Val . fst) get
+getCmp = E $ fmap (instant . Val . fstOf4) get
 
 decIter :: (Num r) => E r ()
 decIter = E $ do
-    (cmp, n) <- get
+    (cmp, n, mDisc, discs) <- get
     if n <= 0
     then return $ instant $ Err "Iteration limit exceeded"
-    else do { put (cmp, n-1); return $ instant $ Val () }
+    else do 
+        put (cmp, n-1, mDisc, discs)
+        return $ instant $ Val ()
+
+addDisc :: (Num r) => PState r -> PState r -> E r ()
+addDisc s s' = E $ do
+    (cmp, n, mDisc, discs) <- get
+    put (cmp, n, Just $ maybe (s, s') (\(os, _) -> (os, s')) mDisc, discs)
+    return $ instant $ Val ()
+
+skipDisc :: (Num r) => PState r -> E r ()
+skipDisc s = E $ do
+    (cmp, n, mDisc, discs) <- get
+    case mDisc of
+        Nothing -> return $ instant $ Val ()
+        Just disc -> do
+                        put (cmp, n, Nothing, discs . (disc:))
+                        return $ instant $ Val ()
 
 
 --TODO: change state to list/vector
@@ -109,8 +135,7 @@ evalExpr (Var (V v)) s  = snd s ! v
 evalExpr (Num x) s      = anyFloat x
 evalExpr (Func f a) s   = evalFunc f (evalExpr a s)
 evalExpr (Op op a b) s  = evalOp op (evalExpr a s) (evalExpr b s)
-evalExpr (NatPow a n) s | n > toInteger (maxBound :: Int) = error $ "Integer overflow: " ++ show n ++ " isn't a valid exponent"
-                        | otherwise = pow (evalExpr a s) (fromInteger n)
+evalExpr (NatPow a n) s = pow (evalExpr a s) n
 
 evalComp :: (CompOrd r) => Lang.Comparator -> r -> r -> Int -> Maybe Bool
 evalComp Lang.LT  x y = fmap (LT ==) . mCompare x y
@@ -160,16 +185,16 @@ validateT d = do
 
 interpret :: (Floating r, Powers r, CompOrd r, Show r) => Program -> RunnableProgram r
 interpret Nop s                = return s
-interpret (Assign v e) s       = return (fst s, insert v (evalExpr e s) $ snd s)
-interpret (For [] (Just t)) s  = let d = evalExpr t s in validateT d >> fromHybrid (waitE d s)
-interpret (For [] Nothing) s   = fromHybrid $ endE s
-interpret (For rs (Just t)) s  = let d = evalExpr t s in validateT d >> fromHybrid (for (evalFor rs s) d)
-interpret (For rs Nothing) s   = fromHybrid $ forever $ (evalFor rs s)
+interpret (Assign v e) s       = let s' = (fst s, insert v (evalExpr e s) $ snd s) in addDisc s s' >> return s'
+interpret (For [] (Just t)) s  = let d = evalExpr t s in validateT d >> skipDisc s >> fromHybrid (waitE d s)
+interpret (For [] Nothing) s   = skipDisc s >> fromHybrid (endE s)
+interpret (For rs (Just t)) s  = let d = evalExpr t s in validateT d >> skipDisc s >> fromHybrid (for (evalFor rs s) d)
+interpret (For rs Nothing) s   = skipDisc s >> fromHybrid (forever $ evalFor rs s)
 interpret (IfThenElse c p q) s = do { b <- evalBExpr c s; if b then interpret p s else interpret q s }
 interpret (WhileDo c p) s      = do { b <- evalBExpr c s; if b then decIter >> interpret (Seq p (WhileDo c p)) s else return s }
 interpret (Seq p q) s          = E $ do
     h <- runE (interpret p s)
-    (cmp,_) <- get
+    (cmp,_,_,_) <- get
     case mEndpoint h of
         Just (Val s2)  -> runE (interpret q s2) >>= return . fmap (either id (\(x,y) -> Und (allVals x ++ allVals y) (maybeError y)) . ($ cmp)) . joinComp h
         Just (Err e)   -> return h
@@ -177,8 +202,10 @@ interpret (Seq p q) s          = E $ do
         Nothing        -> return h
 
 
-run :: (Num r) => RunnableProgram r -> EState -> Hybrid r (RunResult (Map Ident r))
-run p = fmap (fmap snd) . evalState (runE (p initial))
+run :: (Num r) => RunnableProgram r -> Int -> Int -> (Hybrid r (RunResult (Map Ident r)), [(r, Map Ident r, Map Ident r)])
+run p comp iters = (fmap (fmap snd) h, map (\((t,s),(_,s')) -> (t,s,s')) discs)
+    where (h, (_,_,mD,ds)) = runState (runE (p initial)) (comp, iters, Nothing, id)
+          discs = (ds . maybe id (\d -> (d:)) mD) []
 
-query :: (Num r) => RunnableProgram r -> EState -> r -> RunResult (Map Ident r)
-query p es = eval (run p es)
+query :: (Num r) => RunnableProgram r -> Int -> Int -> r -> RunResult (Map Ident r)
+query p comp iters = eval $ fst $ run p comp iters

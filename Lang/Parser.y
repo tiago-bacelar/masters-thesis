@@ -111,7 +111,7 @@ Expr :: { Expr }
     | Expr '*' Expr         { Op Mult $1 $3 }
     | Expr '/' Expr         { Op Div $1 $3 }
     | Expr '^' Expr         { Op Pow $1 $3 }
-    | Expr '^' int %prec NP { NatPow $1 $3 }
+    | Expr '^' int %prec NP {% if $3 > toInteger (maxBound :: Int) then failP ("Integer overflow: " ++ show $3 ++ " isn't a valid exponent") else returnP $ NatPow $1 (fromInteger $3) }
     | Expr log Expr         { Op Log $1 $3 }
     | '-' Expr %prec NEG    { Func Neg $2 }
     | '(' Expr ')'          { $2 }
@@ -131,7 +131,7 @@ data Expr = Var Var
             | Num AnyFloat
             | Func Function Expr
             | Op Operator Expr Expr
-            | NatPow Expr Integer
+            | NatPow Expr Int
         deriving (Show)
 
 data Comparator = LT | GT | LLT | LGT | LEQ | GEQ | EQ | NEQ deriving (Show)

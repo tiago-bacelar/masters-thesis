@@ -17,7 +17,5 @@ class CompOrd a where
     x <! y = maybe False (LT ==) . mCompare x y
     x >! y = maybe False (GT ==) . mCompare x y
 
-    {-# MINIMAL mCompare #-}
-
 instance CompOrd Double
 instance CompOrd Integer
