@@ -18,12 +18,8 @@ import Data.Map as Map (Map, (!), empty, insert)
 import qualified Data.Map as Map (map)
 
 
-fstOf4 :: (a, b, c, d) -> a
-fstOf4 (x,_,_,_) = x
-
-
 --TODO: make Und a function of desired precision
---TODO: add line and expression of errors
+--TODO: add line and source code of errors
 
 type Error = String
 data RunResult a = Val a | Und [a] (Maybe Error) | Err Error deriving (Show, Functor, Foldable)
@@ -46,10 +42,9 @@ maybeError (Und _ e) = e
 maybeError (Err e)   = Just e
 maybeError _         = Nothing
 
---EState: (comparison precision, loop iterations, current discontinuity, discontinuities list)
---the discontinuities use the ShowS trick for efficiency
+--the discontinuities use the ShowS trick (difference lists) for efficiency
 type DifList a = [a] -> [a]
-type EState r = (Int, Int, Maybe (PState r, PState r), DifList (PState r, PState r))
+data EState r = EState { cmp :: Int, iters :: Int, curDisc :: Maybe (PState r, PState r), discs :: DifList (PState r, PState r)}
 newtype E r a = E { runE :: MS.State (EState r) (Hybrid r (RunResult a)) } deriving (Functor)
 
 instance (Num r) => Applicative (E r) where
@@ -71,30 +66,30 @@ failE :: (Num r) => Error -> E r a
 failE = E . return . instant . Err
 
 getCmp :: (Num r) => E r Int
-getCmp = E $ fmap (instant . Val . fstOf4) get
+getCmp = E $ fmap (instant . Val . cmp) get
 
 decIter :: (Num r) => E r ()
 decIter = E $ do
-    (cmp, n, mDisc, discs) <- get
-    if n <= 0
+    EState cmpPrec nIters mDisc discList <- get
+    if nIters <= 0
     then return $ instant $ Err "Iteration limit exceeded"
     else do 
-        put (cmp, n-1, mDisc, discs)
+        put $ EState cmpPrec (nIters-1) mDisc discList
         return $ instant $ Val ()
 
 addDisc :: (Num r) => PState r -> PState r -> E r ()
 addDisc s s' = E $ do
-    (cmp, n, mDisc, discs) <- get
-    put (cmp, n, Just $ maybe (s, s') (\(os, _) -> (os, s')) mDisc, discs)
+    EState cmpPrec nIters mDisc discList <- get
+    put $ EState cmpPrec nIters (Just $ maybe (s, s') (\(os, _) -> (os, s')) mDisc) discList
     return $ instant $ Val ()
 
 skipDisc :: (Num r) => PState r -> E r ()
 skipDisc s = E $ do
-    (cmp, n, mDisc, discs) <- get
+    EState cmpPrec nIters mDisc discList <- get
     case mDisc of
         Nothing -> return $ instant $ Val ()
         Just disc -> do
-                        put (cmp, n, Nothing, discs . (disc:))
+                        put $ EState cmpPrec nIters Nothing (discList . (disc:))
                         return $ instant $ Val ()
 
 
@@ -150,8 +145,8 @@ evalComp Lang.LGT x y = Just . (x >! y)
 evalBTerm :: (Floating r, Powers r, CompOrd r) => BTerm -> PState r -> E r Bool
 evalBTerm (BConst b) s   = return b
 evalBTerm (Comp c a b) s = do
-    cmp <- getCmp
-    case evalComp c (evalExpr a s) (evalExpr b s) cmp of
+    cmpPrec <- getCmp
+    case evalComp c (evalExpr a s) (evalExpr b s) cmpPrec of
         Just b  -> return b
         Nothing -> failE "Comparison precision exhausted"
 
@@ -178,9 +173,9 @@ fromHybrid = E . return . fmap Val
 
 validateT :: (Num r, CompOrd r, Show r) => r -> E r ()
 validateT d = do
-    cmp <- getCmp
-    if (d >! 0) cmp --TODO: instead of strict comparison we could use a lax comparison, that only
-    then return ()  --fails if the time step is verifiably negative (preferrable for small time steps)
+    cmpPrec <- getCmp
+    if (d >! 0) cmpPrec --TODO: instead of strict comparison we could use a lax comparison, that only
+    then return ()      --fails if the time step is verifiably negative (preferrable for small time steps)
     else failE ("Time step is not verifiably positive (comparison precision exhausted): " ++ show d)
 
 interpret :: (Floating r, Powers r, CompOrd r, Show r) => Program -> RunnableProgram r
@@ -194,18 +189,19 @@ interpret (IfThenElse c p q) s = do { b <- evalBExpr c s; if b then interpret p 
 interpret (WhileDo c p) s      = do { b <- evalBExpr c s; if b then decIter >> interpret (Seq p (WhileDo c p)) s else return s }
 interpret (Seq p q) s          = E $ do
     h <- runE (interpret p s)
-    (cmp,_,_,_) <- get
+    eState <- get
+    let cmpPrec = cmp eState
     case mEndpoint h of
-        Just (Val s2)  -> runE (interpret q s2) >>= return . fmap (either id (\(x,y) -> Und (allVals x ++ allVals y) (maybeError y)) . ($ cmp)) . joinComp h
+        Just (Val s2)  -> runE (interpret q s2) >>= return . fmap (either id (\(x,y) -> Und (allVals x ++ allVals y) (maybeError y)) . ($ cmpPrec)) . joinComp h
         Just (Err e)   -> return h
-        Just (Und _ _) -> error "an endpoint should never be undecided"
+        Just (Und _ _) -> error "wtf"
         Nothing        -> return h
 
 
 run :: (Num r) => RunnableProgram r -> Int -> Int -> (Hybrid r (RunResult (Map Ident r)), [(r, Map Ident r, Map Ident r)])
-run p comp iters = (fmap (fmap snd) h, map (\((t,s),(_,s')) -> (t,s,s')) discs)
-    where (h, (_,_,mD,ds)) = runState (runE (p initial)) (comp, iters, Nothing, id)
-          discs = (ds . maybe id (\d -> (d:)) mD) []
+run p cmpPrec nIters = (fmap (fmap snd) h, map (\((t,s),(_,s')) -> (t,s,s')) discList)
+    where (h, eState) = runState (runE (p initial)) (EState cmpPrec nIters Nothing id)
+          discList = (discs eState . maybe id (\d -> (d:)) (curDisc eState)) []
 
 query :: (Num r) => RunnableProgram r -> Int -> Int -> r -> RunResult (Map Ident r)
-query p comp iters = eval $ fst $ run p comp iters
+query p cmpPrec nIters = eval $ fst $ run p cmpPrec nIters
