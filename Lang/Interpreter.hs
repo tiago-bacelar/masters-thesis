@@ -43,6 +43,7 @@ maybeError (Err e)   = Just e
 maybeError _         = Nothing
 
 --the discontinuities use the ShowS trick (difference lists) for efficiency
+--TODO: allow infinite comp precision and infinite iterations
 type DifList a = [a] -> [a]
 data EState r = EState { cmp :: Int, iters :: Int, curDisc :: Maybe (PState r, PState r), discs :: DifList (PState r, PState r)}
 newtype E r a = E { runE :: MS.State (EState r) (Hybrid r (RunResult a)) } deriving (Functor)
@@ -83,8 +84,8 @@ addDisc s s' = E $ do
     put $ EState cmpPrec nIters (Just $ maybe (s, s') (\(os, _) -> (os, s')) mDisc) discList
     return $ instant $ Val ()
 
-skipDisc :: (Num r) => PState r -> E r ()
-skipDisc s = E $ do
+skipDisc :: (Num r) => E r ()
+skipDisc = E $ do
     EState cmpPrec nIters mDisc discList <- get
     case mDisc of
         Nothing -> return $ instant $ Val ()
@@ -94,18 +95,18 @@ skipDisc s = E $ do
 
 
 --TODO: change state to list/vector
-type PState r = (r, Map Ident r)
+data PState r = PState {time :: r, variables :: Map Ident r, step :: Int}
 type RunnableProgram r = PState r -> E r (PState r)
 
 initial :: (Num r) => PState r
-initial = (0, empty)
+initial = PState 0 empty 0
 
 --Redefined wait and end to update time and return the right type
 waitE :: (Num r) => r -> HProgram r (PState r)
-waitE d (ti, vars) = for (\t -> (ti + t, vars)) d
+waitE d (PState ti vars i) = for (\t -> PState (ti + t) vars i) d
 
 endE :: (Num r) => HProgram r (PState r)
-endE (ti, vars) = forever (\t -> (ti + t, vars))
+endE (PState ti vars i) = forever (\t -> PState (ti + t) vars i)
 
 
 evalFunc :: (Floating r) => Function -> r -> r
@@ -125,24 +126,23 @@ evalOp Pow  = (**)
 evalOp Log  = logBase
 
 evalExpr :: (Floating r, Powers r) => Expr -> PState r -> r
-evalExpr (Var T) s      = fst s
-evalExpr (Var (V v)) s  = snd s ! v
+evalExpr (Var T) s      = time s
+evalExpr (Var (V v)) s  = variables s ! v
 evalExpr (Num x) s      = anyFloat x
 evalExpr (Func f a) s   = evalFunc f (evalExpr a s)
 evalExpr (Op op a b) s  = evalOp op (evalExpr a s) (evalExpr b s)
 evalExpr (NatPow a n) s = pow (evalExpr a s) n
 
+--TODO: improve CompOrd
 evalComp :: (CompOrd r) => Lang.Comparator -> r -> r -> Int -> Maybe Bool
 evalComp Lang.LT  x y = fmap (LT ==) . mCompare x y
 evalComp Lang.GT  x y = fmap (GT ==) . mCompare x y
 evalComp Lang.LEQ x y = fmap (GT /=) . mCompare x y
 evalComp Lang.GEQ x y = fmap (LT /=) . mCompare x y
-evalComp Lang.EQ  x y = fmap (EQ ==) . mCompare x y
-evalComp Lang.NEQ x y = fmap (EQ /=) . mCompare x y
 evalComp Lang.LLT x y = Just . (x <! y)
 evalComp Lang.LGT x y = Just . (x >! y)
 
-evalBTerm :: (Floating r, Powers r, CompOrd r) => BTerm -> PState r -> E r Bool
+evalBTerm :: (Floating r, Powers r, CompOrd r) => BTerm -> PState r -> Maybe Bool
 evalBTerm (BConst b) s   = return b
 evalBTerm (Comp c a b) s = do
     cmpPrec <- getCmp
@@ -150,6 +150,7 @@ evalBTerm (Comp c a b) s = do
         Just b  -> return b
         Nothing -> failE "Comparison precision exhausted"
 
+--TODO: Maybe Bool
 evalBExpr :: (Floating r, Powers r, CompOrd r) => BExpr -> PState r -> E r Bool
 evalBExpr (Term b)  s = evalBTerm b s
 evalBExpr (Not b)   s = fmap not (evalBExpr b s)
@@ -159,32 +160,35 @@ evalBExpr (Or b c)  s = liftA2 (||) (evalBExpr b s) (evalBExpr c s)
 
 --TODO: optimization? identify common expressions and turn them into variables (or do it in the parsing step?)
 evalFor :: (Floating r, Powers r) => [(Ident, Expr)] -> PState r -> r -> PState r
-evalFor rs (t0, vars) = aux
+evalFor rs (PState t0 vars i) = aux
     where x0 = map ((vars!) . fst) rs
           consts = Map.map con vars
           f t x = map ((`evalExpr` s') . snd) rs
-            where s' = (t, foldr (uncurry insert) consts $ zip (map fst rs) x)
-          aux dt = (t, foldr (uncurry insert) vars $ zip (map fst rs) $ solve f t0 x0 t)
-            where t = t0+dt
+            where s' = PState t (foldr (uncurry insert) consts $ zip (map fst rs) x) i
+          aux dt = PState t (foldr (uncurry insert) vars $ zip (map fst rs) $ solve f t0 x0 t) i
+            where t = t0 + dt
 
 
-fromHybrid :: (Hybrid r a) -> E r a
-fromHybrid = E . return . fmap Val
+incStep :: PState r -> PState r
+incStep (PState t vars i) = PState t vars (i + 1)
+
+fromHybrid :: (Num r) => (Hybrid r a) -> E r a
+fromHybrid h = E $ return $ fmap Val h
 
 validateT :: (Num r, CompOrd r, Show r) => r -> E r ()
 validateT d = do
     cmpPrec <- getCmp
     if (d >! 0) cmpPrec --TODO: instead of strict comparison we could use a lax comparison, that only
     then return ()      --fails if the time step is verifiably negative (preferrable for small time steps)
-    else failE ("Time step is not verifiably positive (comparison precision exhausted): " ++ show d)
+    else failE ("Time step is not verifiably positive (comparison precision exhausted): " ++ show d) --TODO: distinguish "negative" from "not verifialby positive"
 
 interpret :: (Floating r, Powers r, CompOrd r, Show r) => Program -> RunnableProgram r
 interpret Nop s                = return s
-interpret (Assign v e) s       = let s' = (fst s, insert v (evalExpr e s) $ snd s) in addDisc s s' >> return s'
-interpret (For [] (Just t)) s  = let d = evalExpr t s in validateT d >> skipDisc s >> fromHybrid (waitE d s)
-interpret (For [] Nothing) s   = skipDisc s >> fromHybrid (endE s)
-interpret (For rs (Just t)) s  = let d = evalExpr t s in validateT d >> skipDisc s >> fromHybrid (for (evalFor rs s) d)
-interpret (For rs Nothing) s   = skipDisc s >> fromHybrid (forever $ evalFor rs s)
+interpret (Assign v e) s       = let s' = PState (time s) (insert v (evalExpr e s) $ variables s) (step s + 1) in addDisc s s' >> return s'
+interpret (For [] (Just t)) s  = let d = evalExpr t s in validateT d >> skipDisc >> fromHybrid (waitE d $ incStep s)
+interpret (For [] Nothing) s   = skipDisc >> fromHybrid (endE (incStep s))
+interpret (For rs (Just t)) s  = let d = evalExpr t s in validateT d >> skipDisc >> fromHybrid (for (evalFor rs $ incStep s) d)
+interpret (For rs Nothing) s   = skipDisc >> fromHybrid (forever $ evalFor rs $ incStep s)
 interpret (IfThenElse c p q) s = do { b <- evalBExpr c s; if b then interpret p s else interpret q s }
 interpret (WhileDo c p) s      = do { b <- evalBExpr c s; if b then decIter >> interpret (Seq p (WhileDo c p)) s else return s }
 interpret (Seq p q) s          = E $ do
@@ -192,16 +196,16 @@ interpret (Seq p q) s          = E $ do
     eState <- get
     let cmpPrec = cmp eState
     case mEndpoint h of
-        Just (Val s2)  -> runE (interpret q s2) >>= return . fmap (either id (\(x,y) -> Und (allVals x ++ allVals y) (maybeError y)) . ($ cmpPrec)) . joinComp h
-        Just (Err e)   -> return h
-        Just (Und _ _) -> error "wtf"
-        Nothing        -> return h
+        Just (Val s2) -> runE (interpret q s2) >>= return . fmap (either id (\(x,y) -> Und (allVals x ++ allVals y) (maybeError y)) . ($ cmpPrec)) . joinComp h
+        Just (Err e)      -> return h
+        Just (Und _ _)    -> error "wtf"
+        Nothing           -> return h
 
 
-run :: (Num r) => RunnableProgram r -> Int -> Int -> (Hybrid r (RunResult (Map Ident r)), [(r, Map Ident r, Map Ident r)])
-run p cmpPrec nIters = (fmap (fmap snd) h, map (\((t,s),(_,s')) -> (t,s,s')) discList)
+run :: (Num r) => RunnableProgram r -> Int -> Int -> (Hybrid r (RunResult (Int, Map Ident r)), [(r, (Int, Map Ident r), (Int, Map Ident r))])
+run p cmpPrec nIters = (fmap (fmap (\s -> (step s, variables s))) h, [(t,(i,vars),(j,vars')) | (PState t vars i, PState _ vars' j) <- discList])
     where (h, eState) = runState (runE (p initial)) (EState cmpPrec nIters Nothing id)
           discList = (discs eState . maybe id (\d -> (d:)) (curDisc eState)) []
 
 query :: (Num r) => RunnableProgram r -> Int -> Int -> r -> RunResult (Map Ident r)
-query p cmpPrec nIters = eval $ fst $ run p cmpPrec nIters
+query p cmpPrec nIters = fmap snd . (eval $ fst $ run p cmpPrec nIters)

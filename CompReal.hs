@@ -105,6 +105,7 @@ listLimitRatioFromListLimit = listLimit . map fromRational
 --listLimitRatioFromLimitRatio s a = limitRatio ...     TODO
 
 
+--TODO: slowly increase prescision as needed?
 mCompareDef :: (CompReal r) => r -> r -> Int -> Maybe Ordering
 mCompareDef x y p | ux < ly                            = Just LT
                   | lx > uy                            = Just GT
