@@ -63,10 +63,10 @@ joinComp :: (Num t, CompOrd t) => Hybrid t a -> Hybrid t a -> Hybrid t (Int -> E
 joinComp x y = Hybrid (maybe (const . Left . eval x) h (duration x), liftM2 joinDur (dur x) (dur y))
     where dur (Hybrid (_, m)) = m
           joinDur (t1, _) (t2, e) = (t1 + t2, const $ Left e)
-          h d t n = case mCompare t d n of
-                        Nothing -> Right (eval x t, eval y (t - d)) --The wrong branch is evaluated
-                        Just LT -> Left $ eval x t                  --outside its original domain.
-                        _       -> Left $ eval y (t - d)            --Potentially dangerous
+          h d t n = case mCompare (Top LT) (domCompare t d n) of
+                        Just True  -> Left $ eval x t                  --The wrong branch is evaluated
+                        Just False -> Left $ eval y (t - d)            --outside its original domain.
+                        Nothing    -> Right (eval x t, eval y (t - d)) --Potentially dangerous
 
 
 compose :: (Ord t, Num t) => HProgram t a -> HProgram t a -> HProgram t a

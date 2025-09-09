@@ -133,29 +133,42 @@ evalExpr (Func f a) s   = evalFunc f (evalExpr a s)
 evalExpr (Op op a b) s  = evalOp op (evalExpr a s) (evalExpr b s)
 evalExpr (NatPow a n) s = pow (evalExpr a s) n
 
---TODO: improve CompOrd
 evalComp :: (CompOrd r) => Lang.Comparator -> r -> r -> Int -> Maybe Bool
-evalComp Lang.LT  x y = fmap (LT ==) . mCompare x y
-evalComp Lang.GT  x y = fmap (GT ==) . mCompare x y
-evalComp Lang.LEQ x y = fmap (GT /=) . mCompare x y
-evalComp Lang.GEQ x y = fmap (LT /=) . mCompare x y
+evalComp Lang.LT  x y = mCompare (Top LT) . domCompare x y
+evalComp Lang.GT  x y = mCompare (Top GT) . domCompare x y
+evalComp Lang.LEQ x y = mCompare (LEQ) . domCompare x y
+evalComp Lang.GEQ x y = mCompare (GEQ) . domCompare x y
 evalComp Lang.LLT x y = Just . (x <! y)
 evalComp Lang.LGT x y = Just . (x >! y)
 
-evalBTerm :: (Floating r, Powers r, CompOrd r) => BTerm -> PState r -> Maybe Bool
-evalBTerm (BConst b) s   = return b
-evalBTerm (Comp c a b) s = do
-    cmpPrec <- getCmp
-    case evalComp c (evalExpr a s) (evalExpr b s) cmpPrec of
-        Just b  -> return b
-        Nothing -> failE "Comparison precision exhausted"
+evalBTerm :: (Floating r, Powers r, CompOrd r) => BTerm -> PState r -> E r (Maybe Bool)
+evalBTerm (BConst b) s   = return $ Just b
+evalBTerm (Comp c a b) s = getCmp >>= return . evalComp c (evalExpr a s) (evalExpr b s)
 
---TODO: Maybe Bool
+maybeAnd :: Maybe Bool -> Maybe Bool -> Maybe Bool
+maybeAnd (Just a) (Just b) = Just (a && b)
+maybeAnd (Just False) _    = Just False
+maybeAnd _ (Just False)    = Just False
+maybeAnd _ _               = Nothing
+
+maybeOr :: Maybe Bool -> Maybe Bool -> Maybe Bool
+maybeOr (Just a) (Just b) = Just (a || b)
+maybeOr (Just True) _     = Just True
+maybeOr _ (Just True)     = Just True
+maybeOr _ _               = Nothing
+
+maybeEvalBExpr :: (Floating r, Powers r, CompOrd r) => BExpr -> PState r -> E r (Maybe Bool)
+maybeEvalBExpr (Term b)  s = evalBTerm b s
+maybeEvalBExpr (Not b)   s = fmap (fmap not) (maybeEvalBExpr b s)
+maybeEvalBExpr (And b c) s = liftA2 maybeAnd (maybeEvalBExpr b s) (maybeEvalBExpr c s)
+maybeEvalBExpr (Or b c)  s = liftA2 maybeOr  (maybeEvalBExpr b s) (maybeEvalBExpr c s)
+
 evalBExpr :: (Floating r, Powers r, CompOrd r) => BExpr -> PState r -> E r Bool
-evalBExpr (Term b)  s = evalBTerm b s
-evalBExpr (Not b)   s = fmap not (evalBExpr b s)
-evalBExpr (And b c) s = liftA2 (&&) (evalBExpr b s) (evalBExpr c s)
-evalBExpr (Or b c)  s = liftA2 (||) (evalBExpr b s) (evalBExpr c s)
+evalBExpr e s = do
+    ans <- maybeEvalBExpr e s
+    case ans of
+        Just b -> return b
+        Nothing -> failE "Comparison precision exhausted"
 
 
 --TODO: optimization? identify common expressions and turn them into variables (or do it in the parsing step?)

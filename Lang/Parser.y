@@ -134,7 +134,7 @@ data Expr = Var Var
             | NatPow Expr Int
         deriving (Show)
 
-data Comparator = LT | GT | LLT | LGT | LEQ | GEQ | EQ | NEQ deriving (Show)
+data Comparator = LT | GT | LLT | LGT | LEQ | GEQ deriving (Show)
 data BTerm = BConst Bool | Comp Comparator Expr Expr deriving (Show)
 data BExpr = Term BTerm | Not BExpr | And BExpr BExpr | Or BExpr BExpr deriving (Show)
 
@@ -213,8 +213,6 @@ lexer cont s =
         ',':cs      -> cont TokenComma cs . moveColumn 1
         '<':'=':cs  -> cont (TokenComp LEQ) cs . moveColumn 2
         '>':'=':cs  -> cont (TokenComp GEQ) cs . moveColumn 2
-        '=':'=':cs  -> cont (TokenComp EQ) cs . moveColumn 2
-        '!':'=':cs  -> cont (TokenComp NEQ) cs . moveColumn 2
         '<':'!':cs  -> cont (TokenComp LLT) cs . moveColumn 2
         '>':'!':cs  -> cont (TokenComp LGT) cs . moveColumn 2
         '<':cs      -> cont (TokenComp LT) cs . moveColumn 1

@@ -106,11 +106,13 @@ listLimitRatioFromListLimit = listLimit . map fromRational
 
 
 --TODO: slowly increase prescision as needed?
-mCompareDef :: (CompReal r) => r -> r -> Int -> Maybe Ordering
-mCompareDef x y p | ux < ly                            = Just LT
-                  | lx > uy                            = Just GT
-                  | lx == ux && ly == uy && lx == ly   = Just EQ
-                  | otherwise                          = Nothing
+domCompareDef :: (CompReal r) => r -> r -> Int -> OrderingDomain
+domCompareDef x y p | lx == ux && ux == ly && ly == uy  = Top EQ
+                    | ux == ly                          = LEQ
+                    | lx == uy                          = GEQ
+                    | ux < ly                           = Top LT
+                    | lx > uy                           = Top GT
+                    | otherwise                         = Bottom
     where (lx, ux) = bound x p
           (ly, uy) = bound y p
 
@@ -131,7 +133,7 @@ instance CompReal CDAR.CR where
     limitRatio f = CDAR.CR $ ZipList [CDAR.toApprox i (f i) + CDAR.toApprox i 0 | i <- [0..]]
 
 instance CompOrd CDAR.CR where
-    mCompare = mCompareDef
+    domCompare = domCompareDef
 
 instance Powers CDAR.CR
 
@@ -148,7 +150,7 @@ instance CompReal ERA.CReal where
     --limit f = ERA.CR (\i -> let ERA.CR g = f (i+1) in ERA.round_uk (g (i + 1) % 2))
 
 instance CompOrd ERA.CReal where
-    mCompare = mCompareDef
+    domCompare = domCompareDef
 
 instance Powers ERA.CReal
 instance Intervalable ERA.CReal
@@ -176,7 +178,7 @@ instance CompReal IReal.IReal where
                             where a = IReal.appr r i
 
 instance CompOrd IReal.IReal where
-    mCompare = mCompareDef
+    domCompare = domCompareDef
     (<!) = (IReal.<!)
     (>!) = (IReal.>!)
 
