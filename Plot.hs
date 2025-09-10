@@ -15,7 +15,6 @@ import Prelude hiding (lines)
 import Control.Applicative (ZipList(..))
 import Data.Ratio ((%))
 import Data.List (transpose, sortOn, insert)
-import Data.Maybe (isJust, fromJust)
 import GHC.Data.Maybe (orElse)
 import GHC.Utils.Misc (fstOf3, sndOf3, thdOf3)
 import GHC.Exts (groupWith)
@@ -94,14 +93,14 @@ filledPoints color vs = plot $ liftEC $ do
     plot_points_values .= vs
 
 
-segments :: (Show a, Show b) => [(a, RunResult (Int, Maybe b))] -> [[(a, b)]]
-segments evol = map (map snd) $ groupWith fst $ sortOn fst [(i, (t, fromJust m)) | (t,rr) <- evol, (i,m) <- allVals rr, isJust m]
+segments :: (Show a, Show b) => [(a, RunResult (Int, b))] -> [[(a, b)]]
+segments evol = map (map snd) $ groupWith fst $ sortOn fst [(i, (t, m)) | (t,rr) <- evol, (i,m) <- allVals rr]
 
 
 toDouble :: (Real a) => a -> Double
 toDouble = fromRational . toRational
 
-plotHybrid :: (RealFrac a, Real b, Show a, Show b) => [String] -> Hybrid a (RunResult (Int, [Maybe b])) -> [(a, (Int, [Maybe b]), (Int, [Maybe b]))] -> IO ()
+plotHybrid :: (RealFrac a, Real b, Show a, Show b) => [String] -> Hybrid a (RunResult (Int, [b])) -> [(a, (Int, [b]), (Int, [b]))] -> IO ()
 plotHybrid vars h discs = do
     let tf = duration h `orElse` error "Tried to plot infinite system"
     let system = transpose [map (t,) $ getZipList $ sequenceA $ fmap (ZipList . sequenceA) $ eval h t | (_,t) <- samples tf]
@@ -112,8 +111,8 @@ plotHybrid vars h discs = do
         sequence_ $ (<$> zip3 vars (system ++ repeat []) (discsByVar ++ repeat [])) $ \(var, evol, ds) -> do
             color <- takeColor
             lines var color $ map (map (toDouble >< toDouble)) $ segments evol
-            hollowPoints color $ [(toDouble t, toDouble $ fromJust x) | (t,(_,x),_) <- ds, isJust x]
-            filledPoints color $ [(toDouble t, toDouble $ fromJust x) | (t,_,(_,x)) <- ds, isJust x]
+            hollowPoints color [(toDouble t, toDouble x) | (t,(_,x),_) <- ds]
+            filledPoints color [(toDouble t, toDouble x) | (t,_,(_,x)) <- ds]
 
 
 approxDouble :: (CompReal r) => Int -> r -> Double
@@ -122,7 +121,7 @@ approxDouble n r = fromRational $ approx r n
 boundDouble :: (CompReal r) => Int -> r -> (Double, Double)
 boundDouble n r = let (l, u) = bound r n in (fromRational l, fromRational u)
 
-plotHybridCR :: (CompReal a, CompReal b, Show a, Show b) => [String] -> Hybrid a (RunResult (Int, [Maybe b])) -> [(a, (Int, [Maybe b]), (Int, [Maybe b]))] -> Int -> IO ()
+plotHybridCR :: (CompReal a, CompReal b, Show a, Show b) => [String] -> Hybrid a (RunResult (Int, [b])) -> [(a, (Int, [b]), (Int, [b]))] -> Int -> IO ()
 plotHybridCR vars h discs n = do
     let tf = duration h `orElse` error "Tried to plot infinite system"
     let (tfl, tfu) = boundDouble n tf
@@ -140,5 +139,5 @@ plotHybridCR vars h discs n = do
 
             joinRects var color [[(either boundRat (boundDouble n) t, boundDouble n v) | (t,v) <- vs] | vs <- segs]
             lines var color [[(either approxRat (approxDouble n) t, approxDouble n v) | (t,v) <- vs] | vs <- segs]
-            hollowPoints color $ [(approxDouble n t, approxDouble n $ fromJust x) | (t,(_,x),_) <- ds, isJust x]
-            filledPoints color $ [(approxDouble n t, approxDouble n $ fromJust x) | (t,_,(_,x)) <- ds, isJust x]
+            hollowPoints color [(approxDouble n t, approxDouble n x) | (t,(_,x),_) <- ds]
+            filledPoints color [(approxDouble n t, approxDouble n x) | (t,_,(_,x)) <- ds]

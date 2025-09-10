@@ -10,39 +10,34 @@ import Prelude hiding (lookup)
 import Data.Map (Map, lookup, assocs)
 import Data.Number.IReal (IReal)
 
-printResult :: (Show a, Show b) => a -> RunResult (Map Ident b) -> IO ()
-printResult t (Val x) = do
+printResult :: (Show a, Show b) => [String] -> a -> RunResult [b] -> IO ()
+printResult vars t (Val x) = do
     putStrLn $ "System terminated at t=" ++ show t ++ " with following state:"
-    sequence_ [putStrLn (var ++ ": " ++ show val) | (var, val) <- assocs x]
-printResult t (Err e) = putStrLn $ "System terminated at t=" ++ show t ++ " with error: " ++ show e
+    sequence_ [putStrLn (var ++ ": " ++ show val) | (var, val) <- zip vars x]
+printResult vars t (Err e) = putStrLn $ "System terminated at t=" ++ show t ++ " with error: " ++ show e
 
 
 --for quick testing with ghci
-test :: (Floating a, Powers a, CompOrd a, Show a) => IO (RunnableProgram a)
+test :: (Floating a, Powers a, CompOrd a, Show a) => IO ([String], RunnableProgram a)
 test = do
     input <- readFile "input.txt"
     case parseJaguar input of
             Failed err -> error ("Parse error: " ++ show err) --parse error
-            Ok ans -> return (interpret ans)
+            Ok (vars, prog) -> return (vars, interpret prog)
 
-play :: IO (IReal -> RunResult (Map Ident IReal))
-play = fmap (\p -> query p 20 300) test
+play :: IO (IReal -> RunResult [IReal])
+play = fmap (\(_,prog) -> query prog 20 300) test
 
 plot :: IO ()
 plot = do
-    let vars = ["y", "v"]
-    let lookupVars st = map (`lookup` st) vars
+    -- (vars, prog) <- test :: IO ([String], RunnableProgram Double)
+    (vars, prog) <- test :: IO ([String], RunnableProgram IReal)
 
-    --p <- test :: IO (RunnableProgram Double)
-    p <- test :: IO (RunnableProgram IReal)
-    
-    let (h, ds) = run p 20 300
-    let system = fmap (fmap (id >< lookupVars)) h
-    let discs = map (\(t,(i,s),(j,s')) -> (t, (i, lookupVars s), (j, lookupVars s'))) ds
+    let (system, discs) = run prog 20 300
 
-    case duration h of
+    case duration system of
         Just tf -> do
-                    printResult tf $ fmap snd $ endpoint h
+                    printResult vars tf $ fmap snd $ endpoint system
                     --plotHybrid vars system discs
                     plotHybridCR vars system discs 4
         Nothing -> putStrLn "Only finite systems support plotting"

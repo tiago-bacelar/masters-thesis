@@ -3,6 +3,7 @@ module Lang.Parser (parseJaguar, ParseResult(..), Program(..), Comparator(..), B
 
 import Prelude hiding (Ordering(..))
 import Data.Char
+import Data.List
 import GHC.Real
 
 --TODO: make ; after CB optional (after while loops for example)
@@ -67,6 +68,9 @@ import GHC.Real
 %nonassoc func
 %%
 
+Root        :: { ([String], Program) }
+    : Program               {% getPState `thenP` \(_,_,vars) -> returnP (vars, $1) }
+
 Program     :: { Program }
     : var ':=' Expr                         {% case $1 of {T -> failP "Can't assign to time"; V v -> returnP (Assign v $3)}}
     | For for Expr                          { For (reverse $1) (Just $3) }
@@ -117,7 +121,7 @@ Expr :: { Expr }
     | '(' Expr ')'          { $2 }
 
 {
-type Ident = String
+type Ident = Int
 newtype AnyFloat = AnyFloat { anyFloat :: forall a. Floating a => a}
 
 instance Show AnyFloat where
@@ -145,6 +149,8 @@ data Program = Assign Ident Expr
                 | Seq Program Program
                 | Nop
             deriving (Show)
+
+
 
 
 
@@ -182,20 +188,20 @@ data Token = TokenVar Var
 
 
 data ParseResult a = Ok a | Failed String deriving (Show, Functor)
-type PState = (Int, Int)
+type PState = (Int, Int, [String]) --line, col, vars
 type P a = String -> PState -> ParseResult a
 
 initialPState :: PState
-initialPState = (1, 1)
+initialPState = (1, 1, [])
 
 getPState :: P PState
 getPState = \s st -> Ok st
 
 nextLine :: PState -> PState
-nextLine (line, _) = (line+1, 1)
+nextLine (line, _, vars) = (line+1, 1, vars)
 
 moveColumn :: Int -> PState -> PState
-moveColumn n (line, col) = (line, col + n)
+moveColumn n (line, col, vars) = (line, col + n, vars)
 
 lexer :: (Token -> P a) -> P a
 lexer cont s =
@@ -228,8 +234,8 @@ lexer cont s =
         '#':cs      -> let (comment, rest) = span (/= '\n') cs in lexer cont rest . moveColumn (length comment + 1)
         c:cs | isSpace c -> lexer cont cs . moveColumn 1
              | isDigit c -> let (x, rest, n) = lexFloat s in cont x rest . moveColumn n
-             | isAlpha c -> let (word, rest) = span isAlpha s in cont (lexAlpha word) rest . moveColumn (length word)
-             | otherwise -> \(line, col) -> Failed ("Unknown symbol " ++ show c ++ " at line " ++ show line ++ " column " ++ show col)
+             | isAlpha c -> let (word, rest) = span isAlpha s in lexAlpha cont word rest . moveColumn (length word)
+             | otherwise -> \(line, col, _) -> Failed ("Unknown symbol " ++ show c ++ " at line " ++ show line ++ " column " ++ show col)
 
 lexFloat :: String -> (Token, String, Int)
 lexFloat s =
@@ -246,32 +252,35 @@ lexFloat s =
     where (i, s1, n1) = readDigits s
           readDigits s = let (di, s') = span isDigit s in (read di, s', length di)
 
-lexAlpha :: String -> Token
-lexAlpha "e"        = TokenNum $ AnyFloat $ exp 1
-lexAlpha "pi"       = TokenNum $ AnyFloat pi
-lexAlpha "log"      = TokenOp Log
-lexAlpha "exp"      = TokenFunc Exp
-lexAlpha "ln"       = TokenFunc Ln
-lexAlpha "sin"      = TokenFunc Sin
-lexAlpha "cos"      = TokenFunc Cos
-lexAlpha "tan"      = TokenFunc Tan
-lexAlpha "true"     = TokenBool True
-lexAlpha "false"    = TokenBool False
-lexAlpha "for"      = TokenFor
-lexAlpha "forever"  = TokenForever
-lexAlpha "wait"     = TokenWait
-lexAlpha "if"       = TokenIf
-lexAlpha "then"     = TokenThen
-lexAlpha "else"     = TokenElse
-lexAlpha "while"    = TokenWhile
-lexAlpha "do"       = TokenDo
-lexAlpha "t"        = TokenVar T
-lexAlpha var        = TokenVar (V var)
+lexAlpha :: (Token -> P a) -> String -> P a
+lexAlpha cont "e"       = cont $ TokenNum $ AnyFloat $ exp 1
+lexAlpha cont "pi"      = cont $ TokenNum $ AnyFloat pi
+lexAlpha cont "log"     = cont $ TokenOp Log
+lexAlpha cont "exp"     = cont $ TokenFunc Exp
+lexAlpha cont "ln"      = cont $ TokenFunc Ln
+lexAlpha cont "sin"     = cont $ TokenFunc Sin
+lexAlpha cont "cos"     = cont $ TokenFunc Cos
+lexAlpha cont "tan"     = cont $ TokenFunc Tan
+lexAlpha cont "true"    = cont $ TokenBool True
+lexAlpha cont "false"   = cont $ TokenBool False
+lexAlpha cont "for"     = cont $ TokenFor
+lexAlpha cont "forever" = cont $ TokenForever
+lexAlpha cont "wait"    = cont $ TokenWait
+lexAlpha cont "if"      = cont $ TokenIf
+lexAlpha cont "then"    = cont $ TokenThen
+lexAlpha cont "else"    = cont $ TokenElse
+lexAlpha cont "while"   = cont $ TokenWhile
+lexAlpha cont "do"      = cont $ TokenDo
+lexAlpha cont "t"       = cont $ TokenVar T
+lexAlpha cont var       = \cs st@(line,col,vars) ->
+                            case elemIndex var vars of
+                                Just i ->  cont (TokenVar $ V i) cs st
+                                Nothing -> cont (TokenVar $ V $ length vars) cs (line, col, vars ++ [var])
 
 
 
 parseError :: Token -> P a
-parseError t = getPState `thenP` \(line, col) ->
+parseError t = getPState `thenP` \(line, col, _) ->
                 failP ("Parse error on " ++ show t ++ " (line " ++ show line ++ ", column " ++ show col ++ ")")
 
 
@@ -304,9 +313,10 @@ tokenize = lexer cont
           cont t s  st = fmap (t:) (tokenize s st)
 
 
-parseJaguar :: String -> ParseResult Program
+parseJaguar :: String -> ParseResult ([String], Program)
 parseJaguar = ($ initialPState) . parser
 
+--for testing
 main = readFile "input.txt" >>= print . parseJaguar
 mainTokenize = readFile "input.txt" >>= print . ($ initialPState) . tokenize
 }
