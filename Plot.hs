@@ -14,10 +14,9 @@ import Graphics.Rendering.Chart.Drawing
 import Prelude hiding (lines)
 import Control.Applicative (ZipList(..))
 import Data.Ratio ((%))
-import Data.List (transpose, sortOn, insert)
-import GHC.Data.Maybe (orElse)
-import GHC.Utils.Misc (fstOf3, sndOf3, thdOf3)
-import GHC.Exts (groupWith)
+import Data.List (transpose, sortOn, groupBy, insert)
+import GHC.Data.Maybe (catMaybes, orElse)
+import GHC.Utils.Misc (sndOf3, thdOf3)
 
 
 outputPath :: String
@@ -93,24 +92,28 @@ filledPoints color vs = plot $ liftEC $ do
     plot_points_values .= vs
 
 
-segments :: (Show a, Show b) => [(a, RunResult (Int, b))] -> [[(a, b)]]
-segments evol = map (map snd) $ groupWith fst $ sortOn fst [(i, (t, m)) | (t,rr) <- evol, (i,m) <- allVals rr]
-
+--segments :: (Show a, Show b) => [(a, RunResult (Int, b))] -> [[(a, b)]]
+--segments evol = map (map snd) $ groupWith fst $ sortOn fst [(i, (t, m)) | (t,rr) <- evol, (i,m) <- allVals rr]
+--segments evol = [map snd $ sortOn fst [(i, (t, m)) | (t,rr) <- evol, (i,m) <- allVals rr]]
+segments :: (Show a, Show b) => [(a, RunResult (Int, b))] -> [(a, (Int, b), (Int, b))] -> [[(a, b)]]
+segments evol ds = map (map snd) $ groupBy skip $ sortOn fst $ [((i,1),(t,x)) | (t,rr) <- evol, (i,x) <- allVals rr] ++ concat [[((i,2),(t,x)),((j,0),(t,y))] | (t,(i,x),(j,y)) <- ds]
+    where skip ((_,2),_) ((_,0),_) = False
+          skip _ _ = True
 
 toDouble :: (Real a) => a -> Double
 toDouble = fromRational . toRational
 
-plotHybrid :: (RealFrac a, Real b, Show a, Show b) => [String] -> Hybrid a (RunResult (Int, [b])) -> [(a, (Int, [b]), (Int, [b]))] -> IO ()
+plotHybrid :: (RealFrac a, Real b, Show a, Show b) => [String] -> Hybrid a (RunResult (Int, [b])) -> [(a, Int, Int, [Maybe (b, b)])] -> IO ()
 plotHybrid vars h discs = do
     let tf = duration h `orElse` error "Tried to plot infinite system"
     let system = transpose [map (t,) $ getZipList $ sequenceA $ fmap (ZipList . sequenceA) $ eval h t | (_,t) <- samples tf]
-    let discsByVar = transpose [zip3 (repeat t) (sequenceA xs) (sequenceA ys) | (t,xs,ys) <- takeWhile ((<= tf) . fstOf3) $ dropWhile ((< 0) . fstOf3) discs]
+    let discsByVar = map catMaybes $ transpose [map (fmap (\(x,y) -> (t,(i,x),(j,y)))) xs | (t,i,j,xs) <- takeWhile ((<= tf) . fstOf4) $ dropWhile ((< 0) . fstOf4) discs]
 
     toFile def outputPath $ do
         setLayout
         sequence_ $ (<$> zip3 vars (system ++ repeat []) (discsByVar ++ repeat [])) $ \(var, evol, ds) -> do
             color <- takeColor
-            lines var color $ map (map (toDouble >< toDouble)) $ segments evol
+            lines var color $ map (map (toDouble >< toDouble)) $ segments evol ds
             hollowPoints color [(toDouble t, toDouble x) | (t,(_,x),_) <- ds]
             filledPoints color [(toDouble t, toDouble x) | (t,_,(_,x)) <- ds]
 
@@ -121,7 +124,7 @@ approxDouble n r = fromRational $ approx r n
 boundDouble :: (CompReal r) => Int -> r -> (Double, Double)
 boundDouble n r = let (l, u) = bound r n in (fromRational l, fromRational u)
 
-plotHybridCR :: (CompReal a, CompReal b, Show a, Show b) => [String] -> Hybrid a (RunResult (Int, [b])) -> [(a, (Int, [b]), (Int, [b]))] -> Int -> IO ()
+plotHybridCR :: (CompReal a, CompReal b, Show a, Show b) => [String] -> Hybrid a (RunResult (Int, [b])) -> [(a, Int, Int, [Maybe (b, b)])] -> Int -> IO ()
 plotHybridCR vars h discs n = do
     let tf = duration h `orElse` error "Tried to plot infinite system"
     let (tfl, tfu) = boundDouble n tf
@@ -129,14 +132,13 @@ plotHybridCR vars h discs n = do
     let boundRat s = (s * tfl, s * tfu)
     let approxRat s = s * tfm
     let system = transpose [map (fromRational s,) $ getZipList $ sequenceA $ fmap (ZipList . sequenceA) $ eval h t | (s,t) <- samples tf]
-    let discsByVar = transpose [zip3 (repeat t) (sequenceA xs) (sequenceA ys) | (t,xs,ys) <- takeWhile (flip (<! tf) n . fstOf3) $ dropWhile (not . flip (>! 0) n . fstOf3) discs]
+    let discsByVar = map catMaybes $ transpose [map (fmap (\(x,y) -> (t,(i,x),(j,y)))) xs | (t,i,j,xs) <- takeWhile (flip (<! tf) n . fstOf4) $ dropWhile (not . flip (>! 0) n . fstOf4) discs]
 
     toFile def outputPath $ do
         setLayout
         sequence_ $ (<$> zip3 vars (system ++ repeat []) (discsByVar ++ repeat [])) $ \(var, evol, ds) -> do
             color <- takeColor
-            let segs = segments $ (map (Left><id) evol) ++ [(Right t, Val v) | (t,l,r) <- ds, v <- [l,r]]
-
+            let segs = segments [(Left t, rr) | (t,rr) <- evol] [(Right t, l, r) | (t,l,r) <- ds]
             joinRects var color [[(either boundRat (boundDouble n) t, boundDouble n v) | (t,v) <- vs] | vs <- segs]
             lines var color [[(either approxRat (approxDouble n) t, approxDouble n v) | (t,v) <- vs] | vs <- segs]
             hollowPoints color [(approxDouble n t, approxDouble n x) | (t,(_,x),_) <- ds]

@@ -47,7 +47,7 @@ maybeError _         = Nothing
 --the discontinuities use the ShowS trick (difference lists) for efficiency
 --TODO: allow infinite comp precision and infinite iterations
 type DifList a = [a] -> [a]
-data EState r = EState { cmp :: Int, iters :: Int, curDisc :: Maybe (PState r, PState r), discs :: DifList (PState r, PState r)}
+data EState r = EState { cmp :: Int, iters :: Int, curDisc :: Maybe ([Int], PState r, PState r), discs :: DifList ([Int], PState r, PState r)}
 newtype E r a = E { runE :: MS.State (EState r) (Hybrid r (RunResult a)) } deriving (Functor)
 
 instance (Num r) => Applicative (E r) where
@@ -80,10 +80,10 @@ decIter = E $ do
         put $ EState cmpPrec (nIters-1) mDisc discList
         return $ instant $ Val ()
 
-addDisc :: (Num r) => PState r -> PState r -> E r ()
-addDisc s s' = E $ do
+addDisc :: (Num r) => Int -> PState r -> PState r -> E r ()
+addDisc v s s' = E $ do
     EState cmpPrec nIters mDisc discList <- get
-    put $ EState cmpPrec nIters (Just $ maybe (s, s') (\(os, _) -> (os, s')) mDisc) discList
+    put $ EState cmpPrec nIters (Just $ maybe ([v], s, s') (\(vs, os, _) -> (setInsert v vs, os, s')) mDisc) discList
     return $ instant $ Val ()
 
 skipDisc :: (Num r) => E r ()
@@ -175,6 +175,7 @@ evalBExpr e s = do
 
 
 --TODO: optimization? identify common subexpressions and turn them into variables (or do it in the parsing step?)
+--TODO: memoize polynomial transformation to avoid repeated work (in while loops, for example)
 evalFor :: (Floating r, Powers r) => [(Int, Expr)] -> PState r -> r -> PState r
 evalFor rs (PState t0 i vars) = ans
     where rs' = sortOn fst rs
@@ -207,7 +208,7 @@ validateT d = do
 
 interpret :: (Floating r, Powers r, CompOrd r, Show r) => Program -> RunnableProgram r
 interpret Nop s                = return s
-interpret (Assign v e) s       = let s' = PState (time s) (step s + 1) (replaceIndex v (evalExpr e s) $ variables s) in addDisc s s' >> return s'
+interpret (Assign v e) s       = let s' = PState (time s) (step s + 1) (replaceIndex v (evalExpr e s) $ variables s) in addDisc v s s' >> return s'
 interpret (For [] (Just t)) s  = let d = evalExpr t s in validateT d >> skipDisc >> fromHybrid (waitE d $ incStep s)
 interpret (For [] Nothing) s   = skipDisc >> fromHybrid (endE (incStep s))
 interpret (For rs (Just t)) s  = let d = evalExpr t s in validateT d >> skipDisc >> fromHybrid (for (evalFor rs $ incStep s) d)
@@ -225,9 +226,8 @@ interpret (Seq p q) s          = E $ do
         Nothing           -> return h
 
 
---TODO: return discs by variable
-run :: (Num r) => RunnableProgram r -> Int -> Int -> (Hybrid r (RunResult (Int, [r])), [(r, (Int, [r]), (Int, [r]))])
-run p cmpPrec nIters = (fmap (fmap (\s -> (step s, variables s))) h, [(t,(i,vars),(j,vars')) | (PState t i vars, PState _ j vars') <- discList])
+run :: (Num r) => RunnableProgram r -> Int -> Int -> (Hybrid r (RunResult (Int, [r])), [(r, Int, Int, [Maybe (r, r)])])
+run p cmpPrec nIters = (fmap (fmap (\s -> (step s, variables s))) h, [(t,i,j,maybeIndexes [(v, (vars !! v, vars' !! v)) | v <- vs]) | (vs, PState t i vars, PState _ j vars') <- discList])
     where (h, eState) = runState (runE $ p initial) (EState cmpPrec nIters Nothing id)
           discList = (discs eState . maybe id (\d -> (d:)) (curDisc eState)) []
 

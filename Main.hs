@@ -33,13 +33,13 @@ plot = do
     -- (vars, prog) <- test :: IO ([String], RunnableProgram Double)
     (vars, prog) <- test :: IO ([String], RunnableProgram IReal)
 
-    let (system, discs) = run prog 20 300
+    let (system, discs) = run prog 20 30
 
     case duration system of
         Just tf -> do
                     printResult vars tf $ fmap snd $ endpoint system
                     --plotHybrid vars system discs
-                    plotHybridCR vars system discs 4
+                    plotHybridCR vars system discs 8
         Nothing -> putStrLn "Only finite systems support plotting"
 
 
