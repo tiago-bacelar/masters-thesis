@@ -6,6 +6,13 @@ module Utils where
 fstOf4 :: (a, b, c, d) -> a
 fstOf4 (x,_,_,_) = x
 
+--lists must be ordered. f is applied to the same values multiple times (could be optimized)
+mergeOn :: (Ord b) => (a -> b) -> [a] -> [a] -> [a]
+mergeOn f xs [] = xs
+mergeOn f [] ys = ys
+mergeOn f (x:xs) (y:ys) | f x <= f y = x : mergeOn f xs (y:ys)
+                        | otherwise  = y : mergeOn f (x:xs) ys
+
 --inserts an element into an ordered list. if the element already exists in the list, nothing changes
 setInsert :: Ord a => a -> [a] -> [a]
 setInsert x [] = [x]

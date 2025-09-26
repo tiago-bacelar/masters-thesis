@@ -1,14 +1,14 @@
-{-# LANGUAGE TypeFamilies, DefaultSignatures #-}
+{-# LANGUAGE DefaultSignatures #-}
 
-module CompReal where
+module CompReal (CompReal(..), ) where
 
 import CompOrd
 import Solver.Interval
 import Solver.Powers
 
+import qualified ERA.CReal as ERA --available in stdlib as Data.Numbers.CReal, but that version doesn't export CR, making it kinda useless
 import qualified Data.CDAR as CDAR
 --import qualified AERN2.Real as AERN2
-import qualified ERA.CReal as ERA --available in stdlib as Data.Numbers.CReal, but that version doesn't export CR, making it kinda useless
 import qualified Data.Number.IReal as IReal
 import qualified Data.Number.IReal.IReal as IReal(ir, appr)
 import qualified Data.Number.IReal.IntegerInterval as IReal(lowerI, upperI, radI) 
@@ -125,6 +125,20 @@ seriesSumRatio :: (CompReal r) => [Rational] -> (Int -> Int) -> r
 seriesSumRatio = listLimitRatio . scanl1 (+)
 
 
+
+
+instance CompReal ERA.CReal where
+    approx (ERA.CR r) n = r n % pow2 n --TODO: something fishy here... (correctionPi pi)
+    --limit f = ERA.CR (\i -> let ERA.CR g = f (i+1) in ERA.round_uk (g (i + 1) % 2))
+
+instance CompOrd ERA.CReal where
+    domCompare = domCompareDef
+
+instance Powers ERA.CReal
+instance Intervalable ERA.CReal
+
+
+
 instance CompReal CDAR.CR where
     approx r n = toRational $ fromJust $ CDAR.centre $ CDAR.require n r
 
@@ -142,18 +156,6 @@ instance Intervalable CDAR.CR where
     x <~> y = CDAR.CR $ ZipList $ zipWith CDAR.unionA (getZipList $ CDAR.unCR x) (getZipList $ CDAR.unCR y)
     lower = undefined
     upper = undefined
-
-
-
-instance CompReal ERA.CReal where
-    approx (ERA.CR r) n = r n % pow2 n --TODO: something fishy here... (correctionPi pi)
-    --limit f = ERA.CR (\i -> let ERA.CR g = f (i+1) in ERA.round_uk (g (i + 1) % 2))
-
-instance CompOrd ERA.CReal where
-    domCompare = domCompareDef
-
-instance Powers ERA.CReal
-instance Intervalable ERA.CReal
 
 
 
@@ -191,6 +193,7 @@ instance Powers IReal.IReal where
                       q = p + ceiling (logBase 2 (fromIntegral n) :: Double) 
                             + (n-1) * lg2 (IReal.upperI (abs x0)) + n
 
+--And here, sometimes an IReal represents an interval and sometimes represents a single number
 instance Intervalable IReal.IReal where
     type Interval IReal.IReal = IReal.IReal
     (<~>) = (IReal.-+-)

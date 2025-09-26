@@ -1,4 +1,6 @@
-module Plot (plotHybrid, plotHybridCR) where
+{-# LANGUAGE DefaultSignatures #-}
+
+module Plot (PlotConfig(..), defPlotConfig, Plottable(..)) where
 
 import Utils
 import CompReal
@@ -13,25 +15,41 @@ import Graphics.Rendering.Chart.Backend.Cairo
 import Graphics.Rendering.Chart.Drawing
 import Prelude hiding (lines)
 import Control.Applicative (ZipList(..))
+import Control.Monad (when)
 import Data.Ratio ((%))
 import Data.List (transpose, sortOn, groupBy, insert)
-import GHC.Data.Maybe (catMaybes, orElse)
+import Data.Maybe (isJust, fromJust, catMaybes)
 import GHC.Utils.Misc (sndOf3, thdOf3)
+import System.IO (hPutStrLn, stderr)
+import System.Exit (exitWith, ExitCode(..))
 
 
-outputPath :: String
-outputPath = "output.png"
-
-sampleNo :: Integer
-sampleNo = 200
-
-samples :: (Fractional a) => a -> [(Rational, a)]
-samples tf = [(s % sampleNo, tf * fromRational (s % sampleNo)) | s <- [0..sampleNo]]
+--TODO: chart uses Doubles to place features on the plot. We need to
+--      make up some wort of workaround to avoid exhausting the precision
+--      of a Double when very zoomed in
 
 
-setLayout = do
+data PlotConfig = PlotConfig    { outputPath    :: String
+                                , sampleNo      :: Integer
+                                , precision     :: Int
+                                , rangeT        :: Maybe (Rational, Rational)
+                                , rangeX        :: Maybe (Rational, Rational)
+                                }
+
+defPlotConfig :: PlotConfig
+defPlotConfig = PlotConfig  { outputPath    = "output.png"
+                            , sampleNo      = 200
+                            , precision     = 32
+                            , rangeT        = Nothing
+                            , rangeX        = Nothing
+                            }
+
+
+setLayout rangeT rangeX = do
     layout_title .= "System Evolution"
     layout_x_axis . laxis_title .= "time"
+    when (isJust rangeT) $ layout_x_axis . laxis_generate .= scaledAxis def (fromRational >< fromRational $ fromJust rangeT)
+    when (isJust rangeX) $ layout_y_axis . laxis_generate .= scaledAxis def (fromRational >< fromRational $ fromJust rangeX)
 
 lineStyle n colour = line_width .~ n
                    $ line_color .~ colour
@@ -92,10 +110,17 @@ filledPoints color vs = plot $ liftEC $ do
     plot_points_values .= vs
 
 
---segments :: (Show a, Show b) => [(a, RunResult (Int, b))] -> [[(a, b)]]
---segments evol = map (map snd) $ groupWith fst $ sortOn fst [(i, (t, m)) | (t,rr) <- evol, (i,m) <- allVals rr]
---segments evol = [map snd $ sortOn fst [(i, (t, m)) | (t,rr) <- evol, (i,m) <- allVals rr]]
-segments :: (Show a, Show b) => [(a, RunResult (Int, b))] -> [(a, (Int, b), (Int, b))] -> [[(a, b)]]
+getRangeT :: (Fractional a) => Maybe (Rational, Rational) -> Maybe a -> IO (a, a)
+getRangeT (Just (l,r)) _   = return (fromRational l, fromRational r)
+getRangeT Nothing (Just r) = return (0, r)
+getRangeT Nothing Nothing  = do
+    hPutStrLn stderr "Time range not specified for infinite system"
+    exitWith $ ExitFailure 1
+
+samples :: (Fractional a) => Integer -> a -> [(Rational, a)]
+samples sampleNo tf = [(s % sampleNo, tf * fromRational (s % sampleNo)) | s <- [0..sampleNo]]
+
+segments :: [(a, RunResult (Int, b))] -> [(a, (Int, b), (Int, b))] -> [[(a, b)]]
 segments evol ds = map (map snd) $ groupBy skip $ sortOn fst $ [((i,1),(t,x)) | (t,rr) <- evol, (i,x) <- allVals rr] ++ concat [[((i,2),(t,x)),((j,0),(t,y))] | (t,(i,x),(j,y)) <- ds]
     where skip ((_,2),_) ((_,0),_) = False
           skip _ _ = True
@@ -103,19 +128,25 @@ segments evol ds = map (map snd) $ groupBy skip $ sortOn fst $ [((i,1),(t,x)) | 
 toDouble :: (Real a) => a -> Double
 toDouble = fromRational . toRational
 
-plotHybrid :: (RealFrac a, Real b, Show a, Show b) => [String] -> Hybrid a (RunResult (Int, [b])) -> [(a, Int, Int, [Maybe (b, b)])] -> IO ()
-plotHybrid vars h discs = do
-    let tf = duration h `orElse` error "Tried to plot infinite system"
-    let system = transpose [map (t,) $ getZipList $ sequenceA $ fmap (ZipList . sequenceA) $ eval h t | (_,t) <- samples tf]
-    let discsByVar = map catMaybes $ transpose [map (fmap (\(x,y) -> (t,(i,x),(j,y)))) xs | (t,i,j,xs) <- takeWhile ((<= tf) . fstOf4) $ dropWhile ((< 0) . fstOf4) discs]
 
-    toFile def outputPath $ do
-        setLayout
-        sequence_ $ (<$> zip3 vars (system ++ repeat []) (discsByVar ++ repeat [])) $ \(var, evol, ds) -> do
-            color <- takeColor
-            lines var color $ map (map (toDouble >< toDouble)) $ segments evol ds
-            hollowPoints color [(toDouble t, toDouble x) | (t,(_,x),_) <- ds]
-            filledPoints color [(toDouble t, toDouble x) | (t,_,(_,x)) <- ds]
+class Plottable a b where
+    plotHybrid :: PlotConfig -> [String] -> Hybrid a (RunResult (Int, [b])) -> [(a, Int, Int, [Maybe (b, b)])] -> IO ()
+
+    default plotHybrid :: (RealFrac a, Real b) => PlotConfig -> [String] -> Hybrid a (RunResult (Int, [b])) -> [(a, Int, Int, [Maybe (b, b)])] -> IO ()
+    plotHybrid config vars h discs = do
+        (ti, tf) <- getRangeT (rangeT config) (duration h)
+        let system = transpose [map (t,) $ getZipList $ sequenceA $ fmap (ZipList . sequenceA) $ eval h t | (_,t) <- samples (sampleNo config) tf]
+        let discsByVar = map catMaybes $ transpose [map (fmap (\(x,y) -> (t,(i,x),(j,y)))) xs | (t,i,j,xs) <- takeWhile ((<= tf) . fstOf4) $ dropWhile ((< ti) . fstOf4) discs]
+
+        toFile def (outputPath config) $ do
+            setLayout (rangeT config) (rangeX config)
+            sequence_ $ (<$> zip3 vars (system ++ repeat []) (discsByVar ++ repeat [])) $ \(var, evol, ds) -> do
+                color <- takeColor
+                lines var color $ map (map (toDouble >< toDouble)) $ segments evol ds
+                hollowPoints color [(toDouble t, toDouble x) | (t,(_,x),_) <- ds]
+                filledPoints color [(toDouble t, toDouble x) | (t,_,(_,x)) <- ds]
+
+instance Plottable Double Double
 
 
 approxDouble :: (CompReal r) => Int -> r -> Double
@@ -124,22 +155,21 @@ approxDouble n r = fromRational $ approx r n
 boundDouble :: (CompReal r) => Int -> r -> (Double, Double)
 boundDouble n r = let (l, u) = bound r n in (fromRational l, fromRational u)
 
-plotHybridCR :: (CompReal a, CompReal b, Show a, Show b) => [String] -> Hybrid a (RunResult (Int, [b])) -> [(a, Int, Int, [Maybe (b, b)])] -> Int -> IO ()
-plotHybridCR vars h discs n = do
-    let tf = duration h `orElse` error "Tried to plot infinite system"
-    let (tfl, tfu) = boundDouble n tf
-    let tfm = approxDouble n tf
-    let boundRat s = (s * tfl, s * tfu)
-    let approxRat s = s * tfm
-    let system = transpose [map (fromRational s,) $ getZipList $ sequenceA $ fmap (ZipList . sequenceA) $ eval h t | (s,t) <- samples tf]
-    let discsByVar = map catMaybes $ transpose [map (fmap (\(x,y) -> (t,(i,x),(j,y)))) xs | (t,i,j,xs) <- takeWhile (flip (<! tf) n . fstOf4) $ dropWhile (not . flip (>! 0) n . fstOf4) discs]
+instance {-# OVERLAPPABLE #-} (CompReal a, CompReal b) => Plottable a b where
+    plotHybrid config vars h discs = do
+        let n = precision config
+        (ti, tf) <- getRangeT (rangeT config) (duration h)
+        let boundRat s = (s*) >< (s*) $ boundDouble n tf
+        let approxRat s = s * (approxDouble n tf)
+        let system = transpose [map (fromRational s,) $ getZipList $ sequenceA $ fmap (ZipList . sequenceA) $ eval h t | (s,t) <- samples (sampleNo config) tf]
+        let discsByVar = map catMaybes $ transpose [map (fmap (\(x,y) -> (t,(i,x),(j,y)))) xs | (t,i,j,xs) <- takeWhile (flip (<! tf) n . fstOf4) $ dropWhile (flip (<! ti) n . fstOf4) discs]
 
-    toFile def outputPath $ do
-        setLayout
-        sequence_ $ (<$> zip3 vars (system ++ repeat []) (discsByVar ++ repeat [])) $ \(var, evol, ds) -> do
-            color <- takeColor
-            let segs = segments [(Left t, rr) | (t,rr) <- evol] [(Right t, l, r) | (t,l,r) <- ds]
-            joinRects var color [[(either boundRat (boundDouble n) t, boundDouble n v) | (t,v) <- vs] | vs <- segs]
-            lines var color [[(either approxRat (approxDouble n) t, approxDouble n v) | (t,v) <- vs] | vs <- segs]
-            hollowPoints color [(approxDouble n t, approxDouble n x) | (t,(_,x),_) <- ds]
-            filledPoints color [(approxDouble n t, approxDouble n x) | (t,_,(_,x)) <- ds]
+        toFile def (outputPath config) $ do
+            setLayout (rangeT config) (rangeX config)
+            sequence_ $ (<$> zip3 vars (system ++ repeat []) (discsByVar ++ repeat [])) $ \(var, evol, ds) -> do
+                color <- takeColor
+                let segs = segments [(Left t, rr) | (t,rr) <- evol] [(Right t, l, r) | (t,l,r) <- ds]
+                joinRects var color [[(either boundRat (boundDouble n) t, boundDouble n v) | (t,v) <- vs] | vs <- segs]
+                lines var color [[(either approxRat (approxDouble n) t, approxDouble n v) | (t,v) <- vs] | vs <- segs]
+                hollowPoints color [(approxDouble n t, approxDouble n x) | (t,(_,x),_) <- ds]
+                filledPoints color [(approxDouble n t, approxDouble n x) | (t,_,(_,x)) <- ds]
