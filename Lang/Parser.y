@@ -1,18 +1,27 @@
 {
-module Lang.Parser (parseJaguar, ParseResult(..), Program(..), Comparator(..), BTerm(..), BExpr(..), Expr(..), Operator(..), Function(..), Var(..), AnyFloat(..), Ident) where
+
+{-# LANGUAGE ExistentialQuantification #-}
+
+module Lang.Parser (parseJaguar, ParseResult(..), Program(..)) where
+
+import Utils
+import Lang.Expr
+import Solver.Powers
+import Solver.Poly
 
 import Prelude hiding (Ordering(..))
 import Data.Char
 import Data.List
-import GHC.Real
+import Data.Ratio ((%))
+
+import Data.List (sortOn)
 
 --TODO: make ; after CB optional (after while loops for example)
---TODO: validate var usage (unassigned vars)
 --TODO: return position info along with Program to include in runtime error msgs
 --TODO: warnings? (using changing var or time in for statement for time, since its wrong, but could be misleading)
 }
 
-%name parser
+%name parser Root
 %tokentype { Token }
 %error { parseError }
 %lexer { lexer } { EOF }
@@ -22,6 +31,7 @@ import GHC.Real
       var       { TokenVar $$ }
       int       { TokenInt $$ }
       num       { TokenNum $$ }
+      const     { TokenConst $$ }
       func      { TokenFunc $$ }
       '+'       { TokenOp Add }
       '-'       { TokenOp Sub }
@@ -68,19 +78,19 @@ import GHC.Real
 %nonassoc func
 %%
 
-Root        :: { ([String], Program) }
+Root        :: { ([String], AnyProgram) }
     : Program               {% getPState `thenP` \(_,_,vars) -> returnP (vars, $1) }
 
-Program     :: { Program }
-    : var ':=' Expr                         {% case $1 of {T -> failP "Can't assign to time"; V v -> returnP (Assign v $3)}}
-    | For for Expr                          { For (reverse $1) (Just $3) }
-    | For forever                           { For (reverse $1) Nothing }
-    | wait Expr                             { For [] (Just $2) }
-    | wait forever                          { For [] Nothing }
-    | if BExpr then Program else Program    { IfThenElse $2 $4 $6 }
-    | if BExpr then Program                 { IfThenElse $2 $4 Nop }
-    | while BExpr do Program                { WhileDo $2 $4 }
-    | Program ';' Program                   { Seq $1 $3 }
+Program     :: { AnyProgram }
+    : var ':=' Expr                         {% case $1 of {T -> failP "Can't assign to time"; V v -> returnP $ AnyProgram $ Assign v $3}}
+    | For for Expr                          { AnyProgram $ getFor $1 (Just $3) }
+    | For forever                           { AnyProgram $ getFor $1 Nothing }
+    | wait Expr                             { AnyProgram $ getFor [] (Just $2) }
+    | wait forever                          { AnyProgram $ getFor [] Nothing }
+    | if BExpr then Program else Program    { AnyProgram $ IfThenElse $2 (anyProgram $4) (anyProgram $6) }
+    | if BExpr then Program                 { AnyProgram $ IfThenElse $2 (anyProgram $4) Nop }
+    | while BExpr do Program                { AnyProgram $ WhileDo $2 (anyProgram $4) }
+    | Program ';' Program                   { AnyProgram $ Seq (anyProgram $1) (anyProgram $3) }
     | Program ';'                           { $1 }
     | '{' Program '}'                       { $2 }
 
@@ -107,56 +117,40 @@ BTerm       :: { BTerm }
 
 Expr :: { Expr }
     : var                   { Var $1 }
-    | int                   { Num (AnyFloat (fromInteger $1)) }
+    | int                   { Num (fromInteger $1) }
     | num                   { Num $1 }
+    | const                 { Const $1 }
     | func Expr             { Func $1 $2 }
     | Expr '+' Expr         { Op Add $1 $3 }
     | Expr '-' Expr         { Op Sub $1 $3 }
     | Expr '*' Expr         { Op Mult $1 $3 }
     | Expr '/' Expr         { Op Div $1 $3 }
     | Expr '^' Expr         { Op Pow $1 $3 }
-    | Expr '^' int %prec NP {% if $3 > toInteger (maxBound :: Int) then failP ("Integer overflow: " ++ show $3 ++ " isn't a valid exponent") else returnP $ NatPow $1 (fromInteger $3) }
-    | Expr log Expr         { Op Log $1 $3 }
+    | Expr '^' int %prec NP {% if $3 > toInteger (maxBound :: Int) then failP ("Integer overflow: " ++ show $3 ++ " isn't a valid exponent") else if $3 == 0 then failP "0 isn't a valid exponent" else returnP $ NatPow $1 (fromInteger $3) }
+    | Expr log Expr         { Op Log $3 $1 }
     | '-' Expr %prec NEG    { Func Neg $2 }
     | '(' Expr ')'          { $2 }
 
 {
-type Ident = Int
-newtype AnyFloat = AnyFloat { anyFloat :: forall a. Floating a => a}
 
-instance Show AnyFloat where
-    show x = show (anyFloat x :: Double)
-
---TODO: sqrt (and other roots?)
-data Var = T | V Ident deriving (Show)
-data Function = Neg | Exp | Ln | Sin | Cos | Tan deriving (Show)
-data Operator = Add | Sub | Mult | Div | Pow | Log deriving (Show)
-data Expr = Var Var
-            | Num AnyFloat
-            | Func Function Expr
-            | Op Operator Expr Expr
-            | NatPow Expr Int
-        deriving (Show)
-
-data Comparator = LT | GT | LLT | LGT | LEQ | GEQ deriving (Show)
-data BTerm = BConst Bool | Comp Comparator Expr Expr deriving (Show)
-data BExpr = Term BTerm | Not BExpr | And BExpr BExpr | Or BExpr BExpr deriving (Show)
-
-data Program = Assign Ident Expr
-                | For [(Ident, Expr)] (Maybe Expr)
-                | IfThenElse BExpr Program Program
-                | WhileDo BExpr Program
-                | Seq Program Program
+newtype AnyProgram = AnyProgram { anyProgram :: forall r. (Floating r, Powers r) => Program r }
+data Program r = Assign Ident Expr
+                | For [(Ident, Expr)] [(Expr, Poly r)] (Maybe Expr) --lists are returned ordered by Ident
+                | IfThenElse BExpr (Program r) (Program r)
+                | WhileDo BExpr (Program r)
+                | Seq (Program r) (Program r)
                 | Nop
             deriving (Show)
 
-
-
+getFor :: (Floating r, Powers r) => [(Ident,Expr)] -> (Maybe Expr) -> Program r
+getFor l d = For sorted (toPoly sorted) d
+    where sorted = sortOn fst l
 
 
 data Token = TokenVar Var
             | TokenInt Integer
-            | TokenNum AnyFloat
+            | TokenNum Rational
+            | TokenConst Constant
             | TokenDot
             | TokenFunc Function
             | TokenOp Operator
@@ -246,15 +240,15 @@ lexFloat s =
                 ('e':s4) -> let (e, s5, n5) = readDigits s4
                             in if e >= n3
                                then (TokenInt $ (i * 10 ^ n3 + nr) * 10 ^ (e - n3), s5, n1 + n3 + n5 + 2)
-                               else (TokenNum $ AnyFloat $ (fromInteger i + fromRational r) * fromInteger (10 ^ e), s5, n1 + n3 + n5 + 2)
-                _        -> (TokenNum $ AnyFloat $ fromInteger i + fromRational r, s3, n1 + n3 + 1)
+                               else (TokenNum $ (fromInteger i + r) * fromInteger (10 ^ e), s5, n1 + n3 + n5 + 2)
+                _        -> (TokenNum $ fromInteger i + r, s3, n1 + n3 + 1)
         _       -> (TokenInt i, s1, n1)
     where (i, s1, n1) = readDigits s
           readDigits s = let (di, s') = span isDigit s in (read di, s', length di)
 
 lexAlpha :: (Token -> P a) -> String -> P a
-lexAlpha cont "e"       = cont $ TokenNum $ AnyFloat $ exp 1
-lexAlpha cont "pi"      = cont $ TokenNum $ AnyFloat pi
+lexAlpha cont "e"       = cont $ TokenConst E
+lexAlpha cont "pi"      = cont $ TokenConst PI
 lexAlpha cont "log"     = cont $ TokenOp Log
 lexAlpha cont "exp"     = cont $ TokenFunc Exp
 lexAlpha cont "ln"      = cont $ TokenFunc Ln
@@ -305,18 +299,17 @@ catchP m k = \s st ->
 
 
 --automatically generated
---parser :: P Program
+--parser :: P ([String], AnyProgram)
 
 tokenize :: P [Token]
 tokenize = lexer cont
     where cont t [] st = Ok [t] 
           cont t s  st = fmap (t:) (tokenize s st)
 
-
-parseJaguar :: String -> ParseResult ([String], Program)
-parseJaguar = ($ initialPState) . parser
+parseJaguar :: (Floating r, Powers r) => String -> ParseResult ([String], Program r)
+parseJaguar = fmap (id >< (\p -> anyProgram p)) . ($ initialPState) . parser
 
 --for testing
-main = readFile "input.txt" >>= print . parseJaguar
+main = readFile "input.txt" >>= (\s -> print (parseJaguar s :: ParseResult ([String], Program Double)))
 mainTokenize = readFile "input.txt" >>= print . ($ initialPState) . tokenize
 }

@@ -33,21 +33,16 @@ printResult vars t (Val x) = do
 printResult vars t (Err e) = putStrLn $ "System terminated at t=" ++ show t ++ " with error: " ++ show e
 
 
-toRunnable :: (Floating r, Powers r, CompOrd r) => [String] -> Program r -> RunnableProgram r
-toRunnable vars prog = fmap (fmap takeVars) (interpret prog)
-    where takeVars ps = ps {variables = take n (variables ps)}
-          n = length vars
-
 --for quick testing with ghci
 test :: (Floating r, Powers r, CompOrd r) => IO ([String], RunnableProgram r)
 test = do
     input <- readFile "input.txt"
     case parseJaguar input of
             Failed err -> error ("Parse error: " ++ show err) --parse error
-            Ok (vars, code) -> return (vars, toRunnable vars code)
+            Ok (vars, code) -> return (vars, interpret code)
 
 play :: IO (IReal.IReal -> RunResult [IReal.IReal])
-play = fmap (\(_,prog) -> query prog 20 300) test
+play = fmap (\(vars,prog) -> query prog (length vars) 20 300) test
 
 
 data Mode = Plot | Query | InteractivePlot deriving (Show, Eq)
@@ -103,13 +98,13 @@ options =
             "FILE")
         "Output path"
 
-    --TODO: plot config options (incompatible with modes other than Plot)
+    --TODO: plot config options (incompatible with modes other than Plot (and interactive plot??))
 
     , Option "q" ["query"] --TODO: must have an input file
         (NoArg
             (\opt -> return opt { optMode = Query }))
         "Query mode"
-    , Option "i" ["interactive"] --TODO: must have an input file???? (depends on how i process the input)
+    , Option "i" ["interactive"] --TODO: must have an input file???? (could maybe read from stdin depending on how i process the input)
         (NoArg
             (\opt -> return opt { optMode = InteractivePlot }))
         "Interactive plot"
@@ -158,9 +153,9 @@ mainWith (Options   { optFile       = file
 
     (vars, prog) <- case parseJaguar input of
                         Failed err -> error ("Parse error: " ++ show err)
-                        Ok (vars, code :: Program r) -> return (vars, toRunnable vars code)
+                        Ok (vars, code :: Program r) -> return (vars, interpret code)
 
-    let (system, discs) = run prog compPrec iterations
+    let (system, discs) = run prog (length vars) compPrec iterations
 
     case mode of
         Plot -> do
@@ -175,7 +170,7 @@ plot = mainWith Options { optFile       = Just "input.txt"
                         , optNumType    = SomeProxy (Proxy :: Proxy IReal.IReal)
                         , optCompPrec   = 10
                         , optIterations = 30
-                        , optPlotConfig = defPlotConfig { rangeT = Just (0,1), rangeX = Just (0,1), precision = 6 }
+                        , optPlotConfig = defPlotConfig { rangeT = Just (-0.1,10.1), precision = 6 }
                         , optMode       = Plot
                         }
 
