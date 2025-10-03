@@ -6,6 +6,15 @@ module Utils where
 fstOf4 :: (a, b, c, d) -> a
 fstOf4 (x,_,_,_) = x
 
+count :: (Eq a) => a -> [a] -> Int
+count x = length . filter (x ==)
+
+spanList :: ([a] -> Bool) -> [a] -> ([a], [a]) 
+spanList _ [] = ([],[])
+spanList f list@(x:xs) | f list    = (x:ys, zs)
+                       | otherwise = ([], list)
+    where (ys,zs) = spanList f xs
+
 --lists must be ordered. f is applied to the same values multiple times (could be optimized)
 mergeOn :: (Ord b) => (a -> b) -> [a] -> [a] -> [a]
 mergeOn f xs [] = xs

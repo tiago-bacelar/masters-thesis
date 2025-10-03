@@ -194,38 +194,42 @@ getPState = \s st -> Ok st
 nextLine :: PState -> PState
 nextLine (line, _, vars) = (line+1, 1, vars)
 
+moveLine :: Int -> PState -> PState
+moveLine n (line, _, vars) = (line + n, 1, vars)
+
 moveColumn :: Int -> PState -> PState
 moveColumn n (line, col, vars) = (line, col + n, vars)
 
 lexer :: (Token -> P a) -> P a
 lexer cont s =
     case s of
-        []          -> cont EOF []
-        '\n':cs     -> lexer cont cs . nextLine
-        '+':cs      -> cont (TokenOp Add) cs . moveColumn 1
-        '-':cs      -> cont (TokenOp Sub) cs . moveColumn 1
-        '*':cs      -> cont (TokenOp Mult) cs . moveColumn 1
-        '/':cs      -> cont (TokenOp Div) cs . moveColumn 1
-        '^':cs      -> cont (TokenOp Pow) cs . moveColumn 1
-        '(':cs      -> cont TokenOP cs . moveColumn 1
-        ')':cs      -> cont TokenCP cs . moveColumn 1
-        '\'':cs     -> cont TokenDeriv cs . moveColumn 1
-        ',':cs      -> cont TokenComma cs . moveColumn 1
-        '<':'=':cs  -> cont (TokenComp LEQ) cs . moveColumn 2
-        '>':'=':cs  -> cont (TokenComp GEQ) cs . moveColumn 2
-        '<':'!':cs  -> cont (TokenComp LLT) cs . moveColumn 2
-        '>':'!':cs  -> cont (TokenComp LGT) cs . moveColumn 2
-        '<':cs      -> cont (TokenComp LT) cs . moveColumn 1
-        '>':cs      -> cont (TokenComp GT) cs . moveColumn 1
-        '!':cs      -> cont (TokenNot) cs . moveColumn 1
-        '&':'&':cs  -> cont (TokenAnd) cs . moveColumn 2
-        '|':'|':cs  -> cont (TokenOr) cs . moveColumn 2
-        '=':cs      -> cont TokenEquals cs . moveColumn 1
-        ':':'=':cs  -> cont TokenAssign cs . moveColumn 2
-        ';':cs      -> cont TokenSep cs . moveColumn 1
-        '{':cs      -> cont TokenOB cs . moveColumn 1
-        '}':cs      -> cont TokenCB cs . moveColumn 1
-        '#':cs      -> let (comment, rest) = span (/= '\n') cs in lexer cont rest . moveColumn (length comment + 1)
+        []               -> cont EOF []
+        '/':'/':cs       -> let (comment, rest) = span (/= '\n') s in lexer cont rest . moveColumn (length comment)
+        '/':'*':cs       -> blockComment (lexer cont) s
+        '\n':cs          -> lexer cont cs . nextLine
+        '+':cs           -> cont (TokenOp Add) cs . moveColumn 1
+        '-':cs           -> cont (TokenOp Sub) cs . moveColumn 1
+        '*':cs           -> cont (TokenOp Mult) cs . moveColumn 1
+        '/':cs           -> cont (TokenOp Div) cs . moveColumn 1
+        '^':cs           -> cont (TokenOp Pow) cs . moveColumn 1
+        '(':cs           -> cont TokenOP cs . moveColumn 1
+        ')':cs           -> cont TokenCP cs . moveColumn 1
+        '\'':cs          -> cont TokenDeriv cs . moveColumn 1
+        ',':cs           -> cont TokenComma cs . moveColumn 1
+        '<':'=':cs       -> cont (TokenComp LEQ) cs . moveColumn 2
+        '>':'=':cs       -> cont (TokenComp GEQ) cs . moveColumn 2
+        '<':'!':cs       -> cont (TokenComp LLT) cs . moveColumn 2
+        '>':'!':cs       -> cont (TokenComp LGT) cs . moveColumn 2
+        '<':cs           -> cont (TokenComp LT) cs . moveColumn 1
+        '>':cs           -> cont (TokenComp GT) cs . moveColumn 1
+        '!':cs           -> cont (TokenNot) cs . moveColumn 1
+        '&':'&':cs       -> cont (TokenAnd) cs . moveColumn 2
+        '|':'|':cs       -> cont (TokenOr) cs . moveColumn 2
+        '=':cs           -> cont TokenEquals cs . moveColumn 1
+        ':':'=':cs       -> cont TokenAssign cs . moveColumn 2
+        ';':cs           -> cont TokenSep cs . moveColumn 1
+        '{':cs           -> cont TokenOB cs . moveColumn 1
+        '}':cs           -> cont TokenCB cs . moveColumn 1
         c:cs | isSpace c -> lexer cont cs . moveColumn 1
              | isDigit c -> let (x, rest, n) = lexFloat s in cont x rest . moveColumn n
              | isAlpha c -> let (word, rest) = span isAlpha s in lexAlpha cont word rest . moveColumn (length word)
@@ -270,6 +274,14 @@ lexAlpha cont var       = \cs st@(line,col,vars) ->
                             case elemIndex var vars of
                                 Just i ->  cont (TokenVar $ V i) cs st
                                 Nothing -> cont (TokenVar $ V $ length vars) cs (line, col, vars ++ [var])
+
+blockComment :: P a -> P a
+blockComment f s = case rest of
+    '*':'/':cs -> f cs . moveColumn cols . moveLine lines
+    []         -> \(line, col, _) -> Failed ("Unclosed block comment at line " ++ show line ++ " column " ++ show col)
+    where (comment, rest) = spanList ((/= "*/") . take 2) s
+          lines = count '\n' comment
+          cols = length $ takeWhile (/= '\n') $ reverse comment
 
 
 
