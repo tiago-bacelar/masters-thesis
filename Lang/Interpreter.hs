@@ -54,7 +54,7 @@ instance (Num r) => Applicative (E r) where
     (<*>) = ap
 
 --This is a dirty instance of Monad, used only for the benefit of the do notation.
---A true instance needs a Comp r restriction to join the Hybrids, which we can't provide
+--A true instance needs an Ord r restriction to join the Hybrids, which we can't provide
 --Instead, this instance only looks at the endpoint of the hybrid x, which is fine as long
 --as the hybrid x is instantaneous (has duration 0)
 instance (Num r) => Monad (E r) where
@@ -64,6 +64,9 @@ instance (Num r) => Monad (E r) where
               liftF (Just (Und _ _)) = error "wtf"
               liftF Nothing          = error "wtf"
 
+initialE :: Int -> Integer -> EState r
+initialE cmpPrec nIters = EState { cmp = cmpPrec, iters = nIters, curDisc = Nothing, discs = id }
+
 failE :: (Num r) => Error -> E r a
 failE = E . return . instant . Err
 
@@ -72,36 +75,35 @@ getCmp = E $ fmap (instant . Val . cmp) get
 
 decIter :: (Num r) => E r ()
 decIter = E $ do
-    EState cmpPrec nIters mDisc discList <- get
-    if nIters <= 0
+    eState <- get
+    if iters eState <= 0
     then return $ instant $ Err "Iteration limit exceeded"
     else do 
-        put $ EState cmpPrec (nIters-1) mDisc discList
+        put $ eState { iters = iters eState - 1 }
         return $ instant $ Val ()
 
 addDisc :: (Num r) => Ident -> PState r -> PState r -> E r ()
 addDisc v s s' = E $ do
-    EState cmpPrec nIters mDisc discList <- get
-    put $ EState cmpPrec nIters (Just $ maybe ([v], s, s') (\(vs, os, _) -> (setInsert v vs, os, s')) mDisc) discList
+    eState <- get
+    put $ eState { curDisc = Just $ maybe ([v], s, s') (\(vs, os, _) -> (setInsert v vs, os, s')) (curDisc eState) }
     return $ instant $ Val ()
 
 skipDisc :: (Num r) => E r ()
 skipDisc = E $ do
-    EState cmpPrec nIters mDisc discList <- get
-    case mDisc of
+    eState <- get
+    case curDisc eState of
         Nothing -> return $ instant $ Val ()
         Just disc -> do
-                        put $ EState cmpPrec nIters Nothing (discList . (disc:))
+                        put $ eState { curDisc = Nothing, discs = discs eState . (disc:) }
                         return $ instant $ Val ()
 
 
 data PState r = PState { time :: r, step :: Int, variables :: [r] }
 type RunnableProgram r = PState r -> E r (PState r)
 
---variables are initialized at 0
-initial :: (Num r) => Int -> PState r
-initial n = PState { time = 0, step = 0, variables = replicate n 0 }
-
+--variables are initialPized at 0
+initialP :: (Num r) => Int -> PState r
+initialP n = PState { time = 0, step = 0, variables = replicate n 0 }
 
 evalVar :: PState r -> Var -> r
 evalVar s T = time s
@@ -156,7 +158,7 @@ interpret (Seq p q) s            = E $ do
 
 run :: (Num r) => RunnableProgram r -> Int -> Int -> Integer -> (Hybrid r (RunResult (Int, [r])), [(r, Int, Int, [Maybe (r, r)])])
 run p n cmpPrec nIters = (fmap (fmap (\s -> (step s, variables s))) h, [(time s, step s, step s' ,maybeIndexes [(v, (variables s !! v, variables s' !! v)) | v <- vs]) | (vs, s, s') <- discList])
-    where (h, eState) = runState (runE $ p $ initial n) (EState cmpPrec nIters Nothing id)
+    where (h, eState) = runState (runE $ p $ initialP n) (initialE cmpPrec nIters)
           discList = (discs eState . maybe id (\d -> (d:)) (curDisc eState)) []
 
 query :: (Num r) => RunnableProgram r -> Int -> Int -> Integer -> r -> RunResult [r]

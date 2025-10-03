@@ -23,7 +23,6 @@ import GHC.Utils.Misc (sndOf3, thdOf3)
 import System.IO (hPutStrLn, stderr)
 import System.Exit (exitWith, ExitCode(..))
 
-
 --TODO: chart uses Doubles to place features on the plot. We need to
 --      make up some wort of workaround to avoid exhausting the precision
 --      of a Double when very zoomed in
@@ -121,9 +120,11 @@ samples :: (Fractional a) => Integer -> a -> [(Rational, a)]
 samples sampleNo tf = [(s % sampleNo, tf * fromRational (s % sampleNo)) | s <- [0..sampleNo]]
 
 segments :: [(a, RunResult (Int, b))] -> [(a, (Int, b), (Int, b))] -> [[(a, b)]]
-segments evol ds = map (map snd) $ groupBy skip $ sortOn fst $ [((i,1),(t,x)) | (t,rr) <- evol, (i,x) <- allVals rr] ++ concat [[((i,2),(t,x)),((j,0),(t,y))] | (t,(i,x),(j,y)) <- ds]
-    where skip ((_,2),_) ((_,0),_) = False
-          skip _ _ = True
+segments evol ds = map (map snd) $ foldr groupify [] $ sortOn fst $ [((i,1),(t,x)) | (t,rr) <- evol, (i,x) <- allVals rr] ++ concat [[((i,2),(t,x)),((j,0),(t,y))] | (t,(i,x),(j,y)) <- ds]
+    where groupify x [] = [[x]]
+          groupify x@((_,2),_) xss@((((_,0),_):_):_) = [x] : xss
+          groupify x@((_,2),_) ((_:xs):xss) = groupify x (xs:xss)
+          groupify x (ys:yss) = (x : ys) : yss
 
 toDouble :: (Real a) => a -> Double
 toDouble = fromRational . toRational
