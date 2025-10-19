@@ -34,19 +34,19 @@ printResult vars t (Err e) = putStrLn $ "System terminated at t=" ++ show t ++ "
 
 
 --for quick testing with ghci
-test :: (Floating r, Powers r, CompOrd r) => IO ([String], RunnableProgram r)
+test :: (SimNum r) => IO ([String], RunnableProgram r)
 test = do
     input <- readFile "input.txt"
     case parseJaguar input of
             Failed err -> error ("Parse error: " ++ show err) --parse error
             Ok (vars, code) -> return (vars, interpret code)
 
-play :: IO (IReal.IReal -> RunResult [IReal.IReal])
+play :: IO (TestType -> RunResult [TestType])
 play = fmap (\(vars,prog) -> query prog (length vars) 20 300) test
 
 
 data Mode = Plot | Query | InteractivePlot deriving (Show, Eq)
-data SomeProxy where SomeProxy :: forall r. (Plottable r r, Floating r, Powers r, CompOrd r) => Proxy r -> SomeProxy
+data SomeProxy where SomeProxy :: forall r. (Plottable r r, SimNum r) => Proxy r -> SomeProxy
 data Options = Options  { optFile       :: Maybe String
                         , optNumType    :: SomeProxy
                         , optCompPrec   :: Int
@@ -165,12 +165,13 @@ mainWith (Options   { optFile       = file
         InteractivePlot -> undefined
 
 
+type TestType = CDAR.CR
 plot :: IO ()
 plot = mainWith Options { optFile       = Just "input.txt"
-                        , optNumType    = SomeProxy (Proxy :: Proxy IReal.IReal)
+                        , optNumType    = SomeProxy (Proxy :: Proxy TestType)
                         , optCompPrec   = 10
                         , optIterations = 30
-                        , optPlotConfig = defPlotConfig { rangeT = Just (-0.1,10.1), precision = 6 }
+                        , optPlotConfig = defPlotConfig { rangeT = Just (0,10), precision = 6 }
                         , optMode       = Plot
                         }
 

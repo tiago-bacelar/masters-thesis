@@ -13,7 +13,6 @@ class Intervalable a where
     (<~>) :: a -> a -> Interval a --interval from ordered endpoints
     lower  :: Interval a -> a
     upper  :: Interval a -> a
-    --union        :: Interval a -> Interval a -> Interval a
     --intersection :: Interval a -> Interval a -> Interval a
     --contains     :: Interval a -> a -> Bool
 
@@ -28,14 +27,6 @@ class Intervalable a where
     upper = snd . getPair
 
 instance Intervalable Double
-
-{-
-instance (Intervalable a) => Intervalable [a] where
-    type Interval [a] = [Interval a]
-    (<~>) = zipWith (<~>)
-    upper = map upper
-    lower = map lower
--}
 
 
 singleton :: (Intervalable a) => a -> Interval a
@@ -69,6 +60,7 @@ instance (Fractional a, Ord a) => Fractional (IPair a) where
     recip x@(IPair (l, u)) = ivalCase x (IPair (recip u, recip l)) (IPair (recip u, recip l)) (error "signum of interval containing 0")
     fromRational r = let z = fromRational r in IPair (z, z)
 
+--TODO: define sq and use default powers instead (after upgrading it to logarithmic)
 instance (Powers a, Ord a) => Powers (IPair a) where
     pow x = (powers x !!)
     powers (IPair (l, u)) = aux

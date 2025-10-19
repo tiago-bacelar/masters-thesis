@@ -1,15 +1,13 @@
 module Lang.Interpreter where
 
 import Utils
-import CompReal
+import Limit
 import CompOrd
-import Solver.Powers
-import Solver.Interval
-import Solver.FAD
-import Solver.Solver
 import Lang.Hybrid
 import Lang.Parser
 import Solver.Poly
+import Solver.Powers
+import Solver.Solver
 import Lang.Expr hiding (E)
 
 import Data.List (sortOn)
@@ -18,6 +16,7 @@ import Control.Applicative (liftA2)
 import Control.Monad (ap)
 import Control.Monad.State as MS (State, runState, evalState, get, put)
 
+type SimNum r = (Floating r, Powers r, CompOrd r, Limit r r)
 
 --TODO: make Und a function of desired precision
 --TODO: add line and source code of errors
@@ -116,7 +115,7 @@ evalBExpr e s = do
         Just b -> return b
         Nothing -> failE "Comparison precision exhausted"
 
-evalFor :: (Floating r, Powers r) => [Ident] -> [(Expr, Poly r)] -> PState r -> r -> PState r
+evalFor :: (Floating r, Powers r, CompOrd r, Limit r r) => [Ident] -> [(Expr, Poly r)] -> PState r -> r -> PState r
 evalFor [] _ s = \dt -> s { time = time s + dt }
 evalFor is ps s = ans
     where rs = map ((`evalExpr` (evalVar s)) >< id) ps
@@ -138,7 +137,7 @@ validateT d = do
     then return ()
     else failE "Time step is not verifiably positive (comparison precision exhausted)"
 
-interpret :: (Floating r, Powers r, CompOrd r) => Program r -> RunnableProgram r
+interpret :: (SimNum r) => Program r -> RunnableProgram r
 interpret Nop s                  = return s
 interpret (Assign v e) s         = let s' = s { step = step s + 1, variables = replaceIndex v (evalExpr e (evalVar s)) $ variables s } in addDisc v s s' >> return s'
 interpret (For es ps (Just t)) s = let d = evalExpr t (evalVar s) in validateT d >> skipDisc >> fromHybrid (for (evalFor (map fst es) ps $ incStep s) d)
@@ -157,9 +156,9 @@ interpret (Seq p q) s            = E $ do
 
 
 run :: (Num r) => RunnableProgram r -> Int -> Int -> Integer -> (Hybrid r (RunResult (Int, [r])), [(r, Int, Int, [Maybe (r, r)])])
-run p n cmpPrec nIters = (fmap (fmap (\s -> (step s, variables s))) h, [(time s, step s, step s' ,maybeIndexes [(v, (variables s !! v, variables s' !! v)) | v <- vs]) | (vs, s, s') <- discList])
-    where (h, eState) = runState (runE $ p $ initialP n) (initialE cmpPrec nIters)
+run p nVars cmpPrec nIters = (fmap (fmap (\s -> (step s, variables s))) h, [(time s, step s, step s' ,maybeIndexes [(v, (variables s !! v, variables s' !! v)) | v <- vs]) | (vs, s, s') <- discList])
+    where (h, eState) = runState (runE $ p $ initialP nVars) (initialE cmpPrec nIters)
           discList = (discs eState . maybe id (\d -> (d:)) (curDisc eState)) []
 
 query :: (Num r) => RunnableProgram r -> Int -> Int -> Integer -> r -> RunResult [r]
-query p n cmpPrec nIters = fmap snd . (eval $ fst $ run p n cmpPrec nIters)
+query p nVars cmpPrec nIters = fmap snd . (eval $ fst $ run p nVars cmpPrec nIters)

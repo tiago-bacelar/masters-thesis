@@ -1,10 +1,34 @@
 module Utils where
 
+import GHC.Num
+import Data.Bits
+import Data.Ratio
+import Debug.Trace
+
+traceX :: (Show a) => a -> a
+traceX x = trace (show x) x
+
+
+pow2 :: Int -> Integer
+pow2 = shiftL 1
+
+lg2 :: Integer -> Int
+lg2 = fromIntegral . integerLogBase 2
+
+logFloor :: Rational -> Int
+logFloor r | r < a_r = a - 1
+           | otherwise = a
+    where a = lg2 (numerator r) - lg2 (denominator r)
+          a_r | a < 0 = 1 % pow2 (-a)
+              | otherwise = pow2 a % 1
+
+
 (><) :: (a -> b) -> (c -> d) -> (a, c) -> (b, d)
 (><) f g (x, y) = (f x, g y)
 
 fstOf4 :: (a, b, c, d) -> a
 fstOf4 (x,_,_,_) = x
+
 
 count :: (Eq a) => a -> [a] -> Int
 count x = length . filter (x ==)
@@ -39,3 +63,15 @@ maybeIndexes xs = rec 0 xs
     where rec n [] = repeat Nothing
           rec n ((i, x) : t) | n == i    = Just x  : rec (n + 1) t
                              | otherwise = Nothing : rec (n + 1) ((i, x) : t)
+
+replaceLast :: (a -> a) -> [a] -> [a]
+replaceLast f [x]    = [f x]
+replaceLast f (x:xs) = x : replaceLast f xs
+
+findOrLast :: (a -> Bool) -> [a] -> a
+findOrLast p [x] = x
+findOrLast p (x:xs) | p x = x
+                    | otherwise = findOrLast p xs
+
+indexOrLast :: [a] -> Int -> a
+indexOrLast xs p = last $ take (p+1) xs

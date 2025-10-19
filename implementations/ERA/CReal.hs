@@ -114,6 +114,8 @@ mul2n (CR x') n = CR (\p -> x' (p+n))
 
 instance Floating CReal where
 
+  --as far as i can tell, this is wrong? unCR pi 9 is 1609, which should
+  --mean 1609/512 is the best approximation, but 1608/512 is closer
   pi = 16 * atan (fromRational (1 % 5)) 
 
                 - 4 * atan (fromRational (1 % 239))
@@ -472,4 +474,4 @@ floorsqrt x = until satisfy improve x
 
 round_uk :: Rational -> Integer
 
-round_uk x = floor (x+1 % 2)
+round_uk x = floor (x + 1%2)

@@ -1,6 +1,7 @@
-module Solver.Poly (Poly, toPoly, evalPoly, degree, norm) where
+module Solver.Poly (Poly, toPoly, evalPoly, degree, norm, normCR) where
 
 import Utils
+import CompReal (maximumCR)
 import Lang.Expr
 import Solver.Powers
 
@@ -83,16 +84,21 @@ instance (Num r, Powers r) => Powers (Poly r) where
             | otherwise = p * (pow (p * p) (n `div` 2))
 
 --the degree of a single multi-var polynomial (assumes non-zero coefficients)
+--m
 degree :: Poly r -> Int
-degree = maximum . map (sum . fst) . unPoly
+degree = maximum . (0:) . map (sum . fst) . unPoly
 
 --the L_INF subordinate norm of the transformation (assumes non-zero coefficients)
+--B_N
 norm :: (Ord r, Num r) => [Poly r] -> r
 norm = maximum . map (sum . map (abs . snd) . unPoly)
 
+--same as norm, but rewritten without the Ord constraint
+normCR :: (Fractional r) => [Poly r] -> r
+normCR = maximumCR . map (sum . map (abs . snd) . unPoly)
 
 
---The gene used in the first graph iteration, agnostic to the output
+--The gene used in the first graph iteration, agnostic to the input (a) and output (b)
 type Gen a b s = a -> (a -> State s b) -> State s b
 --This function performs the first iteration of the graph, which is stateful.
 --The iteration has multiple start points and returns the state at the end of the
@@ -101,7 +107,7 @@ stateFix :: (Traversable t) => Gen a b s -> s -> t a -> (t b, s)
 stateFix g i xs = runState (mapM rec xs) i
     where rec x = g x rec
 
---The output of the first iteration, per node, agnostic to the output of the second iteration
+--The output of the first iteration, per node, agnostic to the output of the second iteration (c)
 type B t c = (Bool, Reader (t c) c)
 --This function performs the second iteration. Unlike the first, there is no state.
 --There is also no mechanism to detect loops. Loops are allowed as long as they don't
@@ -153,10 +159,10 @@ addVar ex = gets (Map.lookup ex . vars) >>= maybe runAdd (return . varPoly)
                     return $ varPoly j
 
 returnConst :: Reader (t c) c -> State s (B t c)
-returnConst r = return (True, r)
+returnConst = return . (True,)
 
 returnNotConst :: Reader (t c) c -> State s (B t c)
-returnNotConst r = return (False, r)
+returnNotConst = return . (False,)
 
 --The output of the second iteration, per node
 type C r = (Poly r, Poly r)
@@ -298,8 +304,8 @@ toPoly :: (Floating r, Powers r) => [(Ident, Expr)] -> [(Expr, Poly r)]
 toPoly exs = map (getData . fst) $ sortOn snd $ toList $ vars st
     where (_, st) = stateFix g (initial exs) [Var (V i) | (i,_) <- exs]
           g ex rec = skipVisited ex $ polyGen ex rec
-          nodes = readerFix $ Map.map (fmap pairMagic . snd) $ visited st
+          nodes = readerFix $ Map.map (fmap lazyPair . snd) $ visited st
           getData ex = (ex, snd $ nodes ! ex)
-          pairMagic pair = (fst pair, snd pair)
-          --i do not know why pairMagic is needed, but without it the function just hangs
+          lazyPair ~(x, y) = (x, y)
+          --i do not know exactly why lazyPair is needed, but without it the function just hangs
           --so, please leave the proverbial coconut alone

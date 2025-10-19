@@ -3,7 +3,6 @@
 --module Benchmarking where
 
 import Solver.Powers
-import Solver.Interval
 import CompOrd
 import CompReal
 import Tests

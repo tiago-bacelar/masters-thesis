@@ -1,33 +1,35 @@
 {-# LANGUAGE DefaultSignatures #-}
 
-module CompReal (CompReal(..), ) where
+module CompReal where
 
+import Utils
+import Limit
 import CompOrd
-import Solver.Interval
 import Solver.Powers
 
-import qualified ERA.CReal as ERA --available in stdlib as Data.Numbers.CReal, but that version doesn't export CR, making it kinda useless
+import qualified ERA.CReal as ERA --available in numbers as Data.Numbers.CReal, but that version doesn't export CR, making it kinda useless
 import qualified Data.CDAR as CDAR
 --import qualified AERN2.Real as AERN2
 import qualified Data.Number.IReal as IReal
 import qualified Data.Number.IReal.IReal as IReal(ir, appr)
-import qualified Data.Number.IReal.IntegerInterval as IReal(lowerI, upperI, radI) 
+import qualified Data.Number.IReal.IntegerInterval as IReal(IntegerInterval(..), upperI)
 
-import GHC.Num
-import Data.Bits
 import Data.List
 import Data.Maybe
 import Data.Ratio
 import Control.Applicative
 
-pow2 :: Int -> Integer
-pow2 = shiftL 1
+--Same as max, but written without the Ord constraint
+maxCR :: (Fractional a) => a -> a -> a
+maxCR x y = (x + y + abs (x - y)) / 2
 
-lg2 :: Integer -> Int
-lg2 = fromIntegral . GHC.Num.integerLogBase 2
+--Same as maximum, but written without the Ord constraint
+maximumCR :: (Fractional a) => [a] -> a
+maximumCR = foldr1 maxCR
 
---TODO: partial comparison?
-class (Floating r, CompOrd r) => CompReal r where
+
+
+class (Floating r, CompOrd r, Limit Rational r, Limit r r) => CompReal r where
     --receives the desired accuracy and returns an approximation of r
     --formally, |approx n r - r| <= 2^(-n-1)
     approx :: r -> Int -> Rational
@@ -40,72 +42,25 @@ class (Floating r, CompOrd r) => CompReal r where
         where m = approx r n
               e = 1 % pow2 (n+1)
 
+    {-# MINIMAL (approx | bound) #-}
 
-    --Limits can be taken from either functions, centerpoint lists or bound lists, and of either Rationals or ComprReals
-    --This means 6 limit functions are possible, and translating between them agnostically may incur heavy performance penalties
-    --For this reason, the only mandatory implementation in this class is listLimit, since translating to the others has relatively small penalties
-    --However, implementing the other functions directly may still be more efficient depending on the specific CompReal type
-    --Although implementing listLimit is always recomended, translation functions to listLimit using one of the others are available below
+--unambiguated aliases of the limit class
+unapprox :: (CompReal r) => (Int -> Rational) -> r
+unapprox = limit
+listLimit :: (CompReal r) => [(Rational, Rational)] -> r
+listLimit = errorLimit
+realLimit :: (CompReal r) => (Int -> r) -> r
+realLimit = limit
+realListLimit :: (CompReal r) => [(r, r)] -> r
+realListLimit = errorLimit
 
-    --limit of a normalized Cauchy sequence (composed with its modulus of convergence)
-    --formally, |approx (limit s) n - lim s| <= 2^(-n-1)
-    limit :: (Int -> r) -> r
-    limit f = listLimit (map f [0..]) id
-
-    limitRatio :: (Int -> Rational) -> r
-    limitRatio f = listLimitRatio (map f [0..]) id
-
-    --calculates the limit through its modulus of convergence
-    listLimit :: [r] -> (Int -> Int) -> r
-    default listLimit :: (Intervalable r) => [r] -> (Int -> Int) -> r
-    listLimit s a = boundLimit $ map boundX $ zip [0..] $ composeModulusList a s
-        where boundX (i, x) = let r = fromRational (1 % pow2 i+1) in x-r <~> x+r
-
-    listLimitRatio :: [Rational] -> (Int -> Int) -> r
-    listLimitRatio s a = boundLimitRatio $ map boundX $ zip [0..] $ composeModulusList a s
-        where boundX (i, x) = let r = 1 % pow2 i+1 in (x-r, x+r)
-
-    --calculates the limit from a list of arbitrarily shrinking nested intervals
-    --if the list is finite, the last interval must be degenerate (must have a single element)
-    --other than that, there are no restrictions on the convergence rate of the intervals
-    boundLimit :: (Intervalable r) => [Interval r] -> r
-
-    boundLimitRatio :: [(Rational, Rational)] -> r
-    default boundLimitRatio :: (Intervalable r) => [(Rational, Rational)] -> r
-    boundLimitRatio = boundLimit . map (\(l,u) -> fromRational l <~> (fromRational u :: r))
-
-    {-# MINIMAL (approx | bound), boundLimit #-}
+--a default implementation of realListLimit using realLimit and a CompReal restriction
+realListLimitDef :: (CompReal r) => [(r, r)] -> r
+realListLimitDef = realLimit . errorLimitAux p
+    where p n e = snd (bound e (n+1)) <= 1 % pow2 (n+1)
 
 
-composeModulusList :: (Int -> Int) -> [a] -> [a]    --TODO: finite lists
-composeModulusList a = map head . flip (scanl (flip drop)) dif
-    where mcList = map a [0..]  
-          dif = head mcList : zipWith (-) (tail mcList) mcList
-
---penalty from loss of accuracy and diagonal limit
-limitFromLimitRatio :: (CompReal r) => (Int -> r) -> r
-limitFromLimitRatio f = limitRatio (\i -> approx (f (i + 1)) (i + 1))
-
---may cause penalties from use of fromRational
-limitRatioFromLimit :: (CompReal r) => (Int -> Rational) -> r
-limitRatioFromLimit f = limit (fromRational . f)
-
---time penalty from linear list access (TODO: optimize with btree?)
-listLimitFromLimit :: (CompReal r) => [r] -> (Int -> Int) -> r
-listLimitFromLimit s a = limit (composeModulusList a s !!)
-
---listLimitFromListLimitRatio :: (CompReal r) => [r] -> (Int -> Int) -> r
---listLimitFromListLimitRatio s a = listLimitRatio ...  TODO
-
---may cause penalties from use of fromRational
-listLimitRatioFromListLimit :: (CompReal r) => [Rational] -> (Int -> Int) -> r
-listLimitRatioFromListLimit = listLimit . map fromRational
-
---listLimitRatioFromLimitRatio :: (CompReal r) => [Rational] -> (Int -> Int) -> r
---listLimitRatioFromLimitRatio s a = limitRatio ...     TODO
-
-
---TODO: slowly increase prescision as needed?
+--TODO: slowly increase prescision if needed?
 domCompareDef :: (CompReal r) => r -> r -> Int -> OrderingDomain
 domCompareDef x y p | lx == ux && ux == ly && ly == uy  = Top EQ
                     | ux == ly                          = LEQ
@@ -117,45 +72,48 @@ domCompareDef x y p | lx == ux && ux == ly && ly == uy  = Top EQ
           (ly, uy) = bound y p
 
 
---calculates the sum of a series through its modulus of convergence
-seriesSum :: (CompReal r) => [r] -> (Int -> Int) -> r
-seriesSum = listLimit . scanl1 (+)
-
-seriesSumRatio :: (CompReal r) => [Rational] -> (Int -> Int) -> r
-seriesSumRatio = listLimitRatio . scanl1 (+)
-
-
-
-
 instance CompReal ERA.CReal where
-    approx (ERA.CR r) n = r n % pow2 n --TODO: something fishy here... (correctionPi pi)
-    --limit f = ERA.CR (\i -> let ERA.CR g = f (i+1) in ERA.round_uk (g (i + 1) % 2))
+    approx (ERA.CR r) n = r (n+1) % pow2 (n+1)
+
+instance Limit Rational ERA.CReal where
+    limit f = ERA.CR (\i -> ERA.round_uk (f (i+1) * fromInteger (pow2 i)))
+
+instance Limit ERA.CReal ERA.CReal where
+    limit f = ERA.CR (\i -> let ERA.CR g = f (i+1) in ERA.round_uk (g (i+1) % 2))
+    errorLimit = realListLimitDef
 
 instance CompOrd ERA.CReal where
     domCompare = domCompareDef
 
 instance Powers ERA.CReal
-instance Intervalable ERA.CReal
 
 
 
 instance CompReal CDAR.CR where
     approx r n = toRational $ fromJust $ CDAR.centre $ CDAR.require n r
 
-    --limit = CDAR.limCR --the library's implementation is stupidly bad for expensive sequences
-                         --because it looks at the first 70 terms to produce the first Approx
-    limitRatio f = CDAR.CR $ ZipList [CDAR.toApprox i (f i) + CDAR.toApprox i 0 | i <- [0..]]
+instance Limit Rational CDAR.CR where
+    limit f = CDAR.CR $ ZipList [CDAR.Approx (round $ (f i)*(toRational $ pow2 i)) 1 (-i) | i <- [0..]]
+    
+    --This implementation keeps all approximations in the list. the problem is, if the
+    --approximations converge slowly, the list gets huge and causes a heap overflow
+    {-
+    errorLimit = CDAR.CR . ZipList . aux 0
+        where resources startLimit = ZipList $ iterate bumpLimit $ min 80 startLimit
+              bumpLimit p = p * 3 `div` 2
+              aux p [(a,_)] = getZipList $ CDAR.toApprox <$> resources p <*> pure a
+              aux _ ((a,e):as) = CDAR.Approx (round (a*(toRational $ pow2 p))) 1 (-p) : aux p as
+                where p = negate $ min 0 $ logFloor e
+    -}
+
+instance Limit CDAR.CR CDAR.CR where
+    limit = CDAR.limCR
+    errorLimit = realListLimitDef
 
 instance CompOrd CDAR.CR where
     domCompare = domCompareDef
 
 instance Powers CDAR.CR
-
-instance Intervalable CDAR.CR where
-    type Interval CDAR.CR = CDAR.CR
-    x <~> y = CDAR.CR $ ZipList $ zipWith CDAR.unionA (getZipList $ CDAR.unCR x) (getZipList $ CDAR.unCR y)
-    lower = undefined
-    upper = undefined
 
 
 
@@ -170,32 +128,24 @@ instance Intervalable CDAR.CR where
 --This CompReal instance assumes IReals are numbers (all intervals are "thin", that is, have
 --a difference of 2) and as such always converge with the expected modulus
 instance CompReal IReal.IReal where
-    bound r n = let i = IReal.appr r (n + 1); d = pow2 (n + 1) in (IReal.lowerI i % d, IReal.upperI i % d)
+    bound r n = let IReal.I (l,u) = IReal.appr r (n+1); d = pow2 (n+1) in (l % d, u % d)
 
-    boundLimit rs = IReal.ir (\p -> last (take (p+1) ans) p)
-        where ans = aux 0 (zip [0..] rs)
-              aux p [(i, r)] = [\p -> IReal.appr r p]
-              aux p ((i,r):rs) | IReal.radI a < pow2 (i-p+1) = const a : aux (p+1) ((i,r):rs) --TODO: test properly
-                               | otherwise = aux p rs
-                            where a = IReal.appr r i
+instance Limit Rational IReal.IReal where
+    limit f = IReal.ir (\p -> let r = f (p+1) in fromInteger (pow2 p * (numerator r) `div` denominator r))
+
+instance Limit IReal.IReal IReal.IReal where
+    limit f = IReal.ir (\p -> let IReal.I (l,u) = IReal.appr (f (p+1)) (p+1) in IReal.I (l `div` 2, u `div` 2))
+    errorLimit = realListLimitDef
 
 instance CompOrd IReal.IReal where
     domCompare = domCompareDef
-    (<!) = (IReal.<!)
-    (>!) = (IReal.>!)
 
 instance Powers IReal.IReal where
     pow x 0 = 1
+    pow x 1 = x
     pow x n = IReal.ir f
         where x0 = IReal.appr x 0
               f p = IReal.scale (IReal.pow xp n) (p - n*q)
                 where xp = IReal.appr x q
                       q = p + ceiling (logBase 2 (fromIntegral n) :: Double) 
                             + (n-1) * lg2 (IReal.upperI (abs x0)) + n
-
---And here, sometimes an IReal represents an interval and sometimes represents a single number
-instance Intervalable IReal.IReal where
-    type Interval IReal.IReal = IReal.IReal
-    (<~>) = (IReal.-+-)
-    lower = IReal.lower
-    upper = IReal.upper

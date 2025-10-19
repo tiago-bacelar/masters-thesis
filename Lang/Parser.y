@@ -2,7 +2,7 @@
 
 {-# LANGUAGE ExistentialQuantification #-}
 
-module Lang.Parser (parseJaguar, ParseResult(..), Program(..)) where
+module Lang.Parser (parseJaguar, ParseResult(..), Program(..), getFor) where
 
 import Utils
 import Lang.Expr
