@@ -33,12 +33,11 @@ class Limit a r where
     default errorLimit :: (Real a) => [(a, a)] -> r
     errorLimit = limit . errorLimitAux (\n e -> toRational e <= 1 % pow2 (n+1))
 
-
     {-# MINIMAL (limit | errorLimit) #-}
 
 --Translation function between limit and errorLimit.
 --Receives a predicate function to test the condition e <= 1/2^(n+1)
---If the predicate returns True, the condition must be true. If it
+--The predicate can only return True if the condition is met. If it
 --returns False, the condition may be true or false
 errorLimitAux :: (Int -> a -> Bool) -> [(a, a)] -> Int -> a
 errorLimitAux p l = indexOrLast normalized

@@ -2,7 +2,7 @@ module Solver.Solver where
 
 import Utils
 import Limit
-import CompReal (maxCR)
+import CompReal (maxCR, scanlTree1)
 import CompOrd
 import Solver.Powers
 import Solver.Poly
@@ -67,12 +67,12 @@ solvePoly ps = ans
 
           m = max 2 $ maximum $ map degree exs
           bN = normCR exs
-          _M = fromRational (toRational (m - 1)) * bN
+          _M = fromIntegral (m - 1) * bN
 
           --r = |_M*dt|
-          r = 0.5 --has to be between 0 and 1 (exclusive). I chose 0.5 for no reason in particluar
+          r = 0.5 --must be strictly between 0 and 1. I chose 0.5 to make the accuracy double each iteration
           auxs = map fromRational $ iterate (r*) (r / (1 - r))
-          dt = fromRational (recip r) * _M
+          dt = fromRational r / _M
 
           --steps[t][j][k] --TODO: steps[t][acc k][j] not do steps after reaching end of derivs
           steps = zip (map fromInteger [0..]) $ iterate (step dt) x0
@@ -84,5 +84,5 @@ solvePoly ps = ans
           step delta xi = map (errorLimit . replaceLast (\(xij,_) -> (xij,0))) $ zipWith zip terms errs
             where c = scale_coeffs xi
                   gen = generalTerms delta
-                  terms = map (scanl1 (+) . zipWith (*) gen) $ odeDerivs f xi
+                  terms = map (scanlTree1 (+) . zipWith (*) gen) $ odeDerivs f xi
                   errs = map ((<$> auxs) . (*)) c

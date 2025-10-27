@@ -108,7 +108,8 @@ filledPoints color vs = plot $ liftEC $ do
     plot_points_style .= filledCircles 3.5 color
     plot_points_values .= vs
 
-
+--TODO: if rangeT is specified, it shouldn't return a value greater than duration (but we also
+--don't want to evaluate duration because that forces to evaluate the whole program, soooo...)
 getRangeT :: (Fractional a) => Maybe (Rational, Rational) -> Maybe a -> IO (a, a)
 getRangeT (Just (l,r)) _   = return (fromRational l, fromRational r)
 getRangeT Nothing (Just r) = return (0, r)

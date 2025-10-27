@@ -33,6 +33,10 @@ fstOf4 (x,_,_,_) = x
 count :: (Eq a) => a -> [a] -> Int
 count x = length . filter (x ==)
 
+uninterleave :: [a] -> ([a], [a])
+uninterleave (x:y:t) = let (xs,ys) = uninterleave t in (x:xs,y:ys)
+uninterleave xs = (xs,[])
+
 spanList :: ([a] -> Bool) -> [a] -> ([a], [a]) 
 spanList _ [] = ([],[])
 spanList f list@(x:xs) | f list    = (x:ys, zs)

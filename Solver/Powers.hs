@@ -15,9 +15,11 @@ class Num a => Powers a where
    powers :: a -> [a]
    sq = flip pow 2
    pow x n = x ^ n
-   powers x = 1 : aux   --this is equivalent to the expected definition ```iterate (*x) 1```
-      where s = sq x    --but behaves correctly on intervals (as long as sq is well implemented)
-            aux = x : s : map (s*) aux
+   powers x = map (pow x) [0..]
+   
 
-instance Powers Double
-instance Powers Integer
+instance Powers Double where
+   powers x = 1 : iterate (x*) x
+   
+instance Powers Integer where
+   powers x = 1 : iterate (x*) x

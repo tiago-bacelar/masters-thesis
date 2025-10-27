@@ -1,3 +1,5 @@
+{-# LANGUAGE ScopedTypeVariables #-}
+
 module Tests where
 
 import Limit
@@ -25,6 +27,20 @@ correctionPi r = map (containsPi . bound r) [0..300]
 correctionRational :: (CompReal r) => r -> Rational -> [Bool]
 correctionRational r q = map (contains . bound r) [0..]
     where contains (l,u) = l <= q && q <= u
+
+
+gaussSum :: (Num r) => r
+gaussSum = sum $ map fromInteger [1..100] --5050
+
+factorial50 :: (Num r) => r
+factorial50 = product $ map fromInteger [1..50] --30414093201713378043612608166064768844377641568960512000000000000
+
+geometricSeriesRat :: (Limit Rational r) => r
+geometricSeriesRat = limit $ (!!) $ scanl1 (+) $ iterate (/2) $ 1%2
+
+geometricSeriesCR :: forall r. (Fractional r, Limit r r) => r
+geometricSeriesCR = _limit $ (!!) $ map fromRational $ scanl1 (+) $ iterate (/2) $ 1%2
+    where _limit = limit :: (Int -> r) -> r
 
 -- [y, v] (nVars=2)
 ballBounce :: (SimNum r) => Rational -> r

@@ -3,6 +3,7 @@
 --module Benchmarking where
 
 import Solver.Powers
+import Limit
 import CompOrd
 import CompReal
 import Tests
@@ -18,16 +19,18 @@ import qualified ERA.CReal as ERA
 import qualified Data.Number.IReal as IReal
 
 
+type BenchNum r = (Floating r, Powers r, CompOrd r, Limit Rational r, Limit r r)
+
 --a single run takes a test and a precision and benchmarks taking
 --the CompReal outputted from the test up to the given preicison
 run :: (CompReal r) => (() -> r) -> Int -> Benchmarkable
 run r n = nf (uncurry (approx . r)) ((),n)
 
 --a test groups together runs for every implementation and every precision
-test :: String -> [Int] -> (forall r. (CompOrd r, CompReal r, Powers r, Show r) => r) -> Benchmark
+test :: String -> [Int] -> (forall r. (BenchNum r) => r) -> Benchmark
 test name precisions r = bgroup name [
-        --TODO: include Double as a "control"
-        --iRun "CDAR"  (\() -> (r :: CDAR.CR)),       --we do this stupid lambda thing here to prevent sharing
+        --bench "Double" $ nf (\() -> (r :: Double)) (),
+        iRun "CDAR"  (\() -> (r :: CDAR.CR)),         --we do this stupid lambda thing here to prevent sharing
         --iRun "AERN2" (\() -> (r :: AERN2.CReal)),   --in the run function after resolving the polymorphism
         iRun "ERA"   (\() -> (r :: ERA.CReal)),
         iRun "IReal" (\() -> (r :: IReal.IReal)) ]
@@ -38,19 +41,20 @@ test name precisions r = bgroup name [
 myConfig = defaultConfig {
               timeLimit = 2.0,
               --resamples = 10,
-              reportFile = Just "benchmarking/benchmarks/report1.html",
-              csvFile = Just "benchmarking/benchmarks/output1.csv"
+              reportFile = Just "benchmarking/benchmarks/report2.html",
+              csvFile = Just "benchmarking/benchmarks/output2.csv"
            }
 
 --WHEN RUNNING, COMPILE WITH: ghc -O --make Benchmarking
 main = defaultMainWith myConfig [
-       --test "exact_dyadic"      $ fromRational $ 35184372088000 % 35184372088832, -- 2^45
-       --test "dyadic_division"   $ 35184372088000 / 35184372088832,
-       --test "exact_rational"    $ fromRational (22 % 7),
+       --test "exact_dyadic" [0..10]      $ fromRational $ 35184372088000 % 35184372088832, -- 2^45
+       --test "dyadic_division" [0..10]   $ 35184372088000 / 35184372088832,
+       --test "exact_rational" [0..10]    $ fromRational (22 % 7),
 
-       --test "piLeibniz" [8,9]        $ piLeibniz,
+       --test "gauss_sum" [0..2]          $ gaussSum
+       test "piLeibniz" [0..6]        $ piLeibniz
        --test "simple_sum" [8,9]       $ piLeibniz + piLeibniz,
        --test "memo_sum" [8,9]         $ let x = piLeibniz in x + x,
-       --test "double" [8,9]           $ 2 * piLeibniz
-       test "ball_bounce_9" [0..10] $ ballBounce 9
+       --test "doubling" [8,9]           $ 2 * piLeibniz
+       --test "ball_bounce_9" [0..10] $ ballBounce 9
                    ]
