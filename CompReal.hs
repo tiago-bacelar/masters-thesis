@@ -19,7 +19,6 @@ import Data.List
 import Data.Maybe
 import Data.Ratio
 import Control.Applicative
-import GHC.Utils.Misc (thdOf3)
 
 
 class (Floating r, CompOrd r, Limit Rational r, Limit r r) => CompReal r where
@@ -47,6 +46,25 @@ realLimit = limit
 realListLimit :: (CompReal r) => [(r, r)] -> r
 realListLimit = errorLimit
 
+
+class Boundable r where
+    bounds :: r -> (Integer, Integer)
+
+    default bounds :: (RealFrac r) => r -> (Integer, Integer)
+    bounds x = (floor x, ceiling x)
+
+instance Boundable Double
+
+lowerBound :: (Boundable r) => r -> Integer
+lowerBound = fst . bounds
+
+upperBound :: (Boundable r) => r -> Integer
+upperBound = snd . bounds
+
+--a default implementation of Boundable's bounds using a CompReal restriction
+boundsDef :: (CompReal r) => r -> (Integer, Integer)
+boundsDef = (floor >< ceiling) . flip bound 0
+
 --a default implementation of realListLimit using realLimit and a CompReal restriction
 realListLimitDef :: (CompReal r) => [(r, r)] -> r
 realListLimitDef = realLimit . errorLimitAux p
@@ -65,40 +83,6 @@ domCompareDef x y p | lx == ux && ux == ly && ly == uy  = Top EQ
           (ly, uy) = bound y p
 
 
---Balanced fold, minimizing depth of call tree. Assumes associative operator.
---This is useful for CompReals because operations usually try to balance errors by
---splitting it equally among the two terms. Therefore, if an operation is applied across
---a list, the first element will take half of the error, the second will take a quarter, etc
---This function ensures the error is distributed equally across all elements of the list
-foldTree :: (a -> a -> a) -> a -> [a] -> a
-foldTree f u []        = u
-foldTree f u (x:xs)    = foldTree f (f u x) (g xs)
-  where g (x:y:xs)  = f x y : g xs
-        g xs        = xs
-
--- Balanced fold for associative operator over non-empty list.
-foldTree1 :: (a -> a -> a) -> [a] -> a
-foldTree1 f (x:xs) = foldTree f x xs
-
---same as foldTree1, but generates all partial results (from the left)
---evaluating the partial results may require additional applications of f
--- (e.g. scanlTree1 (+) [1,2,3,4] will return [1, 1+2, (1+2)+3, (1+2)+(3+4)]
--- notice how the value (1+2)+3 isn't used in the next term)
-scanlTree1 :: (a -> a -> a) -> [a] -> [a]
-scanlTree1 f = map (thdOf3 . head) . tail . scanl (aux 0) []
-    where aux i [] x = [(x,i,x)]
-          aux i ((y,j,acc):ys) x | i < j = (x,i,f x acc) : (y,j,acc) : ys
-                                 | otherwise = aux (i+1) ys (f x y)
-
---Same as max, but written with a Fractional constraint instead of Ord
-maxCR :: (Fractional a) => a -> a -> a
-maxCR x y = (x + y + abs (x - y)) / 2
-
---Same as maximum, but written with a Fractional constraint instead of Ord
-maximumCR :: (Fractional a) => [a] -> a
-maximumCR = foldTree1 maxCR
-
-
 
 instance CompReal ERA.CReal where
     approx (ERA.CR r) n = r (n+1) % pow2 (n+1)
@@ -112,6 +96,11 @@ instance Limit ERA.CReal ERA.CReal where
 
 instance CompOrd ERA.CReal where
     domCompare = domCompareDef
+    compMax = max
+    compMin = min
+
+instance Boundable ERA.CReal where
+    bounds = boundsDef
 
 instance Powers ERA.CReal where
     pow x 0 = 1
@@ -150,6 +139,11 @@ instance Limit CDAR.CR CDAR.CR where
 instance CompOrd CDAR.CR where
     domCompare = domCompareDef
     infCompare x y = head $ catMaybes $ getZipList $ CDAR.compareCR x y
+    compMax = compMaxDef --TODO?
+    compMin = compMinDef --TODO?
+
+instance Boundable CDAR.CR where
+    bounds = boundsDef
 
 powA :: Int -> CDAR.Approx -> CDAR.Approx
 powA n CDAR.Bottom = CDAR.Bottom
@@ -206,6 +200,11 @@ instance Limit IReal.IReal IReal.IReal where
 
 instance CompOrd IReal.IReal where
     domCompare = domCompareDef
+    compMax = max
+    compMin = min
+
+instance Boundable IReal.IReal where
+    bounds = boundsDef
 
 instance Powers IReal.IReal where
     pow x 0 = 1

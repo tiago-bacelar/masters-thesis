@@ -3,10 +3,7 @@ module Utils where
 import GHC.Num
 import Data.Bits
 import Data.Ratio
-import Debug.Trace
-
-traceX :: (Show a) => a -> a
-traceX x = trace (show x) x
+import GHC.Utils.Misc (thdOf3)
 
 
 pow2 :: Int -> Integer
@@ -26,6 +23,11 @@ logFloor r | r < a_r = a - 1
 (><) :: (a -> b) -> (c -> d) -> (a, c) -> (b, d)
 (><) f g (x, y) = (f x, g y)
 
+(.-.) :: (c -> d) -> (a -> b -> c) -> a -> b -> d
+(.-.) f g x y = f (g x y)
+infixr 9 .-.
+
+
 fstOf4 :: (a, b, c, d) -> a
 fstOf4 (x,_,_,_) = x
 
@@ -42,6 +44,11 @@ spanList _ [] = ([],[])
 spanList f list@(x:xs) | f list    = (x:ys, zs)
                        | otherwise = ([], list)
     where (ys,zs) = spanList f xs
+
+joinWith :: (a -> a -> a) -> [a] -> [a] -> [a]
+joinWith f (x:xs) (y:ys) = f x y : joinWith f xs ys
+joinWith f xs [] = xs
+joinWith f [] ys = ys
 
 --lists must be ordered. f is applied to the same values multiple times (could be optimized)
 mergeOn :: (Ord b) => (a -> b) -> [a] -> [a] -> [a]
@@ -77,5 +84,36 @@ findOrLast p [x] = x
 findOrLast p (x:xs) | p x = x
                     | otherwise = findOrLast p xs
 
+dropOrLast :: Int -> [a] -> [a]
+dropOrLast _ [x] = [x]
+dropOrLast 0 xs = xs
+dropOrLast p (_:xs) = dropOrLast (p-1) xs
+
 indexOrLast :: [a] -> Int -> a
 indexOrLast xs p = last $ take (p+1) xs
+
+
+--Balanced fold, minimizing depth of call tree. Assumes associative operator.
+--This is useful for CompReals because operations usually try to balance errors by
+--splitting it equally among the two terms. Therefore, if an operation is applied across
+--a list, the first element will take half of the error, the second will take a quarter, etc
+--This function ensures the error is distributed equally across all elements of the list
+foldTree :: (a -> a -> a) -> a -> [a] -> a
+foldTree f u []        = u
+foldTree f u (x:xs)    = foldTree f (f u x) (g xs)
+  where g (x:y:xs)  = f x y : g xs
+        g xs        = xs
+
+-- Balanced fold for associative operator over non-empty list.
+foldTree1 :: (a -> a -> a) -> [a] -> a
+foldTree1 f (x:xs) = foldTree f x xs
+
+--same as foldTree1, but generates all partial results (from the left)
+--evaluating the partial results may require additional applications of f
+-- (e.g. scanlTree1 (+) [1,2,3,4] will return [1, 1+2, (1+2)+3, (1+2)+(3+4)]
+-- notice how the value (1+2)+3 isn't used in the next term)
+scanlTree1 :: (a -> a -> a) -> [a] -> [a]
+scanlTree1 f = map (thdOf3 . head) . tail . scanl (aux 0) []
+    where aux i [] x = [(x,i,x)]
+          aux i ((y,j,acc):ys) x | i < j = (x,i,f x acc) : (y,j,acc) : ys
+                                 | otherwise = aux (i+1) ys (f x y)

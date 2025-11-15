@@ -69,7 +69,7 @@ joinComp x y = Hybrid (maybe (const . Left . eval x) h (duration x), liftM2 join
                         Nothing    -> Right (eval x t, eval y (t - d)) --Potentially dangerous
 
 
-compose :: (Ord t, Num t) => HProgram t a -> HProgram t a -> HProgram t a
+compose :: (Num t, Ord t) => HProgram t a -> HProgram t a -> HProgram t a
 compose f g x = let h = f x in join h (g $ endpoint h)
 
 composeComp :: (Num t, CompOrd t) => HProgram t a -> HProgram t a -> a -> Hybrid t (Int -> Either a (a,a))

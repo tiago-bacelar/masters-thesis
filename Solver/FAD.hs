@@ -19,7 +19,7 @@
 
 module Solver.FAD where
 
-import Data.Number.IReal.Scalable
+import Utils
 import Solver.Powers
 
 -- | A 'Dif' value is an infinite list consisting of the values of an infinitely differentiable
@@ -76,9 +76,6 @@ r2chain f1 f2 f1' f2' g = x
 
 -- instances -------------------------------------------------------------------
 
-instance VarPrec a => VarPrec (Dif a) where
-  precB b (D xs) = D (map (precB b) xs)
-
 instance (Num a, Eq a) => Eq (Dif a) where
   x==y          = val x == val y
 
@@ -116,6 +113,7 @@ instance (Floating a, Powers a) => Floating (Dif a) where
 
 instance (Num a, Powers a) => Powers (Dif a) where
    pow x 0  = con 1
+   pow x 1  = x --this case isn't needed but adding it improves performance
    pow x n  = chain (flip pow n) ((fromIntegral n *) . flip pow (n-1)) x 
    -- Note: This is linear in n, but behaves correctly on intervals
 
@@ -146,6 +144,7 @@ instance ( Powers a, RealFloat a) => RealFloat (Dif a) where
 
 -- convs xs ys = [ sum [xs!!j * ys!!(k-j)*bin k j | j <- [0..k]] | k <- [0..]]
 -- adapted for efficiency and to handle finite lists xs, ys 
+convs :: Num a => [a] -> [a] -> [a]
 convs [] _ = []
 convs (a:as) bs = convs' [1] [a] as bs
   where convs' _ _ _ [] = []
@@ -157,4 +156,4 @@ convs (a:as) bs = convs' [1] [a] as bs
         convs'' ps ars (_:bs) = sumProd3 ps ars bs : convs'' (next' ps) ars bs
         next xs = 1 : zipWith (+) xs (tail xs) ++ [1] -- next row in Pascal's triangle
         next' xs = zipWith (+) xs (tail xs) ++ [1] -- end part of next row in Pascal's triangle 
-        sumProd3 as bs cs = sum (zipWith3 (\x y z -> x*y*z) as bs cs)
+        sumProd3 as bs cs = foldTree1 (+) (zipWith3 (\x y z -> fromInteger x*y*z) as bs cs)

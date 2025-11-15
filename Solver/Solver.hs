@@ -1,12 +1,16 @@
+{-# LANGUAGE DefaultSignatures #-}
+
 module Solver.Solver where
 
 import Utils
 import Limit
-import CompReal (maxCR, scanlTree1)
+import CompReal
 import CompOrd
 import Solver.Powers
 import Solver.Poly
 import Solver.FAD
+
+import Tracing
 
 import Data.List hiding (singleton)
 import Data.Maybe (fromJust)
@@ -54,35 +58,44 @@ solve f t0 x0 = \t -> step (t0,x0) (t-t0) --let (tm,xm) = last ((t0, x0) : takeW
 --  > solve f 0 [0] 1 :: [IReal] -- [1]
 -}
 
---TODO: test this (the coeffs are different in the paper)
-scale_coeffs :: (Fractional a) => [a] -> [a]
-scale_coeffs = map (maxCR 1 . abs)
 
-
-solvePoly :: (Fractional r, Powers r, CompOrd r, Limit r r) => [(r, Poly r)] -> r -> [r]
-solvePoly ps = ans
-    where (x0, exs) = unzip ps
-          ds = map (evalPoly . fmap con) exs
-          f x = map ($ (x !!)) ds
+solvePoly :: (Fractional r, Powers r, CompOrd r, Limit r r, Boundable r) => [(r, Poly r)] -> r -> [r]
+solvePoly ps = ans . numCoef
+    where (x0, exs) = traceWith (("exs: "++) . show . map (fmap (bsOrd (-1000) 1000)) . snd) $ unzip ps
+          ds = map (evalCoef .-. evalPoly . fmap con) exs
+          f x = map ($ x) ds
 
           m = max 2 $ maximum $ map degree exs
-          bN = normCR exs
-          _M = fromIntegral (m - 1) * bN
+          bN = compNorm exs
+          _M = traceCR "_M" $ fromIntegral (m - 1) * bN
 
           --r = |_M*dt|
           r = 0.5 --must be strictly between 0 and 1. I chose 0.5 to make the accuracy double each iteration
-          auxs = map fromRational $ iterate (r*) (r / (1 - r))
-          dt = fromRational r / _M
+          dt = traceCR "dt" $ fromRational r / _M
+
+          genTermsDT = generalTerms $ evalCoef dt
+          stepDT xi = map (limit . indexOrLast . uncurry dropOrLast) $ zip ks terms --TODO: optimize list access?
+            where terms = map (scanlTree1 (+) . zipWith (*) genTermsDT) $ odeDerivs f xi
+                  ks = traceX "ks" $ map ((1+) . lg2 . max 1 . pred . (2*) . upperBound . abs) xi
+
+          {-
+          stepDelta delta xi = map (limit . ) $ zip ks terms --TODO: optimize list access?
+            where r = traceCR "r" $ _M * delta --assumes delta is positive
+                  genTerms = generalTerms delta
+                  terms = map (scanlTree1 (+) . zipWith (*) genTermsDT) $ odeDerivs f xi
+                  ks = traceX "ks" $ map (\a -> ) xi --TODO: take delta into account
+          -}
+          --this definition of stepDelta is correct, but can be improved. check the comented version (not done yet)
+          stepDelta delta xi = map (limit . indexOrLast . uncurry dropOrLast) $ zip ks terms
+            where genTerms = generalTerms $ evalCoef delta
+                  terms = map (scanlTree1 (+) . zipWith (*) genTerms) $ odeDerivs f xi
+                  ks = traceX "ks" $ map ((1+) . lg2 . max 1 . pred . (2*) . upperBound . abs) xi
 
           --steps[t][j][k] --TODO: steps[t][acc k][j] not do steps after reaching end of derivs
-          steps = zip (map fromInteger [0..]) $ iterate (step dt) x0
+          steps = zip (map fromInteger [0..]) $ iterate stepDT x0
+          --traceList "steps" (show . map bounds . snd) $
 
-          ans t = step dt2 xi
+          ans t = stepDelta dt2 xi
             where s = t / dt
-                  (i, xi) = fromJust $ find (\(i,_) -> not $ (i <! s) 0) steps
-                  dt2 = t - i * dt
-          step delta xi = map (errorLimit . replaceLast (\(xij,_) -> (xij,0))) $ zipWith zip terms errs
-            where c = scale_coeffs xi
-                  gen = generalTerms delta
-                  terms = map (scanlTree1 (+) . zipWith (*) gen) $ odeDerivs f xi
-                  errs = map ((<$> auxs) . (*)) c
+                  (i, xi) = (traceCR "i" >< id) $ fromJust $ find (\(i,_) -> not $ (i <! s) 0) steps
+                  dt2 = traceCR "dt2" $ t - i * dt --TODO: ensure 0.25 < r < 0.75 (or some other bound? right now i *think* its between 0 and 0.5(ish))

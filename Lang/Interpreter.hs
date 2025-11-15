@@ -3,6 +3,7 @@ module Lang.Interpreter where
 import Utils
 import Limit
 import CompOrd
+import CompReal
 import Lang.Hybrid
 import Lang.Parser
 import Solver.Poly
@@ -16,7 +17,7 @@ import Control.Applicative (liftA2)
 import Control.Monad (ap)
 import Control.Monad.State as MS (State, runState, evalState, get, put)
 
-type SimNum r = (Floating r, Powers r, CompOrd r, Limit r r)
+type SimNum r = (Floating r, Powers r, CompOrd r, Limit r r, Boundable r)
 
 --TODO: make Und a function of desired precision
 --TODO: add line and source code of errors
@@ -115,13 +116,12 @@ evalBExpr e s = do
         Just b -> return b
         Nothing -> failE "Comparison precision exhausted"
 
-evalFor :: (Floating r, Powers r, CompOrd r, Limit r r) => [Ident] -> [(Expr, Poly r)] -> PState r -> r -> PState r
+evalFor :: (Floating r, Powers r, CompOrd r, Limit r r, Boundable r) => [Ident] -> [(Expr, Poly r)] -> PState r -> r -> PState r
 evalFor [] _ s = \dt -> s { time = time s + dt }
-evalFor is ps s = ans
-    where rs = map ((`evalExpr` (evalVar s)) >< id) ps
+evalFor is ps s = \dt -> s { time = time s + dt, variables = updateVars (variables s) (f dt) }
+    where f = solvePoly $ map ((`evalExpr` (evalVar s)) >< id) ps
           --updates the (whole) list of vars by changing only the ones with a differential expression
-          updateVars old = map (uncurry fromMaybe) . zip old . maybeIndexes . zip is 
-          ans dt = s { time = time s + dt, variables = updateVars (variables s) $ solvePoly rs dt }
+          updateVars old = map (uncurry fromMaybe) . zip old . maybeIndexes . zip is
 
 
 incStep :: PState r -> PState r

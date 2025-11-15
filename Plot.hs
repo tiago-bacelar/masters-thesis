@@ -1,3 +1,4 @@
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE DefaultSignatures #-}
 
 module Plot (PlotConfig(..), defPlotConfig, Plottable(..)) where

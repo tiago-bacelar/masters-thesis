@@ -2,7 +2,10 @@
 
 module CompOrd where
 
+import Utils
+
 import Data.Maybe
+import Debug.Trace
 
 
 data OrderingDomain = Bottom | LEQ | NEQ | GEQ | Top Ordering deriving (Eq)
@@ -39,12 +42,37 @@ class CompOrd a where
     infCompare :: a -> a -> Ordering
     (<!) :: a -> a -> Int -> Bool
     (>!) :: a -> a -> Int -> Bool
+    compMax :: a -> a -> a
+    compMin :: a -> a -> a
 
     default domCompare :: (Ord a) => a -> a -> Int -> OrderingDomain
     domCompare x y _ = Top (compare x y)
     infCompare x y = head $ catMaybes $ map (asTop . domCompare x y) [0..]
     x <! y = extendedBy (Top LT) . domCompare x y
     x >! y = extendedBy (Top GT) . domCompare x y
+    compMax x y = case infCompare x y of
+                    LT -> y
+                    _  -> x
+    compMin x y = case infCompare x y of
+                    LT -> x
+                    _  -> y
 
 instance CompOrd Double
 instance CompOrd Integer
+
+
+--a default implementation of compMax using a Fractional constraint
+compMaxDef :: (Fractional a) => a -> a -> a
+compMaxDef x y = (x + y + abs (x - y)) / 2
+
+--a default implementation of compMin using a Fractional constraint
+compMinDef :: (Fractional a) => a -> a -> a
+compMinDef x y = (x + y - abs (x - y)) / 2
+
+
+
+compMaximum :: (CompOrd a) => [a] -> a
+compMaximum = foldTree1 compMax
+
+compMinimum :: (CompOrd a) => [a] -> a
+compMinimum = foldTree1 compMin
