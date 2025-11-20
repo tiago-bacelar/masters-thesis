@@ -5,7 +5,6 @@ module CompOrd where
 import Utils
 
 import Data.Maybe
-import Debug.Trace
 
 
 data OrderingDomain = Bottom | LEQ | NEQ | GEQ | Top Ordering deriving (Eq)
@@ -42,20 +41,23 @@ class CompOrd a where
     infCompare :: a -> a -> Ordering
     (<!) :: a -> a -> Int -> Bool
     (>!) :: a -> a -> Int -> Bool
-    compMax :: a -> a -> a
     compMin :: a -> a -> a
+    compMax :: a -> a -> a
 
     default domCompare :: (Ord a) => a -> a -> Int -> OrderingDomain
     domCompare x y _ = Top (compare x y)
     infCompare x y = head $ catMaybes $ map (asTop . domCompare x y) [0..]
     x <! y = extendedBy (Top LT) . domCompare x y
     x >! y = extendedBy (Top GT) . domCompare x y
-    compMax x y = case infCompare x y of
-                    LT -> y
-                    _  -> x
+    
+    --TODO: rewrite using domCompare (to search for GEQ and LEQ)
     compMin x y = case infCompare x y of
                     LT -> x
                     _  -> y
+    compMax x y = case infCompare x y of
+                    LT -> y
+                    _  -> x
+    
 
 instance CompOrd Double
 instance CompOrd Integer

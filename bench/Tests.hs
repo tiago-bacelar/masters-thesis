@@ -1,14 +1,13 @@
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE FlexibleContexts #-}
 
 module Tests where
 
 import Limit
-import CompOrd
 import CompReal
 import Lang.Expr
 import Lang.Parser
 import Lang.Interpreter
-import Solver.Powers
 
 import Data.Ratio ((%))
 
@@ -16,17 +15,23 @@ import Data.Ratio ((%))
 piLeibniz :: (Num r, Limit Rational r) => r
 piLeibniz = 4 * calabreseSum [1 % (2 * k + 1) | k <- [0..]]
 
+
+--given the actual value of a CompReal, tests the correction of all its approximations
+correction :: (CompReal r) => Rational -> r -> [Bool]
+correction ans r = map (contains . bound r) [0..]
+    where contains (l,u) = l <= ans && ans <= u
+
 --this serves as a test for the CompReal instance
---if any of its methods are poorly implemented, 'correctionPi piLeibniz' may return false
+--if any of its methods are poorly implemented, 'correctionPi pi'
+--or 'correctionPi piLeibniz' may return false
 correctionPi :: (CompReal r) => r -> [Bool]
-correctionPi r = map (containsPi . bound r) [0..300]
-    where containsPi (l,u) = l <= ratPi && ratPi <= u
-          ratPi = 31415926535897932384626433832795028841971693993751058209749445923078164062862089986280348253421170679 % 10^100
+correctionPi = take 300 . correction ratPi
+    where ratPi = 31415926535897932384626433832795028841971693993751058209749445923078164062862089986280348253421170679 % 10^100
 
-
-correctionRational :: (CompReal r) => r -> Rational -> [Bool]
-correctionRational r q = map (contains . bound r) [0..]
-    where contains (l,u) = l <= q && q <= u
+--if any of CompReals methods are poorly implemented, 'correctionSqrt2 (2 ** 0.5)' may return false
+correctionSqrt2 :: (CompReal r) => r -> [Bool]
+correctionSqrt2 = take 300 . correction ratSqrt2
+    where ratSqrt2 = 14142135623730950488016887242096980785696718753769480731766797379907324784621070388503875343276415727 % 10^100
 
 
 gaussSum :: (Num r) => r

@@ -1,3 +1,8 @@
+{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE TupleSections #-}
+{-# LANGUAGE FlexibleContexts #-}
+
+
 module Solver.Poly (Poly, toPoly, evalPoly, numCoef, evalCoef, joinCoef, degree, norm, compNorm) where
 
 import Utils
@@ -10,10 +15,8 @@ import Data.Maybe (isNothing, fromJust)
 import Data.Map hiding (map, singleton, filter)
 import qualified Data.Map as Map
 import GHC.Exts (groupWith)
-import Control.Applicative (liftA2)
 import Control.Monad.Reader
 import Control.Monad.State
-import Data.Ratio
 import GHC.Real (Ratio(..))
 
 --coefficients are the product of an integer part and a real part for efficency
@@ -30,16 +33,16 @@ evalCoef (Coef (-1, Just c)) = negate c
 evalCoef (Coef (n, Just c)) = fromRational n * c
 
 coefAux :: (Fractional a) => (Rational -> b) -> (a -> b) -> Coef a -> b
-coefAux f g (Coef (n, Nothing)) = f n
-coefAux f g (Coef (0, _)) = f 0
-coefAux f g x = g (evalCoef x)
+coefAux f _ (Coef (n, Nothing)) = f n
+coefAux f _ (Coef (0, _)) = f 0
+coefAux _ g x = g (evalCoef x)
 
 coef2Aux :: (Fractional a, Fractional b) => (Rational -> Rational -> c) -> (a -> b -> c) -> Coef a -> Coef b -> c
-coef2Aux f g (Coef (n, Nothing)) (Coef (m, Nothing)) = f n m
-coef2Aux f g (Coef (0, _)) (Coef (0, _)) = f 0 0
-coef2Aux f g (Coef (n, Nothing)) (Coef (0, _)) = f n 0
-coef2Aux f g (Coef (0, _)) (Coef (m, Nothing)) = f 0 m
-coef2Aux f g x y = g (evalCoef x) (evalCoef y)
+coef2Aux f _ (Coef (n, Nothing)) (Coef (m, Nothing)) = f n m
+coef2Aux f _ (Coef (0, _)) (Coef (0, _)) = f 0 0
+coef2Aux f _ (Coef (n, Nothing)) (Coef (0, _)) = f n 0
+coef2Aux f _ (Coef (0, _)) (Coef (m, Nothing)) = f 0 m
+coef2Aux _ g x y = g (evalCoef x) (evalCoef y)
 
 instance (Fractional r, Show r) => Show (Coef r) where
     show (Coef (0, _)) = "0"
@@ -71,8 +74,7 @@ instance (Fractional r) => Num (Coef r) where
     abs = Coef . (abs >< fmap abs) . unCoef
     signum (Coef (n, mx)) = case signum n of
                             0  -> 0
-                            1  -> Coef (1, fmap signum mx)
-                            -1 -> Coef (-1, fmap signum mx)
+                            s  -> Coef (s, fmap signum mx)
     fromInteger n = Coef (fromInteger n, Nothing)
 
 instance (Fractional r) => Fractional (Coef r) where
@@ -83,7 +85,7 @@ instance (Fractional r) => Fractional (Coef r) where
     fromRational n = Coef (n, Nothing)
 
 instance (Fractional r, Powers r) => Powers (Coef r) where
-    pow x 0 = 1
+    pow _ 0 = 1
     pow x 1 = x
     pow x n = coefAux (fromRational . (^^n)) (numCoef . (`pow` n)) x
 
@@ -109,8 +111,8 @@ newtype Poly r = Poly { unPoly :: [([Int], Coef r)] } deriving (Functor)
 instance (Fractional r, Show r) => Show (Poly r) where
     show (Poly []) = "0"
     show (Poly [([],c)]) = show c
-    show p = concat $ intersperse " + " [show c ++ concat (map showVar $ zip [0..] vs) | (vs,c) <- unPoly p]
-        where showVar (i,0) = ""
+    show p = concat $ intersperse " + " [show c ++ concat (map showVar $ zip ([0..] :: [Integer]) vs) | (vs,c) <- unPoly p]
+        where showVar (_,0) = ""
               showVar (i,1) = "x_" ++ show i
               showVar (i,n) = "x_" ++ show i ++ "^" ++ show n
 
@@ -136,6 +138,7 @@ evalPoly p xs = mySum [c * myProduct (map (uncurry pow) $ filter ((/=0) . snd) $
 --raises an error if the polynomial isn't constant
 fromConstPoly :: Poly r -> Coef r
 fromConstPoly (Poly [([], c)]) = c
+fromConstPoly _ = error "fromConstPoly: failed to parse non const poly"
 
 instance (Fractional r) => Num (Poly r) where
     p + q = Poly $ map (\((k,c):t) -> (k, sum (c:map snd t))) $ groupWith fst $ mergeOn fst (unPoly p) (unPoly q)
@@ -279,8 +282,8 @@ polyGen (Var (V i)) rec = do
         returnNotConst $ do
             (v,_) <- aux
             return (varPoly $ fromJust mv, v)
-polyGen (Num c) rec = returnConst $ return (constPoly $ fromRational c, 0)
-polyGen (Const c) rec = returnConst $ return (constPoly $ numCoef $ evalConst c, 0)
+polyGen (Num c) _ = returnConst $ return (constPoly $ fromRational c, 0)
+polyGen (Const c) _ = returnConst $ return (constPoly $ numCoef $ evalConst c, 0)
 polyGen (Func Neg ex) rec = myFMap (negate >< negate) (rec ex)
 polyGen (Func Exp ex) rec = shortConst (rec ex) (numCoef . exp . evalCoef) $ \aux -> do
     p <- addVar (Func Exp ex)
@@ -349,7 +352,7 @@ polyGen (Op Pow ex1 ex2) rec = shortConst2 (rec ex1) (rec ex2) coefRealPow const
             p <- addVar (Op Pow ex1 ex2)
             returnNotConst $ do
                 (v1,_)  <- aux1
-                (v2,d2) <- aux2
+                (_,d2) <- aux2
                 return (p, scalePoly (numCoef $ log $ evalCoef $ fromConstPoly v1) (p * d2))
           const2 aux1 aux2 = do
             p <- addVar (Op Pow ex1 ex2)

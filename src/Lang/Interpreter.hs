@@ -1,3 +1,7 @@
+{-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE DeriveFoldable #-}
+{-# LANGUAGE DeriveFunctor #-}
+
 module Lang.Interpreter where
 
 import Utils
@@ -11,11 +15,9 @@ import Solver.Powers
 import Solver.Solver
 import Lang.Expr hiding (E)
 
-import Data.List (sortOn)
-import Data.Maybe (isJust, fromMaybe)
-import Control.Applicative (liftA2)
+import Data.Maybe (fromMaybe)
 import Control.Monad (ap)
-import Control.Monad.State as MS (State, runState, evalState, get, put)
+import Control.Monad.State as MS (State, runState, get, put)
 
 type SimNum r = (Floating r, Powers r, CompOrd r, Limit r r, Boundable r)
 
@@ -32,6 +34,7 @@ instance Traversable RunResult where
 
 fromVal :: RunResult a -> a
 fromVal (Val x) = x
+fromVal _ = error "fromVal: failed to parse non val RunResult"
 
 allVals :: RunResult a -> [a]
 allVals (Val x)    = [x]
@@ -59,7 +62,7 @@ instance (Num r) => Applicative (E r) where
 --as the hybrid x is instantaneous (has duration 0)
 instance (Num r) => Monad (E r) where
     x >>= f = E $ do { v <- runE x; runE (liftF $ mEndpoint v) }
-        where liftF (Just (Val x))   = f x
+        where liftF (Just (Val y))   = f y
               liftF (Just (Err e))   = failE e
               liftF (Just (Und _ _)) = error "wtf"
               liftF Nothing          = error "wtf"
@@ -127,7 +130,7 @@ evalFor is ps s = \dt -> s { time = time s + dt, variables = updateVars (variabl
 incStep :: PState r -> PState r
 incStep s = s { step = step s + 1 }
 
-fromHybrid :: (Num r) => (Hybrid r a) -> E r a
+fromHybrid :: (Hybrid r a) -> E r a
 fromHybrid h = E $ return $ fmap Val h
 
 validateT :: (Num r, CompOrd r) => r -> E r ()
@@ -150,7 +153,7 @@ interpret (Seq p q) s            = E $ do
     let cmpPrec = cmp eState
     case mEndpoint h of
         Just (Val s2) -> runE (interpret q s2) >>= return . fmap (either id (\(x,y) -> Und (allVals x ++ allVals y) (maybeError y)) . ($ cmpPrec)) . joinComp h
-        Just (Err e)      -> return h
+        Just (Err _)      -> return h
         Just (Und _ _)    -> error "wtf"
         Nothing           -> return h
 

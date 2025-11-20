@@ -1,13 +1,12 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE DefaultSignatures #-}
 
 module Limit where
 
 import Utils
-import CompOrd
 
 import Data.Ratio ((%))
-import Control.Applicative
 
 
 class Limit a r where
@@ -42,13 +41,13 @@ class Limit a r where
 errorLimitAux :: (Int -> a -> Bool) -> [(a, a)] -> Int -> a
 errorLimitAux p l = indexOrLast normalized
         where normalized = aux 0 l
-              aux n [(x,_)] = [x]
+              aux _ [(x,_)] = [x]
               aux n ((x,e):xs) | p n e = x : aux (n+1) ((x,e):xs)
                                | otherwise = aux n xs
 
 instance Limit Rational Double where
     errorLimit = fromRational . fst . findOrLast p
-        where p (x, e) = fromRational (x + e) == fromRational x
+        where p (x, e) = fromRational (x + e) == (fromRational x :: Double)
 
 instance Limit Double Double where
     errorLimit = fst . findOrLast p

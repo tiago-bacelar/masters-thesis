@@ -1,10 +1,5 @@
-#generated
-bin/
-Lang/Parser.hs
-
-#executables
-bench
-jaguar
+.stack-work/
+*~
 
 #testing
 input.txt

@@ -1,4 +1,7 @@
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE DefaultSignatures #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FlexibleContexts #-}
 
 module CompReal where
 
@@ -9,11 +12,13 @@ import Solver.Powers
 
 import qualified ERA.CReal as ERA --available in numbers as Data.Numbers.CReal, but that version doesn't export CR, making it kinda useless
 import qualified Data.CDAR as CDAR
---import qualified AERN2.Real as AERN2
+import qualified AERN2.Real as AERN2
+import qualified AERN2.MP as AERN2((+-), ball_value)
 import qualified Data.Number.IReal as IReal
 import qualified Data.Number.IReal.IReal as IReal(ir, appr)
 import qualified Data.Number.IReal.IntegerInterval as IReal(IntegerInterval(..), upperI)
 
+import qualified MixedTypesNumPrelude as MTNP
 import Data.Bits
 import Data.List
 import Data.Maybe
@@ -84,38 +89,6 @@ domCompareDef x y p | lx == ux && ux == ly && ly == uy  = Top EQ
 
 
 
-instance CompReal ERA.CReal where
-    approx (ERA.CR r) n = r (n+1) % pow2 (n+1)
-
-instance Limit Rational ERA.CReal where
-    limit f = ERA.CR (\i -> ERA.round_uk (f i * fromInteger (pow2 i)))
-
-instance Limit ERA.CReal ERA.CReal where
-    limit f = ERA.CR (\i -> let ERA.CR g = f (i+1) in ERA.round_uk (g (i+1) % 2))
-    errorLimit = realListLimitDef
-
-instance CompOrd ERA.CReal where
-    domCompare = domCompareDef
-    compMax = max
-    compMin = min
-
-instance Boundable ERA.CReal where
-    bounds = boundsDef
-
-instance Powers ERA.CReal where
-    pow x 0 = 1
-    pow x 1 = x
-    pow (ERA.CR x') n = ERA.CR f
-        where x0 = x' 0
-              scale x n | n >= 0    = shift x n
-                        | otherwise = shift (x + bit (-n-1)) n
-              f p = scale (xp ^ n) (p - n*q)
-                where xp = x' q
-                      q = p + ceiling (logBase 2 (fromIntegral n) :: Double) 
-                            + (n-1) * lg2 (abs x0 + 1) + n
-
-
-
 instance CompReal CDAR.CR where
     approx r n = toRational $ fromJust $ CDAR.centre $ CDAR.require n r
 
@@ -133,20 +106,20 @@ instance Limit Rational CDAR.CR where
     -}
 
 instance Limit CDAR.CR CDAR.CR where
-    limit = CDAR.limCR
+    limit f = CDAR.limCR (f . (max 0) . pred)
     errorLimit = realListLimitDef --TODO??
 
 instance CompOrd CDAR.CR where
     domCompare = domCompareDef
     infCompare x y = head $ catMaybes $ getZipList $ CDAR.compareCR x y
-    compMax = compMaxDef --TODO?
     compMin = compMinDef --TODO?
+    compMax = compMaxDef --TODO?
 
 instance Boundable CDAR.CR where
     bounds = boundsDef
 
 powA :: Int -> CDAR.Approx -> CDAR.Approx
-powA n CDAR.Bottom = CDAR.Bottom
+powA _ CDAR.Bottom = CDAR.Bottom
 powA n (CDAR.Approx m e s)
     | even n && am <= e = CDAR.Approx ame ame (n*s-1)
     | even n && m < 0   = CDAR.Approx (a+b) (b-a) (n*s-1)
@@ -170,7 +143,7 @@ powersA (CDAR.Approx m e s) = map aux $ tail $ zip4 [1..] (iterate (ame0*) ame0)
             | otherwise         = CDAR.Approx (a+b) (a-b) (n*s-1)
 
 instance Powers CDAR.CR where
-    pow x 0 = 1
+    pow _ 0 = 1
     pow x 1 = x
     pow x n = CDAR.CR $ fmap (powA n) $ CDAR.unCR x
     --powers x = 1 : x : (map (CDAR.CR . ZipList) $ transpose $ map powersA $ getZipList $ CDAR.unCR x)
@@ -178,9 +151,61 @@ instance Powers CDAR.CR where
 
 
 
---instance CompReal AERN.RealNumber where
---    approx 
+instance CompReal AERN2.CReal where
+    approx x n = toRational $ AERN2.ball_value $ MTNP.unCN $ x AERN2.? AERN2.bits n
 
+instance Limit Rational AERN2.CReal where
+    limit f = AERN2.CSequence [MTNP.cn $ f i AERN2.+- (1 % pow2 (i+1)) | i <- [0..]] --TODO: fix
+
+instance Limit AERN2.CReal AERN2.CReal where
+    limit f = AERN2.limit (f . (max 0) . pred)
+    errorLimit = realListLimitDef --TODO?
+
+instance CompOrd AERN2.CReal where
+    domCompare = domCompareDef
+    compMin = MTNP.min
+    compMax = MTNP.max
+
+instance Boundable AERN2.CReal where
+    bounds = boundsDef
+
+instance Powers AERN2.CReal where
+    pow = MTNP.pow
+
+
+
+instance CompReal ERA.CReal where
+    approx (ERA.CR r) n = r (n+1) % pow2 (n+1)
+
+instance Limit Rational ERA.CReal where
+    limit f = ERA.CR (\i -> ERA.round_uk (f i * fromInteger (pow2 i)))
+
+instance Limit ERA.CReal ERA.CReal where
+    limit f = ERA.CR (\i -> let ERA.CR g = f (i+1) in ERA.round_uk (g (i+1) % 2))
+    errorLimit = realListLimitDef
+
+instance CompOrd ERA.CReal where
+    domCompare = domCompareDef
+    compMin = min
+    compMax = max
+
+instance Boundable ERA.CReal where
+    bounds = boundsDef
+
+instance Powers ERA.CReal where
+    pow _ 0 = 1
+    pow x 1 = x
+    pow (ERA.CR x') n = ERA.CR f
+        where x0 = x' 0
+              scale x n | n >= 0    = shift x n
+                        | otherwise = shift (x + bit (-n-1)) n
+              f p = scale (xp ^ n) (p - n*q)
+                where xp = x' q
+                      q = p + ceiling (logBase 2 (fromIntegral n) :: Double) 
+                            + (n-1) * lg2 (abs x0 + 1) + n
+
+
+--TODO: exact-real
 
 
 --ireal is a bit unique, because it explicitely uses IReals to represent open real intervals
@@ -200,14 +225,14 @@ instance Limit IReal.IReal IReal.IReal where
 
 instance CompOrd IReal.IReal where
     domCompare = domCompareDef
-    compMax = max
     compMin = min
+    compMax = max
 
 instance Boundable IReal.IReal where
     bounds = boundsDef
 
 instance Powers IReal.IReal where
-    pow x 0 = 1
+    pow _ 0 = 1
     pow x 1 = x
     pow x n = IReal.ir f
         where x0 = IReal.appr x 0

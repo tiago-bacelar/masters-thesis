@@ -1,0 +1,86 @@
+name:                jaguar
+version:             0.1.0.0
+github:              "tiago-bacelar/jaguar"
+license:             BSD-3-Clause
+author:              "Tiago Bacelar"
+maintainer:          "pereira.migueltiago@gmail.com"
+copyright:           "2025 Tiago Bacelar"
+
+extra-source-files:
+- README.md
+- CHANGELOG.md
+
+# Metadata used when publishing your package
+# synopsis:            Short description of your package
+# category:            Web
+
+# To avoid duplicated efforts in documentation and dealing with the
+# complications of embedding Haddock markup inside cabal files, it is
+# common to point users to the README.md file.
+description:         Please see the README on GitHub at <https://github.com/tiago-bacelar/jaguar#readme>
+
+dependencies:
+- base >= 4.7 && < 5
+- ghc
+- containers
+- array
+- mtl
+- Chart
+- Chart-cairo
+- mixed-types-num
+#- numbers  #(ERA is imported directy as a src file to export its constructors)
+- cdar
+- aern2-mp
+- aern2-real
+- ireal
+
+build-tools:
+- happy
+
+ghc-options:
+- -Wall
+- -Wcompat
+- -Widentities
+- -Wincomplete-record-updates
+- -Wincomplete-uni-patterns
+- -Wmissing-export-lists
+- -Wmissing-home-modules
+- -Wpartial-fields
+- -Wredundant-constraints
+
+library:
+  source-dirs: src
+
+executables:
+  jaguar-exe:
+    main:                Main.hs
+    source-dirs:         app
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - jaguar
+
+tests:
+  jaguar-test:
+    main:                Spec.hs
+    source-dirs:         test
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - jaguar
+
+benchmarks:
+  jaguar-bench:
+    main:                Benchmark.hs
+    source-dirs:         bench
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - jaguar
+    - criterion

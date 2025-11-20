@@ -1,9 +1,10 @@
+{-# LANGUAGE DeriveFunctor #-}
+
 module Lang.Hybrid where
 
 import CompOrd
 
 import Control.Monad (ap, liftM2)
-import Data.Maybe
 
 --plugging in a t less than 0 or greater than the duration should be invalid
 --endpoint is memo'ed to avoid unnecessary time comparisons

@@ -30,8 +30,10 @@ newtype Dif a = D [a] deriving Show
 
 -- constructing Dif values -----------------------------------------------------
 
-con, var :: Num a => a -> Dif a
-con c = D [c] 
+con :: a -> Dif a
+con c = D [c]
+
+var :: Num a => a -> Dif a
 var x = D [x,1]
 
 mkDif :: a -> Dif a -> Dif a
@@ -43,7 +45,7 @@ val :: Num a => Dif a -> a
 val (D []) = 0
 val (D (x:_)) = x
 
-fromDif :: Num a => Dif a -> [a]
+fromDif :: Dif a -> [a]
 fromDif (D xs) = xs
 
 unDif :: (Num a, Num b) => (Dif a -> Dif b) -> a -> b
@@ -58,8 +60,8 @@ df n (D xs) = D (drop n xs)
 deriv :: (Num a, Num b) => Int -> (Dif a -> Dif b) -> a -> b
 deriv n f = unDif (df n . f)
 
--- | derivs f a is the list of allderivatives of f, evaluated at a.
-derivs :: (Num a, Num b) => (Dif a -> Dif b) -> a -> [b]
+-- | derivs f a is the list of all derivatives of f, evaluated at a.
+derivs :: (Num a) => (Dif a -> Dif b) -> a -> [b]
 derivs f = fromDif . f . var
 
 chain, rchain :: Num a => (a -> a) -> (Dif a -> Dif a) -> Dif a -> Dif a

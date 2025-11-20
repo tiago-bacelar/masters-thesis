@@ -1,15 +1,17 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE DefaultSignatures #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TupleSections #-}
 
 module Plot (PlotConfig(..), defPlotConfig, Plottable(..)) where
 
 import Utils
 import CompReal
 import Lang.Hybrid
-import Lang.Interpreter
+import Lang.Interpreter (RunResult, allVals)
 import CompOrd
 
---using https://hackage.haskell.org/package/Chart
 --needs packages Chart and Chart-cairo
 import Graphics.Rendering.Chart.Easy hiding (points, both)
 import Graphics.Rendering.Chart.Backend.Cairo
@@ -18,7 +20,7 @@ import Prelude hiding (lines)
 import Control.Applicative (ZipList(..))
 import Control.Monad (when)
 import Data.Ratio ((%))
-import Data.List (transpose, sortOn, groupBy, insert)
+import Data.List (transpose, sortOn, insert)
 import Data.Maybe (isJust, fromJust, catMaybes)
 import GHC.Utils.Misc (sndOf3, thdOf3)
 import System.IO (hPutStrLn, stderr)
@@ -45,11 +47,11 @@ defPlotConfig = PlotConfig  { outputPath    = "output.png"
                             }
 
 
-setLayout rangeT rangeX = do
+setLayout rT rX = do
     layout_title .= "System Evolution"
     layout_x_axis . laxis_title .= "time"
-    when (isJust rangeT) $ layout_x_axis . laxis_generate .= scaledAxis def (fromRational >< fromRational $ fromJust rangeT)
-    when (isJust rangeX) $ layout_y_axis . laxis_generate .= scaledAxis def (fromRational >< fromRational $ fromJust rangeX)
+    when (isJust rT) $ layout_x_axis . laxis_generate .= scaledAxis def (fromRational >< fromRational $ fromJust rT)
+    when (isJust rX) $ layout_y_axis . laxis_generate .= scaledAxis def (fromRational >< fromRational $ fromJust rX)
 
 lineStyle n colour = line_width .~ n
                    $ line_color .~ colour
@@ -119,10 +121,10 @@ getRangeT Nothing Nothing  = do
     exitWith $ ExitFailure 1
 
 samples :: (Fractional a) => Integer -> a -> [(Rational, a)]
-samples sampleNo tf = [(s % sampleNo, tf * fromRational (s % sampleNo)) | s <- [0..sampleNo]]
+samples no tf = [(s % no, tf * fromRational (s % no)) | s <- [0..no]]
 
 segments :: [(a, RunResult (Int, b))] -> [(a, (Int, b), (Int, b))] -> [[(a, b)]]
-segments evol ds = map (map snd) $ foldr groupify [] $ sortOn fst $ [((i,1),(t,x)) | (t,rr) <- evol, (i,x) <- allVals rr] ++ concat [[((i,2),(t,x)),((j,0),(t,y))] | (t,(i,x),(j,y)) <- ds]
+segments evol ds = map (map snd) $ foldr groupify [] $ sortOn fst $ [((i,1),(t,x)) | (t,rr) <- evol, (i,x) <- allVals rr] ++ concat [[((i,2 :: Integer),(t,x)),((j,0),(t,y))] | (t,(i,x),(j,y)) <- ds]
     where groupify x [] = [[x]]
           groupify x@((_,2),_) xss@((((_,0),_):_):_) = [x] : xss
           groupify x@((_,2),_) ((_:xs):xss) = groupify x (xs:xss)

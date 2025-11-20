@@ -50,8 +50,8 @@ evalOp Log  = logBase
 
 evalExpr :: (Floating r, Powers r) => Expr -> (Var -> r) -> r
 evalExpr (Var v) s      = s v
-evalExpr (Const c) s    = evalConst c
-evalExpr (Num r) s      = fromRational r
+evalExpr (Const c) _    = evalConst c
+evalExpr (Num r) _      = fromRational r
 evalExpr (Func f a) s   = evalFunc f (evalExpr a s)
 evalExpr (Op op a b) s  = evalOp op (evalExpr a s) (evalExpr b s)
 evalExpr (NatPow a n) s = pow (evalExpr a s) n
@@ -65,7 +65,7 @@ evalComp LLT x y = Just . (x <! y)
 evalComp LGT x y = Just . (x >! y)
 
 evalBTerm :: (Floating r, Powers r, CompOrd r) => BTerm -> (Var -> r) -> Int -> Maybe Bool
-evalBTerm (BConst b)   s = const (Just b)
+evalBTerm (BConst b)   _ = const (Just b)
 evalBTerm (Comp c a b) s = evalComp c (evalExpr a s) (evalExpr b s)
 
 maybeAnd :: Maybe Bool -> Maybe Bool -> Maybe Bool

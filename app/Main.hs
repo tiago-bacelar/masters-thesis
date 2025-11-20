@@ -3,12 +3,8 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 
-import Utils
-import CompOrd
 import Lang.Parser
 import Lang.Interpreter
-import Lang.Hybrid
-import Solver.Powers
 import Plot
 
 import qualified ERA.CReal as ERA --available in stdlib as Data.Numbers.CReal, but that version doesn't export CR, making it kinda useless
@@ -18,19 +14,17 @@ import qualified Data.Number.IReal as IReal
 
 import Prelude hiding (lookup)
 import Data.Char (toLower)
-import Data.Map (Map, lookup, assocs)
 import Data.Proxy
-import System.IO (getContents, hPutStrLn, stderr)
+import System.IO (hPutStrLn, stderr)
 import System.Environment (getProgName, getArgs)
 import System.Console.GetOpt
-import System.FilePath.Posix (takeBaseName)
 import System.Exit (exitWith, ExitCode(..))
 
 printResult :: (Show a, Show b) => [String] -> a -> RunResult [b] -> IO ()
 printResult vars t (Val x) = do
     putStrLn $ "System terminated at t=" ++ show t ++ " with following state:"
     sequence_ [putStrLn (var ++ ": " ++ show val) | (var, val) <- zip vars x]
-printResult vars t (Err e) = putStrLn $ "System terminated at t=" ++ show t ++ " with error: " ++ show e
+printResult _ t (Err e) = putStrLn $ "System terminated at t=" ++ show t ++ " with error: " ++ show e
 
 
 --for quick testing with ghci
@@ -171,7 +165,7 @@ plot = mainWith Options { optFile       = Just "input.txt"
                         , optNumType    = SomeProxy (Proxy :: Proxy TestType)
                         , optCompPrec   = 10
                         , optIterations = 30
-                        , optPlotConfig = defPlotConfig { rangeT = Just (0,10), precision = 6 }
+                        , optPlotConfig = defPlotConfig { precision = 6 }
                         , optMode       = Plot
                         }
 

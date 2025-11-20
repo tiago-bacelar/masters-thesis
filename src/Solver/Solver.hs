@@ -26,7 +26,7 @@ generalTerms h = zipWith (/) (powers h) facs
 --f can't be strict in its argument. if f tries to
 --unbox its argument, odeDerivs falls into an infinite loop
 --as a workaround, consider using lazy pattern matching (~)
-odeDerivs :: (Num a) => ([Dif a] -> [Dif a]) -> [a] -> [[a]]
+odeDerivs :: ([Dif a] -> [Dif a]) -> [a] -> [[a]]
 odeDerivs f x0 = map fromDif x
     where xder = f x
           x = zipWith mkDif x0 xder

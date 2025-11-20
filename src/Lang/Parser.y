@@ -1,6 +1,8 @@
 {
 
 {-# LANGUAGE ExistentialQuantification #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE DeriveFunctor #-}
 
 module Lang.Parser (parseJaguar, ParseResult(..), Program(..), getFor) where
 
