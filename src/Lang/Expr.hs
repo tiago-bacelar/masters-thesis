@@ -1,4 +1,20 @@
-module Lang.Expr where
+module Lang.Expr (
+    Ident,
+    Var(..),
+    Constant(..),
+    Function(..),
+    Operator(..),
+    Expr(..),
+    Comparator(..),
+    BTerm(..),
+    BExpr(..),
+    evalConst,
+    evalFunc,
+    evalOp,
+    evalExpr,
+    evalComp,
+    evalBTerm,
+    maybeEvalBExpr) where
 
 import Solver.Powers
 import CompOrd hiding (OrderingDomain(..))

@@ -1,6 +1,16 @@
 {-# LANGUAGE DefaultSignatures #-}
 
-module CompOrd where
+module CompOrd (
+    OrderingDomain(..),
+    asTop,
+    extendedBy,
+    consistent,
+    mCompare,
+    CompOrd(..),
+    compMinDef,
+    compMaxDef,
+    compMinimum,
+    compMaximum) where
 
 import Utils
 
@@ -63,18 +73,17 @@ instance CompOrd Double
 instance CompOrd Integer
 
 
---a default implementation of compMax using a Fractional constraint
-compMaxDef :: (Fractional a) => a -> a -> a
-compMaxDef x y = (x + y + abs (x - y)) / 2
-
 --a default implementation of compMin using a Fractional constraint
 compMinDef :: (Fractional a) => a -> a -> a
 compMinDef x y = (x + y - abs (x - y)) / 2
 
+--a default implementation of compMax using a Fractional constraint
+compMaxDef :: (Fractional a) => a -> a -> a
+compMaxDef x y = (x + y + abs (x - y)) / 2
 
-
-compMaximum :: (CompOrd a) => [a] -> a
-compMaximum = foldTree1 compMax
 
 compMinimum :: (CompOrd a) => [a] -> a
 compMinimum = foldTree1 compMin
+
+compMaximum :: (CompOrd a) => [a] -> a
+compMaximum = foldTree1 compMax

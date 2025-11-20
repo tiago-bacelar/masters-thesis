@@ -2,7 +2,7 @@
 {-# LANGUAGE DeriveFoldable #-}
 {-# LANGUAGE DeriveFunctor #-}
 
-module Lang.Interpreter where
+module Lang.Interpreter (SimNum, Error, RunResult(..), fromVal, allVals, maybeError, RunnableProgram, interpret, run, query) where
 
 import Utils
 import Limit

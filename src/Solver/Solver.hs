@@ -1,6 +1,6 @@
 {-# LANGUAGE DefaultSignatures #-}
 
-module Solver.Solver where
+module Solver.Solver (solvePoly) where
 
 import Utils
 import Limit
@@ -12,7 +12,7 @@ import Solver.FAD
 
 import Tracing
 
-import Data.List hiding (singleton)
+import Data.List (find)
 import Data.Maybe (fromJust)
 
 

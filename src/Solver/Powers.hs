@@ -1,4 +1,4 @@
-module Solver.Powers where
+module Solver.Powers (Powers(..)) where
 
 --This class was taken and adapted from https://github.com/sydow/ireal/blob/master/Data/Number/IReal/Powers.hs
 

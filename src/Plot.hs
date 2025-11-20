@@ -15,7 +15,6 @@ import CompOrd
 --needs packages Chart and Chart-cairo
 import Graphics.Rendering.Chart.Easy hiding (points, both)
 import Graphics.Rendering.Chart.Backend.Cairo
-import Graphics.Rendering.Chart.Drawing
 import Prelude hiding (lines)
 import Control.Applicative (ZipList(..))
 import Control.Monad (when)

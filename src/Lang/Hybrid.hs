@@ -1,6 +1,24 @@
 {-# LANGUAGE DeriveFunctor #-}
 
-module Lang.Hybrid where
+module Lang.Hybrid (
+    Hybrid,
+    HProgram,
+    wait,
+    end,
+    for,
+    forever,
+    instant,
+    eval,
+    duration,
+    startpoint,
+    endpoint,
+    mEndpoint,
+    takeH,
+    dropH,
+    join,
+    joinComp,
+    compose,
+    composeComp) where
 
 import CompOrd
 

@@ -2,7 +2,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE DefaultSignatures #-}
 
-module Limit where
+module Limit (Limit(..), errorLimitAux, alternatingSeriesSum, calabreseSum) where
 
 import Utils
 

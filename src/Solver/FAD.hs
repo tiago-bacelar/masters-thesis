@@ -17,7 +17,7 @@
 -- 
 -- No attempt is made to handle functions of several variables or perturbation confusion.
 
-module Solver.FAD where
+module Solver.FAD (Dif, con, var, mkDif, fromDif) where
 
 import Utils
 import Solver.Powers

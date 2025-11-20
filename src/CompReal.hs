@@ -3,7 +3,15 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE FlexibleContexts #-}
 
-module CompReal where
+module CompReal (
+    CompReal(..),
+    unapprox,
+    listLimit,
+    realLimit,
+    realListLimit,
+    Boundable(..),
+    lowerBound,
+    upperBound) where
 
 import Utils
 import Limit
@@ -20,7 +28,7 @@ import qualified Data.Number.IReal.IntegerInterval as IReal(IntegerInterval(..),
 
 import qualified MixedTypesNumPrelude as MTNP
 import Data.Bits
-import Data.List
+import Data.List (zip4)
 import Data.Maybe
 import Data.Ratio
 import Control.Applicative
