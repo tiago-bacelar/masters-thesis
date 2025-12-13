@@ -21,5 +21,8 @@ bsOrd l r x | r - l < 0.000001 = fromRational m
             | otherwise = bsOrd m r x
             where m = (l + r) / 2
 
+showCR :: (Fractional r, CompOrd r) => r -> String
+showCR x = show (bsOrd (-1000) 1000 x)
+
 traceCR :: (Fractional r, CompOrd r) => String -> r -> r
-traceCR s x = trace (s ++ ": " ++ show (bsOrd (-1000) 1000 x)) x
+traceCR s x = trace (s ++ ": " ++ showCR x) x

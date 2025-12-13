@@ -14,7 +14,7 @@
 
 
 
-module ERA.CReal(CReal (..), round_uk, showCReal) where
+module CompReal.Instances.ERA.CReal(CReal (..), round_uk, showCReal) where
 
 import Data.Ratio
 

@@ -16,6 +16,13 @@ packages:
     commit: 1919f75c2cacd9f994ad50e925d8932d2639b690
     git: https://github.com/jensblanck/cdar.git
 - completed:
+    hackage: exact-real-0.12.5.1@sha256:258e91c9f0725496b13dff8d8984b3ddf9a6040892e2687779aae8d3cf90e7c8,2427
+    pantry-tree:
+      sha256: de8d882012188a0a52df2139d6187318f008620b4d7e7d9f82eb2565476a346f
+      size: 1598
+  original:
+    hackage: exact-real-0.12.5.1
+- completed:
     commit: a7c83281362c5dc857e97d98b424ec314a216b56
     git: https://github.com/sydow/ireal.git
     name: ireal

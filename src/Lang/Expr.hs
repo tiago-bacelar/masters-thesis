@@ -16,7 +16,7 @@ module Lang.Expr (
     evalBTerm,
     maybeEvalBExpr) where
 
-import Solver.Powers
+import Powers
 import CompOrd hiding (OrderingDomain(..))
 import qualified CompOrd as CompOrd
 

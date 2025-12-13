@@ -43,6 +43,7 @@ packages:
 extra-deps:
 - git: https://github.com/jensblanck/cdar.git
   commit: 1919f75c2cacd9f994ad50e925d8932d2639b690
+- exact-real-0.12.5.1
 #- ireal-0.2.3     the version on hackage only compiles with base < 4.15
 - git: https://github.com/sydow/ireal.git
   commit: a7c83281362c5dc857e97d98b424ec314a216b56

@@ -6,9 +6,9 @@
 module Solver.Poly (Poly, toPoly, evalPoly, numCoef, evalCoef, joinCoef, degree, norm, compNorm) where
 
 import Utils
+import Powers
 import CompOrd
 import Lang.Expr
-import Solver.Powers
 
 import Data.List (singleton, sortOn, intersperse)
 import Data.Maybe (isNothing, fromJust)

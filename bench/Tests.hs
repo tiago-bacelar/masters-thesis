@@ -40,12 +40,25 @@ gaussSum = sum $ map fromInteger [1..100] --5050
 factorial50 :: (Num r) => r
 factorial50 = product $ map fromInteger [1..50] --30414093201713378043612608166064768844377641568960512000000000000
 
+
+geometricSeriesDyadRat :: (Limit Rational r) => r
+geometricSeriesDyadRat = Limit.listLimit $ scanl1 (+) $ iterate (/2) $ 1%2
+
 geometricSeriesRat :: (Limit Rational r) => r
-geometricSeriesRat = limit $ (!!) $ scanl1 (+) $ iterate (/2) $ 1%2
+geometricSeriesRat = Limit.listLimit $ aux (1%2) $ scanl1 (+) $ iterate (/3) $ 1%3
+    where aux e (x:xs) | 1%2 - x <= e = x : aux (e/2) (x:xs)
+                       | otherwise = aux e xs
+
+geometricSeriesDyadCR :: forall r. (Fractional r, Limit r r) => r
+geometricSeriesDyadCR = _listLimit $ map fromRational $ scanl1 (+) $ iterate (/2) $ 1%2
+    where _listLimit = Limit.listLimit :: [r] -> r
 
 geometricSeriesCR :: forall r. (Fractional r, Limit r r) => r
-geometricSeriesCR = _limit $ (!!) $ map fromRational $ scanl1 (+) $ iterate (/2) $ 1%2
-    where _limit = limit :: (Int -> r) -> r
+geometricSeriesCR = _listLimit $ map fromRational $ aux (1%2) $ scanl1 (+) $ iterate (/3) $ 1%3
+    where _listLimit = Limit.listLimit :: [r] -> r
+          aux e (x:xs) | 1%2 - x <= e = x : aux (e/2) (x:xs)
+                       | otherwise = aux e xs
+
 
 -- [y, v] (nVars=2)
 ballBounce :: (SimNum r) => Rational -> r

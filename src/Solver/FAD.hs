@@ -20,7 +20,7 @@
 module Solver.FAD (Dif, con, var, mkDif, fromDif) where
 
 import Utils
-import Solver.Powers
+import Powers
 
 -- | A 'Dif' value is an infinite list consisting of the values of an infinitely differentiable
 -- function and all its derivatives, all evaluated at a common point. Polynomials are represented

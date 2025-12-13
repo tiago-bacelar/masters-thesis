@@ -7,10 +7,10 @@
 module Plot (PlotConfig(..), defPlotConfig, Plottable(..)) where
 
 import Utils
+import CompOrd
 import CompReal
 import Lang.Hybrid
 import Lang.Interpreter (RunResult, allVals)
-import CompOrd
 
 --needs packages Chart and Chart-cairo
 import Graphics.Rendering.Chart.Easy hiding (points, both)

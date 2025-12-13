@@ -67,6 +67,8 @@ class CompOrd a where
     compMax x y = case infCompare x y of
                     LT -> y
                     _  -> x
+
+    {-# MINIMAL domCompare #-}
     
 
 instance CompOrd Double

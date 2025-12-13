@@ -6,13 +6,13 @@ module Lang.Interpreter (SimNum, Error, RunResult(..), fromVal, allVals, maybeEr
 
 import Utils
 import Limit
+import Powers
 import CompOrd
-import CompReal
+import Boundable
+import Solver.Poly
+import Solver.Solver
 import Lang.Hybrid
 import Lang.Parser
-import Solver.Poly
-import Solver.Powers
-import Solver.Solver
 import Lang.Expr hiding (E)
 
 import Data.Maybe (fromMaybe)

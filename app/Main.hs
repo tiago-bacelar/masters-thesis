@@ -7,10 +7,11 @@ import Lang.Parser
 import Lang.Interpreter
 import Plot
 
-import qualified ERA.CReal as ERA --available in stdlib as Data.Numbers.CReal, but that version doesn't export CR, making it kinda useless
-import qualified Data.CDAR as CDAR
---import qualified AERN2.Real as AERN2
-import qualified Data.Number.IReal as IReal
+import qualified CompReal.Instances.CDAR as CDAR
+import qualified CompReal.Instances.AERN2 as AERN2
+import qualified CompReal.Instances.ERA as ERA
+import qualified CompReal.Instances.ExactReal as ExactReal
+import qualified CompReal.Instances.IReal as IReal
 
 import Prelude hiding (lookup)
 import Data.Char (toLower)
@@ -63,12 +64,13 @@ options =
     [ Option "t" ["type"]
         (ReqArg
             (\arg opt -> case map toLower arg of
-                            "era"    -> return opt { optNumType = SomeProxy (Proxy :: Proxy ERA.CReal)      }
-                            "cdar"   -> return opt { optNumType = SomeProxy (Proxy :: Proxy CDAR.CR)        }
-                        --  "aern"   -> return opt { optNumType = SomeProxy (Proxy :: Proxy AERN.RealNumber)}
-                            "ireal"  -> return opt { optNumType = SomeProxy (Proxy :: Proxy IReal.IReal)    }
-                            "double" -> return opt { optNumType = SomeProxy (Proxy :: Proxy Double)         }
-                            _        -> error "TODO")
+                            "cdar"      -> return opt { optNumType = SomeProxy (Proxy :: Proxy CDAR.CR)             }
+                            "exact-real"-> return opt { optNumType = SomeProxy (Proxy :: Proxy ExactReal.AnyCReal)  }
+                            "era"       -> return opt { optNumType = SomeProxy (Proxy :: Proxy ERA.CReal)           }
+                            "aern"      -> return opt { optNumType = SomeProxy (Proxy :: Proxy AERN2.CReal)         }
+                            "ireal"     -> return opt { optNumType = SomeProxy (Proxy :: Proxy IReal.IReal)         }
+                            "double"    -> return opt { optNumType = SomeProxy (Proxy :: Proxy Double)              }
+                            _           -> error "TODO: error msg")
             "TYPE")
         "Number type"
     , Option "c" ["comparison-precision"]
@@ -155,7 +157,7 @@ mainWith (Options   { optFile       = file
         Plot -> do
                     --TODO: printResult vars tf $ fmap snd $ endpoint system
                     plotHybrid plotConfig vars system discs
-        Query -> undefined
+        Query -> undefined --A read–evaluate–print loop (REPL) environment
         InteractivePlot -> undefined
 
 

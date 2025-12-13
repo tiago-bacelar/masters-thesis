@@ -25,18 +25,24 @@ source-repository head
 
 library
   exposed-modules:
+      Boundable
       CompOrd
       CompReal
-      ERA.CReal
+      CompReal.Instances.AERN2
+      CompReal.Instances.CDAR
+      CompReal.Instances.ERA
+      CompReal.Instances.ERA.CReal
+      CompReal.Instances.ExactReal
+      CompReal.Instances.IReal
       Lang.Expr
       Lang.Hybrid
       Lang.Interpreter
       Lang.Parser
       Limit
       Plot
+      Powers
       Solver.FAD
       Solver.Poly
-      Solver.Powers
       Solver.Solver
       Tracing
       Utils
@@ -58,6 +64,7 @@ library
     , base >=4.7 && <5
     , cdar
     , containers
+    , exact-real
     , ghc
     , ireal
     , mixed-types-num
@@ -84,6 +91,7 @@ executable jaguar-exe
     , base >=4.7 && <5
     , cdar
     , containers
+    , exact-real
     , ghc
     , ireal
     , jaguar
@@ -112,6 +120,7 @@ test-suite jaguar-test
     , base >=4.7 && <5
     , cdar
     , containers
+    , exact-real
     , ghc
     , ireal
     , jaguar
@@ -142,6 +151,7 @@ benchmark jaguar-bench
     , cdar
     , containers
     , criterion
+    , exact-real
     , ghc
     , ireal
     , jaguar

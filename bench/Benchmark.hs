@@ -3,7 +3,7 @@
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE RankNTypes #-}
 
-import Solver.Powers
+import Powers
 import Limit
 import CompOrd
 import CompReal
@@ -14,10 +14,11 @@ import Criterion.Types
 import Criterion.Main.Options
 import Criterion.Main
 
-import qualified Data.CDAR as CDAR
-import qualified AERN2.Real as AERN2
-import qualified ERA.CReal as ERA
-import qualified Data.Number.IReal as IReal
+import qualified CompReal.Instances.CDAR as CDAR
+import qualified CompReal.Instances.AERN2 as AERN2
+import qualified CompReal.Instances.ERA as ERA
+import qualified CompReal.Instances.ExactReal as ExactReal
+import qualified CompReal.Instances.IReal as IReal
 
 
 type BenchNum r = (Floating r, Powers r, CompOrd r, Limit Rational r, Limit r r)
@@ -31,11 +32,11 @@ run r n = nf (uncurry (approx . r)) ((),n)
 test :: String -> [Int] -> (forall r. (BenchNum r) => r) -> Benchmark
 test name precisions r = bgroup name [
         bench "Double" $ nf (\() -> (r :: Double)) (),
-        iRun "CDAR"  (\() -> (r :: CDAR.CR)),       --we do this stupid lambda thing here to prevent sharing
-        iRun "AERN2" (\() -> (r :: AERN2.CReal)),   --in the run function after resolving the polymorphism
-        iRun "ERA"   (\() -> (r :: ERA.CReal)),
-        --exact-real
-        iRun "IReal" (\() -> (r :: IReal.IReal)) ]
+        iRun "CDAR"     (\() -> (r :: CDAR.CR)),       --we do this dumb lambda thing here to prevent sharing
+        iRun "AERN2"    (\() -> (r :: AERN2.CReal)),   --in the run function after resolving the polymorphism
+        iRun "ERA"      (\() -> (r :: ERA.CReal)),
+        iRun "ExactReal"(\() -> (r :: ExactReal.AnyCReal)),
+        iRun "IReal"    (\() -> (r :: IReal.IReal)) ]
     where iRun :: (CompReal r) => String -> (() -> r) -> Benchmark
           iRun iName i = bgroup iName $ map (\p -> bench (show p) $ run i p) precisions
 

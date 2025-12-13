@@ -7,9 +7,9 @@
 module Lang.Parser (parseJaguar, ParseResult(..), Program(..), getFor) where
 
 import Utils
-import Lang.Expr
-import Solver.Powers
+import Powers
 import Solver.Poly
+import Lang.Expr
 
 import Prelude hiding (Ordering(..))
 import Data.Char

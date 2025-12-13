@@ -13,37 +13,40 @@ class Limit a r where
     --limit of a normalized Cauchy sequence (composed with its modulus of convergence)
     --formally, |f n - r| <= 2^(-n-1) implies limit f = r
     limit :: (Int -> a) -> r
+    limit f = listLimit (map f [0..])
+    --default limit :: (Fractional a) => (Int -> a) -> r
+    --limit f = errorLimit [(f n, fromRational $ 1 % pow2 (n+1)) | n <- [0..]]
+
+    --same as limit, but allows finite lists, in which case the last
+    --element of the list is the value of the limit (has zero error)
+    listLimit :: [a] -> r
+    listLimit xs = limit (indexOrLastMemo xs)
 
     --limit from list of approximation and error pairs
     --the error is assumed to be decreasing (<=), at no specific rate, and
     --the approximations are assumed to be consistent with the previous ones
     --if the list is finite, the last approximation's error is assumed to be zero
     errorLimit :: [(a, a)] -> r
-
-    --epsilonLimit :: (a -> a) -> r
-
-
-    default limit :: (Fractional a) => (Int -> a) -> r
-    limit f = errorLimit [(f n, fromRational $ 1 % pow2 (n+1)) | n <- [0..]]
-
     --This default uses a Real constraint, which most CompReal instances implement as
     --toRational = undefined (or even worse, toRational r = approx r 40 or equivalent)
     --as such, this default isn't useful for Limit r r, but is still used in Limit Rational r
     default errorLimit :: (Real a) => [(a, a)] -> r
-    errorLimit = limit . errorLimitAux (\n e -> toRational e <= 1 % pow2 (n+1))
+    errorLimit = listLimit . errorLimitAux (\n -> (<= (1 % pow2 (n+1))) . toRational)
 
-    {-# MINIMAL (limit | errorLimit) #-}
+    --epsilonLimit :: (a -> a) -> r
 
---Translation function between limit and errorLimit.
+    {-# MINIMAL (limit | listLimit) #-}
+
+--Translation function between listLimit and errorLimit.
 --Receives a predicate function to test the condition e <= 1/2^(n+1)
 --The predicate can only return True if the condition is met. If it
 --returns False, the condition may be true or false
-errorLimitAux :: (Int -> a -> Bool) -> [(a, a)] -> Int -> a
-errorLimitAux p l = indexOrLast normalized
-        where normalized = aux 0 l
-              aux _ [(x,_)] = [x]
-              aux n ((x,e):xs) | p n e = x : aux (n+1) ((x,e):xs)
-                               | otherwise = aux n xs
+errorLimitAux :: (Int -> a -> Bool) -> [(a, a)] -> [a]
+errorLimitAux p l = aux (map p [0..]) l
+        where aux _ [(x,_)] = [x]
+              aux (pn:ps) ((x,e):xs) | pn e = x : aux ps ((x,e):xs)
+                                     | otherwise = aux (pn:ps) xs
+              aux _ [] = error "errorLimitAux: empty list"
 
 instance Limit Rational Double where
     errorLimit = fromRational . fst . findOrLast p

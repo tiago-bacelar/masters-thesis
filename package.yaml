@@ -28,8 +28,9 @@ dependencies:
 - Chart
 - Chart-cairo
 - mixed-types-num
-#- numbers  #(ERA is imported directy as a src file to export its constructors)
 - cdar
+- exact-real
+#- numbers  #(ERA is imported directy as a src file to export its constructors)
 - aern2-mp
 - aern2-real
 - ireal

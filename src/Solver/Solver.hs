@@ -4,9 +4,9 @@ module Solver.Solver (solvePoly) where
 
 import Utils
 import Limit
-import CompReal
+import Powers
 import CompOrd
-import Solver.Powers
+import Boundable
 import Solver.Poly
 import Solver.FAD
 
@@ -74,7 +74,7 @@ solvePoly ps = ans . numCoef
           dt = traceCR "dt" $ fromRational r / _M
 
           genTermsDT = generalTerms $ evalCoef dt
-          stepDT xi = map (limit . indexOrLast . uncurry dropOrLast) $ zip ks terms --TODO: optimize list access?
+          stepDT xi = map (Limit.listLimit . uncurry dropOrLast) $ zip ks terms --TODO: optimize list access?
             where terms = map (scanlTree1 (+) . zipWith (*) genTermsDT) $ odeDerivs f xi
                   ks = traceX "ks" $ map ((1+) . lg2 . max 1 . pred . (2*) . upperBound . abs) xi
 
@@ -86,7 +86,7 @@ solvePoly ps = ans . numCoef
                   ks = traceX "ks" $ map (\a -> ) xi --TODO: take delta into account
           -}
           --this definition of stepDelta is correct, but can be improved. check the comented version (not done yet)
-          stepDelta delta xi = map (limit . indexOrLast . uncurry dropOrLast) $ zip ks terms
+          stepDelta delta xi = map (Limit.listLimit . uncurry dropOrLast) $ zip ks terms
             where genTerms = generalTerms $ evalCoef delta
                   terms = map (scanlTree1 (+) . zipWith (*) genTerms) $ odeDerivs f xi
                   ks = traceX "ks" $ map ((1+) . lg2 . max 1 . pred . (2*) . upperBound . abs) xi
