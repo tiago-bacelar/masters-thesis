@@ -1,0 +1,3 @@
+svg-inkscape/
+build/*
+!build/dissertation.pdf

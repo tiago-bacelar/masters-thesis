@@ -1,0 +1,16 @@
+\chapter{Future work}
+\label{chap:conclusion}
+
+With the goal of implementing a hybrid system simulator in mind, the logical next step of the project is empirically testing the surveyed packages in a benchmarking setting, focusing on correctness but also taking performance into account, to decide on the most appropriate for use. This process will necessarily go through the creation of a standard test suite of exact real computations, and the evaluations of the packages can be compared to the predictions of \autoref{sec:practice}. This process is expected to take about three weeks.
+
+After the selection of the library, the implementation of the hybrid simulator may begin. This will take the implementation of a parser, a numeric differential equation solver and an interpreter. Of these, the derivative equation solver is the most sensitive component, and will require further research to design and fine-tune. Taking this into account, the whole implementation should take between five and six weeks. 
+
+This simulator can then be tested against other existing hybrid simulators such as Lince to demonstrate their differences in performance and predictive power. This benchmarking should mostly focus on accuracy and performance tests, and the trade-off between the two, though other metrics, such as memory consumption, are also relevant. The implemented simulator is expected to have a worse performance when simulating with the same precision as Lince, but be able to simulate arbitrarily precise approximations of the answer. This evaluation is expected to take two to three weeks.
+
+All these steps will be documented on a final dissertation presenting the faced challenges, engineered solutions and collected results. The writing of this dissertation will likely take over a month, and is the last step of this project.
+
+
+%FUTURE WORK
+%   allow for even more user customization (e.g. define each comparison precision individually)
+%   condition-driven for statements (lince calls them events i think)
+%   numerical error handling (/0 e assim)

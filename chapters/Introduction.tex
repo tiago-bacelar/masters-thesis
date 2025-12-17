@@ -1,0 +1,78 @@
+\chapter{Introduction}
+\label{chap:intro}
+
+\section{Context and Motivation}
+
+Hybrid systems are commonly defined as processes that possess a mix of both continuous evolution, usually modeled through differential equations, and discrete behaviors, such as conditionals, assignments and other instantaneous changes \cite{neves18}. This model proves invaluable, specifically when simulating the interaction of physical, continuous processes with software-controlled systems, such as cruise controllers and pacemakers. The resulting programs are known as hybrid programs.
+
+Taking the example of a cruise controller, we can write a simple program that checks the velocity of a vehicle every second and either accelerates or brakes, eventually hovering around the target velocity. The following program was implemented in Lince \cite{goncharov2020}, an imperative hybrid programming language and simulator:
+
+%todo: meter o case study (ACC leader) aqui em vez deste CC?
+\begin{lstlisting}[caption=Example of a hybrid program]
+v:=4;
+while true do {
+    if v<=10 then v'=1 for 1; else v'=-1 for 1;
+}
+\end{lstlisting}
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.75\linewidth]{images/cc_plot.png}
+    \caption{Plot of the velocity over time in the cruise control program}
+    \label{fig:cc_plot}
+\end{figure}
+
+The program starts by assigning the value 4 to variable v. The statement inside the while loop will either accelerate or break, depending on the current velocity, by setting the derivative of $v$, $v'$, to 1 or -1 during 1 second. The while loop indicates that this behavior repeats indefinitely. This appears to be a non-terminating program, because of the infinite while loop, but the evaluation at any specific time will only go through a finite number of iterations of the loop. A plot of the simulated velocity over time can be found in \autoref{fig:cc_plot}.
+
+Despite simple, this example illustrates the basic concepts of a hybrid program, namely the presence of both classical assignment, control structures, etc. as well as differential, continuous constructs and their relation to time.
+
+Among the many difficulties of this paradigm, one of the greatest is the often overlooked matter of precision and error. When developing proper methods of simulation, the standard way to represent numbers is floating point arithmetic, which treats values as a mantissa and an exponent. This system can be, and sometimes is, used to represent numbers with an arbitrary precision, but is usually implemented with a finite precision by limiting the size of the mantissa and exponent. This is enough for most applications, but especially in chaotic systems, where errors compound, the precision limit can be easily exhausted, and any value outputted by the program will stray further and further from the actual value of the calculation. Lince itself uses standard floating point numbers with 64 bits of precision, known as double in most programming languages, which makes it prone to errors when the values get too close to zero. Take the following program as an example:
+
+%   x:=2;
+%   x'=1-x for 35;
+%   x'=x-1 for 35;
+\begin{lstlisting}[caption=Hybrid program showcasing insufficient precision]
+x:=1;
+x'=-x for 80;
+x'= x for 80;
+\end{lstlisting}
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.75\linewidth]{images/exp_plot.png}
+    \caption{Plot of $x$ over time in the exponential program}
+    \label{fig:exp-plot}
+\end{figure}
+
+\autoref{fig:exp-plot} is a plot of the simulation of variable $x$ over time. Variable $x$ was expected to go from 1 to a very small number at time $t=80$ following a negative exponential ($e^{-t}$), and then follow a positive exponential ($e^t$) afterwards and bounce back to 1 at time $t=160$. But the Lince simulator shows the final value of $x$ as 5.653719, which is clearly an error. This error grows even larger if we replace 80 with even larger values.
+
+Using an arbitrary number of digits to represent values, together with ratio representations (numerator and denominator), allows for the exact representation of all rational numbers, but still leaves open the problem of irrational numbers, which are common when simulating physical systems (when using trigonometric functions, for instance, or with the previous exponential example). Unlike their rational counterparts, it would take an infinite number of digits to represent an irrational number using a regular digit representation. This problem therefore calls for alternative solutions.
+
+
+\section{Goals}
+
+The goal of the project is the simulation of hybrid systems through the use of exact real arithmetic. More specifically, the project consists of implementing a hybrid system simulator based on preexisting libraries for exact real arithmetic. Simulator performance is expected to be worse than simulators using floating point arithmetic such as the aforementioned tool Lince \cite{goncharov2020}, but should be perfectly faithful to the real system simulated.
+
+The hybrid systems' specification language will be based on a while language with specific constructs to describe the behavior of physical processes. This choice is due to the simplicity and power of the language, which furthermore has a well-established operational semantics that can be used as a basis for implementation. The simulator will be implemented in the Haskell programming language due to its lazy paradigm and use of higher-order functions, which are particularly useful in the context of exact real arithmetic.
+
+\section{Overview}
+
+As a theoretic work, this thesis is mostly about compiling and systematizing already existing research from the fields of exact real arithmetic and hybrid systems. There is a wealth of research on exact real arithmetic, mostly on its more theoretical aspects (a good summary of which can be found in \cite{geuvers07}). This thesis looks at multiple representation strategies from a more practical angle, how they are related, and their unique advantages and disadvantages. As for hybridness, since the topic is already well studied and systematized in the literature, it is presented here in a mostly non-transformative manner, and limited only to the more relevant concepts for the practical implementation of the simulator.
+
+%meter mais enfase nas contribuicoes, menos na intersecao
+%falar das limitacoes fundamentais
+Original theoretical contributions only appear when the two areas intersect, namely: when performing comparisons of real numbers, which are needed for the hybrid simulator; and when numerically solving systems of differential equations using said real numbers. Both of these are made difficult by the specific limitations imposed by exact real arithmetic and have to be handled accordingly. The comparison problem is handled by partially evaluating the comparison up to some specified precision, raising an error if this precision is exceeded. As for the differential equations, despite the existence of multiple sophisticated algorithms for numerically solving ODEs\todo{ref}, none of them fits our needs since they work with estimations and lack a strict error bound. Instead, the presented solution converts the equations into a system of polynomial equations, which have a stricter error bound for their Taylor series and do not require interval arithmetic \cite{WARNE20061695}. Since no generic algorithm for the polynomial projection was found in the literature, one was developed by iterating the graph of values and derivatives of each sub-expression in the equations.
+
+On the practical side, this thesis is a comprehensive exposition of the inner workings and functionality of the developed simulator. Though some efforts were made to formalize the developed work, a lot more could be done in the direction of a solid formal foundation, with the ultimate goal being linking the operational and denotational semantics of the language and using the latter to prove its correction.\todo{adjustar depois dependendo do que eu fizer}
+
+\section{Document Structure}
+
+After this introduction, \autoref{chap:state_art} gathers the technical background relevant for this project. It first delves into an exploration of existing formalizations and techniques for representing exact real numbers (\autoref{sec:theory}). A study of several open-source libraries follows in \autoref{sec:practice}, where the underlying approaches are compared and critiqued. Then, \autoref{sec:hybrid} lays out the theory behind hybrid systems and presents the underlying challenges of their simulation.
+
+\autoref{chap:implementation} discusses the implementation of the simulator (architecture overview in \autoref{sec:architecture}, followed by the parser in \autoref{sec:parser}, interpreter in \autoref{sec:interpreter}, solver in \autoref{sec:solver} and visualizer in \autoref{sec:visualizer}), and exposes the challenges found along the way and their respective solutions, along with other notable implementation details.
+
+In \autoref{chap:results} the performance of the simulator is discussed, and benchmarking results are presented.
+
+Finally, \autoref{chap:conclusion} talks about the general future direction of this research and lists some of the next steps towards it.
+
+Throughout this thesis, the reader is assumed to be knowledgeable about partial orders, limits, derivatives, Taylor and Maclaurin series, and monads. Monads will be represented with a bold upper-case sans-serif letter (e.g. $\monad{M}$), and their respective functors are represented by the same letter in regular font weight (e.g. $\functor{M}$). The set of natural numbers is represented with $\N$ and is understood to consist of all non-negative integers ($0 \in \N$)
