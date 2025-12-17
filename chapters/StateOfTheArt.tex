@@ -4,7 +4,13 @@
 \section{The Theory of Exact Real Arithmetic}
 \label{sec:theory}
 
-There is a lot of established theory on exact real numbers, a good overview of which can be found in \cite{geuvers07}. This section presents the basic concept behind a great deal of real number representations, namely infinite sequences of approximations, and explains the mathematical motivations behind it (\autoref{sec:cauchy}). Domain theory is discussed as both a motivation and formalization of the use of intervals as approximations in \autoref{sec:domain}, and the concept of modulus of convergence is presented in \autoref{sec:modulus}. \autoref{precision_accuracy} presents the formal definitions of precision and accuracy from numerical analysis and how they are used in the context of exact real arithmetic. Lastly, \autoref{theory_summary} summarizes the whole section and lists some limitations common to all representation strategies.
+Since the dawn of computation, computer scientists have studied the problem of representing real numbers. One of the first to touch on the subject was Alan Turing himself, in his now famous paper "On Computable Numbers, with an Application to the Entscheidungsproblem" \cite{Tur37}. In it, he uses Turing machines to formalize the concept of "computable numbers", the class of (real) numbers that can be represented computationally (see \cref{sec:theory_summary} for more details). Since then, several results in the area have expanded this concept, and multiple strategies were developed to represent real numbers.
+
+At the same time, the practical implementation of these concepts slowly developed. As available computational resources grew, more and more sophisticated strategies became viable. Cutting-edge approaches moved from floating point arithmetic and explicit error management to exact rationals (using arbitrary-length integers as numerators/denominators), and eventually to sequences of exact rationals that approximate a real value.
+
+This thesis is based on this last step: sequences of approximations. The mathematical motivation for this strategy is presented in \cref{sec:cauchy}. However, as will be shown, a naive implementation of this concept is insufficient for computation, which is why it is refined into usable strategies with interval arithmetic, motivated by domain theory (\cref{sec:domain}), and modulus of convergence (\cref{sec:modulus}).
+
+After presenting these strategies, \cref{sec:precision_accuracy} presents the formal definitions of precision and accuracy from numerical analysis and how they are used in the context of exact real arithmetic. These concepts will be fundamental in later sections of the thesis, where concrete implementations of exact real representations are compared. Lastly, \cref{sec:theory_summary} summarizes this section and lists some limitations common to all representation strategies.
 
 
 \subsection{Cauchy Sequences}
@@ -12,13 +18,13 @@ There is a lot of established theory on exact real numbers, a good overview of w
 
 There are multiple formal definitions of real numbers, but the most used definition for exact real number representation is based on Cauchy sequences. Concisely: the set of real numbers $\R$ is the smallest set that contains the rationals and is closed under limits of Cauchy sequences. So a simple and straightforward way to represent a real number is simply as a sequence of rationals. Of use to us, because the rational numbers are dense, this means that any real number can be approximated by a Cauchy sequence of rationals, or indeed any dense subset of the rationals, such as the dyadic numbers (numbers of the form $a/2^p$, with $a,p \in \Z$).
 
-A Cauchy sequence is defined as a sequence whose terms get arbitrarily close to each other, essentially converging on a single number. More formally, $\{a_i\}_{i \in \N}$ is a Cauchy sequence if
+A Cauchy sequence is defined as a sequence whose terms get arbitrarily close to each other, converging on a single number. More formally, $\{a_i\}_{i \in \N}$ is a Cauchy sequence if
 \begin{equation}
 \label{eq:cauchy}
 \forall \epsilon>0, \exists i: \forall j>i, |a_i - a_j| < \epsilon
 \end{equation}
 
-This formalization, however, poses a problem: even if a sequence is known to be Cauchy, it is impossible to know which number it is converging into by looking only at a finite number of its terms. For example, the following sequence represents the number 2:
+This formalization, however, poses a problem: even if a sequence is known to be Cauchy, it is impossible to know which number it is converging into by looking only at a finite number of its terms. For example, the following sequence converges on the number 2:
 
 \begin{equation}
   \begin{cases} 
@@ -37,20 +43,20 @@ While insufficient \textit{per se}, Cauchy sequences can still be used as a basi
 
 Domain theory \cite{winskel93} deals with sets equipped with a complete partial order (cpo, here represented as $\sqsubseteq$), called domains, where this order measures the information content of each element of the domain. Each element of a domain can be thought of as a (partial) result of a computation, and one element is greater than another if it extends its information content in a consistent way. Like any partial order, cpos must be reflexive, transitive and antisymmetric. Additionally, every directed chain of the domain (that is, a chain of elements where each element is greater than the previous), must have a least upper bound in the domain. Informally, there is an element of the domain that summarizes all information of any non-contradicting chain of the domain. This property is called completeness.
 
-For example, take the kleenians ($K_3 = \{T, F, U\}$), the 3 possible valuations of a proposition in Kleene's three-valued logic, first introduced in \cite{Kleene_1938}. This domain is of special interest to this dissertation since it will form the basis for the evaluation of propositions in the simulator (\autoref{sec:bool_expr}). The kleenians can be understood as a domain $(K_3,\sqsubseteq)$ where its elements are related as follows: $U \sqsubseteq F$ and $U \sqsubseteq T$ (\autoref{fig:kleenians_dom}). This relation represents the fact that we may have no information about the value of a proposition ($U$), or have mutually exclusive information (the proposition is $T$ or $F$).
+For example, take the kleeneans ($K_3 = \{T, F, U\}$), the 3 possible valuations of a proposition in Kleene's three-valued logic, first introduced in \cite{Kleene_1938}. This domain is of special interest to this thesis since it will form the basis for the evaluation of propositions in the simulator (\cref{sec:bool_expr}). The kleeneans can be understood as a domain $(K_3,\sqsubseteq)$ where its elements are related as follows: $U \sqsubseteq F$ and $U \sqsubseteq T$ (\cref{fig:kleeneans_dom}). This relation represents the fact that we may have no information about the value of a proposition ($U$), or have mutually exclusive information (the proposition is $T$ or $F$).
 
 \begin{figure}
     \centering
-    \includesvg[width=0.75\linewidth]{images/kleenians.svg}
-    \caption{Hasse diagram of the domain of the kleenians}
-    \label{fig:kleenians_dom}
+    \includesvg[width=0.4\linewidth]{images/kleeneans.svg}
+    \caption{Hasse diagram of the domain of the kleeneans}
+    \label{fig:kleeneans_dom}
 \end{figure}
 
-Another example of a domain, also of interest later in the dissertation, is the ordering domain, which extends the 3 relative positions obtained from comparing two real numbers ($a < b$ - LT, $a = b$ - EQ - and $a > b$ - GT) into a domain, where each element of the domain represents a possible state of knowledge about the relative position of the two reals, as shown in \autoref{fig:ordering_dom}:
+Another example of a domain, also of interest later in the thesis, is the ordering domain, which extends the 3 relative positions obtained from comparing two real numbers ($a < b$ - LT, $a = b$ - EQ - and $a > b$ - GT) into a domain, where each element of the domain represents a possible state of knowledge about the relative position of the two reals, as shown in \cref{fig:ordering_dom}.
 
 \begin{figure}
     \centering
-    \includesvg[width=0.75\linewidth]{images/ordering_dom.svg}
+    \includesvg[width=0.5\linewidth]{images/ordering_dom.svg}
     \caption{Hasse diagram of the ordering domain}
     \label{fig:ordering_dom}
 \end{figure}
@@ -91,7 +97,7 @@ Although nested intervals allow the sequence to bound every approximation's erro
 i \geqslant j > f(n) \implies |a_i - a_j| \leq 2^{-n}
 \end{equation}
 
-Informally, for a certain $n$, the modulus of convergence gives us a position on the sequence such that all future terms differ less than $2^{-n}$ from each other, therefore implying that all of these terms have an accuracy of at least $n$. If such a function exists, it is possible to prove that the sequence follows \autoref{eq:cauchy} and therefore converges.
+Informally, for a certain $n$, the modulus of convergence gives us a position on the sequence such that all future terms differ less than $2^{-n}$ from each other, therefore implying that all of these terms have an accuracy of at least $n$. If such a function exists, it is possible to prove that the sequence follows \cref{eq:cauchy} and therefore converges.
 
 To avoid treating the sequence and its modulus separately, an exact real number representation may enforce that its sequences follow a fixed modulus of convergence $f(n) = n$, to which any arbitrary sequence can be converted by composing with its modulus of convergence: $[c,d]_i = [a,b]_{f(i)}$.
 
@@ -99,26 +105,32 @@ In practice, many representations don't provide a modulus of convergence, since 
 
 Lastly, note that a Cauchy sequence $\{a_i\}_{i \in \N}$ equipped with a modulus of convergence $f:\N \rightarrow \N$ can be converted into a valid sequence of nested intervals $\{[b,c]_n\}_{i \in \N}$, since the modulated terms of the sequence effectively form an interval of length $2^{-n}$:
 
-$[b,c]_n = [a_{f(n)}-2^{-n-1}, a_{f(n)}+2^{-n-1}]$
+\begin{equation}
+[b,c]_n = [a_{f(n)}-2^{-n-1}, a_{f(n)}+2^{-n-1}]
+\end{equation}
 
-This makes nested intervals a sort of intermediate step between the basic Cauchy sequences with no modulus, the least restrictive representation (so nonrestrictive, in fact, that it is insufficient for practical use), and sequences with a modulus, which have the most restrictions. For example, to represent the number 2, a plain Cauchy sequence has literally no restrictions on any finite number of its elements (see the example at the end of \autoref{sec:cauchy}); a sequence of nested intervals forces all its intervals to contain the number 2 (but does not restrict the length of the intervals in any way); and a modulus of convergence sets a maximum interval length that gets cut in half for each new interval.
+This makes nested intervals a sort of intermediate step between the basic Cauchy sequences with no modulus, the least restrictive representation (so nonrestrictive, in fact, that it is insufficient for practical use), and sequences with a modulus, which have the most restrictions. For example, to represent the number 2, a plain Cauchy sequence has literally no restrictions on any finite number of its elements (see the example at the end of \cref{sec:cauchy}); a sequence of nested intervals forces all its intervals to contain the number 2 (but does not restrict the length of the intervals in any way); and a modulus of convergence sets a maximum interval length that gets cut in half for each new interval.
 
 
 
 \subsection{Precision vs Accuracy}
-\label{precision_accuracy}
+\label{sec:precision_accuracy}
 
 Since these two terms are used interchangeably in day-to-day language, it may be helpful to revisit their formal definition in numerical analysis and how they apply in exact real arithmetic in particular.
 
 Accuracy refers to how close the result of a computation or approximation is to the mathematical true value being computed, measured by the absolute or relative error of the approximation. In this thesis, accuracy is denoted by $n$ \footnote{As implied by the choice of symbol, $n$ is a natural number ($n \in \N$). Although it wouldn't be nonsensical to consider negative accuracies as well (that is, absolute errors greater than $0.5$), in practice, sequence of approximation-type representations are usually limited to natural accuracies for ease of implementation} and is defined logarithmically in terms of the absolute error $\epsilon$:
 
-$n = \lfloor-log_2(\epsilon)-1\rfloor$
+\begin{equation}
+n = \lfloor-log_2(\epsilon)-1\rfloor
+\end{equation}
 
 This quantity is, not incidentally, the input of the modulus of convergence of a Cauchy sequence. If the accuracy $n$ of a certain result or approximation $\hat{x}$ is known, we can construct an interval of length $2^{-n}$ of all possible values for the computation's true value $x$:
 
-$ \hat{x}-2^{-n-1} \leq x \leq \hat{x}+2^{-n-1} $
+\begin{equation}
+\hat{x}-2^{-n-1} \leq x \leq \hat{x}+2^{-n-1}
+\end{equation}
 
-For instance, take $50/16=3.125$ as an approximation of pi. This approximation has an error of $\epsilon = |\pi-50/16| = 0.016592...$, from which we derive its accuracy of $n=\lfloor-log_2(0.016592...)-1\rfloor = 4$. This means that in a Cauchy sequence converging to pi that follows a constant modulus of convergence ($f(n)=n$), this approximation could be any of the first five terms. Of course, this example is, in a sense, "backwards", since we used the actual value of pi to calculate the error (and then accuracy) of our approximation. In reality, the reason why we generate approximations is to approach an unknown true value, and so the error has to be inferred from the nature of the operations performed to obtain the approximation. This process of error inference is an important part of numerical analysis, and extremely relevant to us here as well: we want to generate error bounds as tight as possible for the amount of computational resources expended, so as to maximize performance.
+For instance, take $50/16=3.125$ as an approximation of pi. This approximation has an error of $\epsilon = |\pi-50/16| = 0.016592...$, from which we derive its accuracy of $n=\lfloor-log_2(0.016592...)-1\rfloor = 4$. This means that in a Cauchy sequence converging to pi that follows a constant modulus of convergence ($f(n)=n$), this approximation could be any of the first five terms. Of course, this example is, in a sense, "backwards"; we used the actual value of pi to calculate the error (and then accuracy) of our approximation. In reality, the reason why we generate approximations is to approach an unknown true value, and so the error has to be inferred from the nature of the operations performed to obtain the approximation. This process of error inference is an important part of numerical analysis, and extremely relevant to us here as well: we want to generate error bounds as tight as possible for the amount of computational resources expended, so as to maximize performance.
 
 %what is precision
 Precision, on the other hand, is the resolution of the result's representation, usually given as the number of decimal or binary digits. More formally, \textit{Accuracy and Stability of Numerical Algorithms} \cite{AccNumAlg} defines precision as "the accuracy with which the basic arithmetic operations $+$, $-$ , $*$, $/$ are performed". As an example, take dyadic numbers: for a fixed $p$ and any integer $a$, dyads of the form $a/2^p$ may be said to have a precision of $p$, since operations may cause errors of at most $1/2^{p+1}$ - exactly half of the "hole" between consecutive dyadic numbers\footnote{This is equivalent to how precision is usually discussed in computer science (in the context of floating-point numbers), but considering the alternative definition of accuracy using relative error instead of absolute error. Floating-point is essentially an attempt to minimize the relative error caused by the "holes" between consecutive floating-point numbers, while dyadic numbers attempt to minimize the absolute error}.
@@ -133,21 +145,22 @@ It is worth mentioning that, in the context of arbitrary-precision (and arbitrar
 
 
 \subsection{Summary}
-\label{theory_summary}
+\label{sec:theory_summary}
 
-%To summarize, all presented methods of exact real representation rely on sequences of increasingly accurate approximations. If the approximations are plain numbers, it is a Cauchy sequence. If the representation uses a sequence of shrinking intervals, it is a nested intervals representation, that allows the sequence to keep track of its accuracy at each step. Finally, if the sequence contains a modulus of convergence, or follows a fixed modulus, it is able to make guarantees about the speed of the convergence. In practice however, using exact real arithmetic for any application pretty much requires a guarantee of accuracy...
 To summarize, all presented methods of exact real representation rely on sequences of increasingly accurate approximations. This concept is based on Cauchy sequences, which by themselves are insufficient since they don't make accuracy guarantees. Two refinements are possible: using sequences of shrinking intervals to keep track of the accuracy of the approximations at each step (nested intervals representation); and keeping a modulus of convergence, or following a fixed modulus, to make guarantees about both the accuracy and the speed of the convergence.
 
-There are a few theoretical quirks to any exact real representation. Perhaps most surprisingly, not all real numbers can be computationally described. This appears to contradict what has been said so far - that any real number is described by a rational Cauchy sequence. However, infinite sequences cannot be stored directly in a computation device with a finite memory. Instead, to represent a sequence, a procedure or function that generates said sequence is used, which means many sequences (and by extension many real numbers) are impossible to represent. This can be formally proved independently of the concept of real numbers as sequences: since there are countably many programs (seeing as each program is a finite, though arbitrarily long, sequence of a finite number of symbols), they can only represent countably many real numbers, no matter the chosen representation strategy. And a Cantor diagonal argument can be used to prove that there are, therefore, real numbers that cannot be represented. The set of representable real numbers is referred to in the literature as the computable real numbers.
+There are a few theoretical quirks to any exact real representation. Perhaps most surprisingly, not all real numbers can be computationally described. This appears to contradict what has been said so far - that any real number is described by a rational Cauchy sequence. However, infinite sequences cannot be stored directly in a computation device with a finite memory. Instead, to represent an infinite sequence, a procedure or function that generates said sequence is used, which means many sequences (and by extension many real numbers) are impossible to represent. This can be formally proved independently of the concept of real numbers as sequences: since there are countably many programs (seeing as each program is a finite, though arbitrarily long, sequence of a finite number of symbols), they can only represent countably many real numbers, no matter the chosen representation strategy. And a Cantor diagonal argument can be used to prove that there are, therefore, real numbers that cannot be represented. The set of representable reals is referred to in the literature as the computable real numbers (sometimes also called recursive real numbers due to their alternative definition using recursion theory \cite{Odi89}) and forms an algebraically closed field \cite{Rice54}.
 
-This fact isn´t really a limitation; after all, if a number can´t be produced as the result of any (finitely describable) computation, then we will never come across it, and so not being able to represent it isn´t a big concern. What is a limitation, though, is the frustrating fact that the comparison of two computable real numbers is undecidable in the general case, since it may involve comparing infinitely many terms of a sequence when the two compared numbers are equal. This is also true when testing for (in)equality. For this reason, practical implementations of the presented ideas offer workarounds or alternatives to comparison, such as performing comparison up to some specified accuracy.
+The observation that computable reals are countable was made by Alan Turing in 1937 \cite{Tur37} and since then the subject has been highly explored in computable analysis. Among other interesting results: despite being countable, the computable reals were shown to not be computationally/recursively enumerable (i.e. there is no algorithm that is guaranteed to enumerate all computable reals such that each one is reached in a finite time) \cite{Odi89}; and the least upper bound of a bounded increasing computable sequence of computable reals may not itself be a computable real, as exemplified by Specker sequences \cite{Specker49}.
+
+Another frustrating limitation is the fact that the comparison of two computable real numbers is undecidable in the general case, since it may involve comparing infinitely many terms of a sequence when the two compared numbers are equal. This is also true when testing for (in)equality. For this reason, practical implementations of the presented ideas offer workarounds or alternatives to comparison, such as performing comparison up to some specified accuracy.
 
 
 
 \section{Implementations: from Theory to Practice}
 \label{sec:practice}
 
-This chapter is dedicated to studying existing implementations of exact real arithmetic in the Haskell programming language. We will analyze each package's chosen representation strategy from a theoretical perspective, listing their features and respective pros and cons. \autoref{chap:results} presents an empirical analysis of the packages' performance.
+This section is dedicated to studying existing implementations of exact real arithmetic in the Haskell programming language. We start with some technical considerations specific to Haskell and an abstract view of the features of these implementations. Then, each package's chosen representation strategy is analyzed from a theoretical perspective, listing their capabilities and respective pros and cons. For an empirical analysis of the packages' performance consult \cref{chap:results}.
 
 \subsection{Technical Considerations}
 
@@ -160,41 +173,49 @@ In the context of exact real arithmetic, there are two levels of memoization: wh
 
 The second level of optimization is more nuanced. It takes advantage of the observation that the $n$-th approximation of a real number is at least as accurate as any of the previous ones, and therefore, it is a valid result for all previous terms of the sequence. This is relevant when the sequence in question is the result of a long series of operations, and therefore each term has a high computational cost. Our observation allows us to return the already calculated $n$-th term when calculating a lesser term would require long computations, thus increasing performance. Note, however, that this makes the elements of the sequence dependent on whether later terms have already been calculated, which is an impure effect. This effect could in principle be modeled as a monad, but that would make using this hypothetical monadic implementation pretty cumbersome. The presented packages that perform this optimization opt for the use of unsafe Haskell functions to produce this impure effect.
 
-\subsection{Minimal Features/Formal Definition}\todo{better title}
+\subsection{The \textit{CompReal} class}
 \label{sec:features}
 
-Each of the surveyed packages implements the concepts above (approximations, computable real numbers, etc.) as their own datatypes. However, for the purposes of testing, benchmarking and later developing the hybrid simulator, it is useful to group them into the same Haskell type class, which was named \textit{CompReal}. This type class abstractly represents the concept of a computable real number, and specifies the following list of functionalities (most of which are pictured in \autoref{fig:comp_real}):
+Each of the surveyed packages implements the concepts above (approximations, computable real numbers, etc.) as their own datatypes. However, for the purposes of testing, benchmarking and later developing the hybrid simulator, it is useful to group them into the same Haskell type class, which was named \textit{CompReal}. This type class abstractly represents the concept of a computable real number, and specifies the following list of functionalities (most of which are pictured in \cref{fig:comp_real}):
 
 \begin{figure}
     \centering
-    \includesvg[width=0.75\linewidth]{images/CompReal.svg}
+    \includesvg[width=0.5\linewidth]{images/CompReal.svg}
     \caption{Core functionality of \textit{CompReal} (abbreviated as CR)}
     \label{fig:comp_real}
 \end{figure}
 
-Since our theory is based on sequences of approximations, our computable reals should support being approximated up to a certain accuracy (as a \textit{Rational}, to generalize any particular approximation datatype the libraries might have). In \autoref{fig:comp_real} this functionality is provided by function \textit{approx}. For example, take the following nested intervals representation of pi, $\{a_i\}_{i \in \N}$:
+Since our theory is based on sequences of approximations, our computable reals should support being approximated up to a certain accuracy (as a \textit{Rational}, to generalize any particular approximation datatype the libraries might be using), or, equivalently, should support generating intervals of decreasing widths of possible values for the real number it represents. In \cref{fig:comp_real} this functionality is provided by function \textit{approx}. For example, take the following nested intervals representation of pi, $\{a_i\}_{i \in \N}$:
 
 $a_0 = [3,4]$
+
 $a_1 = [3.1,3.2]$
+
 $a_2 = [3.14,3.15]$
+
 $a_3 = [3.141,3.142]$
+
 $a_4 = [3.1415,3.1416]$
+
 ...
 
 Evaluating $approx\ a\ 5$ should result in an approximation with an accuracy of at least $5$ (which means we want an approximation of error $\epsilon<2^{-6}=0.015625$ or, equivalently, an interval of width $2^{-5}=0.03125$), so $a_0$ and $a_1$ must be skipped, since they are not tight enough for the required accuracy. Since $a_2$ has a width of $0.01$, its centerpoint $3.145$ is guaranteed to have an error of at most $0.005$. Therefore, $3.145$ is a valid approximation. Taking the centerpoint of any of the tighter intervals would also give a valid approximation, but in general generating tighter intervals requires higher computational costs, so it is usually desirable to use the earliest possible interval to generate the approximation.
 
-% Alternatively, this functionality could be provided by a function that takes a \textit{CompReal} and any positive interval width (instead of only working with widths of the form $2^{-n}$, which are inherent to the way accuracy is defined in this dissertation) and generates an interval with the given width of possible values for the real.  %but, thats anoying to implement for a lot of these libraries, and isnt really that useful anyway, so we opted for the approx function.
+% Alternatively, this functionality could be provided by a function that takes a \textit{CompReal} and any positive interval width (instead of only working with widths of the form $2^{-n}$, which are inherent to the way accuracy is defined in this thesis) and generates an interval with the given width of possible values for the real.  %but, thats anoying to implement for a lot of these libraries, and isnt really that useful anyway, so we opted for the approx function.
 
-Computable reals should also support the reverse: a constructor that takes an approximation function or a list of approximations (\textit{Rationals}), where the first term has an accuracy $n \geq 0$, the second term has $n \geq 1$, etc, and produces the real value they converge towards. This is pictured in \autoref{fig:comp_real} as function \textit{cons}. For instance, if we feed \textit{cons} with the following geometric series, where $a=r=\frac{1}{2}$\footnote{The usual definition of a geometric series starts at index 1, since index 0 corresponds to adding zero terms of the series, which is always 0. This example uses the alternative definition $a_n = ar^{n}$ that starts at index 0, leading to the slightly different summation formula $S_n = a(\sum_{k=0}^{n} r^k) = a\frac{1-r^{n+1}}{1-r}$}:
+Computable reals should also support the reverse: a constructor that takes an approximation function or a list of approximations (\textit{Rationals}), where the first term has an accuracy $n \geq 0$, the second term has $n \geq 1$, etc, and produces the real value they converge towards. This is pictured in \cref{fig:comp_real} as function \textit{cons}. For instance, if we feed \textit{cons} with the following geometric series, where $a=r=\frac{1}{2}$\footnote{The usual definition of a geometric series ($a_n = ar^{n-1}$) starts at index 1, since index 0 corresponds to adding zero terms of the series, which is always 0. This example uses the alternative definition $a_n = ar^{n}$ that starts at index 0, leading to the slightly different summation formula $S_n = \sum_{k=0}^{n} ar^k = a\frac{1-r^{n+1}}{1-r}$}:
 
 $S_0 = \frac{1}{2}$
+
 $S_1 = \frac{1}{2} + \frac{1}{4} = \frac{3}{4}$
+
 $S_2 = \frac{1}{2} + \frac{1}{4} + \frac{1}{8} = \frac{7}{8}$
+
 ...
 
 The resulting computable real $cons\ S$ will denote the number $1$. Notice that $cons$ assumes a constant module of convergence, which in this particular case is satisfied, since the error of each approximation is $R_n = | S_{\infty} - S_n | = \frac{a}{1-r} - a\frac{1-r^{n+1}}{1-r} = |a\frac{r^{n+1}}{1-r}|=2^{-n-1}$. For other geometric series, this condition might not hold, so some terms might have to be filtered out to ensure the filtered sequence follows the modulus. In any case, using $cons$ always requires some known bound to the error of each approximation, either to ensure they follows the modulus or to generate a sequence that does.
 
-Obviously, computable reals must also support numerical operations. In addition to the basic arithmetic operations, real numbers are closed under trigonometric functions, exponentiation (with a positive base), and logarithms (on positive values). It must also be possible to promote any rational value to a computable real (this is function $fromRational$ in \autoref{fig:comp_real}, which can be obtained solely from the constructor as $cons \circ const$. Likewise, other operations such as addition, multiplication, etc can also be obtained from $approx$ and $cons$ - \autoref{fig:sum} is a diagram illustrating such a construction for addition). These restrictions are specified by Haskell's \textit{Floating} type class, which \textit{CompReal} should extend.
+Obviously, computable reals must also support numerical operations. In addition to the basic arithmetic operations, real numbers are closed under trigonometric functions, exponentiation (with a positive base), and logarithms (on positive values). It must also be possible to promote any rational value to a computable real (this is function $fromRational$ in \cref{fig:comp_real}, which can be obtained solely from the constructor as $cons \circ const$. Likewise, other operations such as addition, multiplication, etc can also be obtained from $approx$ and $cons$ - \cref{fig:sum} is a diagram illustrating such a construction for addition). These restrictions are specified by Haskell's \textit{Floating} type class, which \textit{CompReal} should extend.
 
 \begin{figure}
     \centering
@@ -203,20 +224,41 @@ Obviously, computable reals must also support numerical operations. In addition 
     \label{fig:sum}
 \end{figure}
 
-Another natural operation to support is limits. Unlike the constructor, which simply constructs a computable real from a sequence of approximations (which is, as explained before, our theoretical basis for computable reals), a limit takes in a sequence of converging computable reals and produces a single computable real. This function is obtainable using \textit{approx} and \textit{cons} with the help of an auxiliary function $join : (\Q^\N)^\N \rightarrow \Q^\N$, which chooses a sequence of approximations with a constant modulus from the inputted sequence of sequences.
+Another natural operation to support is limits. Unlike the constructor, which simply constructs a computable real from a sequence of approximations (which is, as explained before, our theoretical basis for computable reals), a limit (function \textit{limit} in \cref{fig:comp_real}) takes in a sequence of converging computable reals and produces a single computable real. Like with \textit{cons}, using \textit{limit} requires a known error bound for each approximation, to ensure the reals in the sequence follow a constant modulus of convergence. The function \textit{limit} is also obtainable using \textit{approx} and \textit{cons} with the help of an auxiliary function $join : (\Q^\N)^\N \rightarrow \Q^\N$. To better illustrate this construction, here is a sequence of converging real numbers, each with its own sequence of approximations:
+
+$r_0 \xrightarrow{approx} a_{0,0}\ \ a_{0,1}\ \ a_{0,2}\ \ a_{0,3}\ \ ...$
+
+$r_1 \xrightarrow{approx} a_{1,0}\ \ a_{1,1}\ \ a_{1,2}\ \ a_{1,3}\ \ ...$
+
+$r_2 \xrightarrow{approx} a_{2,0}\ \ a_{2,1}\ \ a_{2,2}\ \ a_{2,3}\ \ ...$
+
+...
+
+The limit of this sequence of reals, $r_{\infty} = limit\ r$, can be constructed with \textit{cons} by taking a path through the approximations with a constant modulus of convergence. To make it clear how to obtain such a path, look at the following table representing the maximum errors of each real and approximation. The top row shows the error of each approximation $a_{n,m}$ to its real $r_{n}$ (guaranteed by the postcondition of \textit{approx}) and the left column shows the error of each real $r_{n}$ to the limit of the sequence $r_{\infty}$ (guaranteed by the precondition of \textit{limit}). The body of the table is the error of each approximation $a_{n,m}$ relative to the limit $r_{\infty}$, and can be obtained by adding the error at the top of its column and the error at the left of its row:
+
+\begin{center}
+\begin{tabular}{| c || c | c | c |} 
+  \cline{2-4}
+  \multicolumn{1}{c|}{}& $|r_n - a_{n,0}| \leq 1/2$ & $|r_n - a_{n,1} \leq 1/4|$ & $|r_n - a_{n,0} \leq 1/8|$ \\ [0.5ex]
+  \hhline{|-|=|=|=|}
+  $|r_{\infty} - r_0| \leq 1/2$ & $|r_{\infty} - a_{0,0}| \leq 1$ & $|r_{\infty} - a_{0,1}| \leq 3/4$ & $|r_{\infty} - a_{0,2}| \leq 5/8$ \\ 
+  \hline
+  $|r_{\infty} - r_1| \leq 1/4$ & $|r_{\infty} - a_{1,0}| \leq 3/4$ & $|r_{\infty} - a_{1,1}| \leq 1/2$ & $|r_{\infty} - a_{1,2}| \leq 3/8$ \\
+  \hline
+  $|r_{\infty} - r_2| \leq 1/8$ & $|r_{\infty} - a_{2,0}| \leq 5/8$ & $|r_{\infty} - a_{2,1}| \leq 3/8$ & $|r_{\infty} - a_{2,2}| \leq 1/4$ \\
+  \hline
+\end{tabular}
+\end{center}
+
+It should now be clear how to obtain an appropriate sequence of approximations for $r_{\infty}$: simply take the diagonal and skip the first element. Hence, $join = (\circ(dup \circ succ)) \circ uncurry$. This is the best choice when optimizing the convergence rate, though it may not be the most performant if one of the directions of the matrix is significantly faster to iterate than the other (e.g. if calculating an approximation $a_{n,m}$ had a time complexity of $O(ij^3)$). In such a case, optimizing for performance might look like taking a sloped path through the matrix instead of the diagonal; but, of course, such considerations would require \textit{a priori} knowledge about the performance of iterating the input sequences, which means that in the general case they are unviable for optimizing pure Haskell code.
 
 
+Finally, real numbers should support comparison. As stated before, comparison is undecidable on the computable reals, so a straight implementation of Haskell's \textit{Ord} class might never halt when comparing two reals. An in-depth exploration of why this is undesirable can be found in \cref{sec:strict_comparison}, which showcases how comparisons work in the hybrid simulator. To guarantee halting, a new class \textit{CompOrd} was created to capture the idea of comparing increasingly accurate approximations, in the domain theory sense. Its comparison function takes two values to compare and an accuracy $n$ and returns an element of the ordering domain, an extension of Haskell's \textit{Ordering} type (pictured in \cref{fig:ordering_dom}), by first \textit{approx}imating its two operands and then comparing the approximations. If the difference between the approximations is greater than $2^{-n}$, the comparison can be fully decided and returns LT or GT. Otherwise, a non-maximal element of the ordering domain is returned.
 
-
-
-%TODO: exemplo de um limite
-
-Finally, real numbers should support comparison. As stated before, comparison is undecidable on the computable reals, so a straight implementation of haskell's \textit{Ord} class is impossible. Instead, a new class \textit{CompOrd} was created to capture the idea of comparing increasingly accurate approximations, in the domain theory sense. Its comparison function takes two values to compare and an accuracy $n$ and returns an element of the \textit{Ordering} domain, of which the top elements are \textit{EQ}, \textit{LT} and \textit{GT}. This function can be written agnostically using the approximation functions provided by the \textit{CompReal} class.
-%todo: comparison using approx ???? or optimization??
-
-An important point to make is that \textit{CompReal} and $\Q^{\N}$ are \textbf{not} isomorphic; they might be, depending on the specific \textit{CompReal}, but are not required to. Even though \textit{approx} and \textit{cons} are maps between the two types, their composition is not required to preserve the internal structure of the \textit{CompReal} ($cons \circ approx \neq id$, or in other words, \textit{approx} and \textit{cons} are not each other's inverse), despite the resulting \textit{CompReal} denoting the same real number. This change in internal structure can have serious impacts on performance, which is why these operations should be used judiciously. For this exact reason, even though \textit{limit}, \textit{fromRational} and all numeric operations could be implemented transparently, solely from manipulating sequences of approximations obtained with $approx$ and translating back to \textit{CompReal} using \textit{cons}, doing so would be terrible for performance. Instead, each instance of \textit{CompReal} implements these functionalities independently, optimized to the specific internal structure of their representation, using its library's code and functionalities whenever possible and new code when not.
+An important point to make is that \textit{CompReal} and $\Q^{\N}$ are \textbf{not} isomorphic; they might be, depending on the specific \textit{CompReal}, but are not required to. Even though \textit{approx} and \textit{cons} are maps between the two types, their composition is not required to preserve the internal structure of the \textit{CompReal} ($cons \circ approx \neq id$, or in other words, \textit{approx} and \textit{cons} are not each other's inverse), despite the resulting \textit{CompReal} denoting the same real number. This change in internal structure can have serious impacts on performance, which is why these operations should be used judiciously. For this exact reason, even though \textit{limit}, \textit{fromRational} and all numeric operations could be implemented transparently (by manipulating sequences of approximations obtained with $approx$ and translating back to \textit{CompReal} using \textit{cons}, as shown in the previous examples), doing so would be terrible for performance. Instead, each instance of \textit{CompReal} implements these functionalities independently, optimized to the specific internal structure of their representation, using its library's code and functionalities whenever possible and new code written specifically for them when not. The exception is \textit{CompOrd} and its comparison function, which is implemented using \textit{approx} in all instances to assure that comparison is somewhat consistent between different libraries when using the same precision - though each instance is still expected to define its own \textit{min} and \textit{max}, optimized to its internal structure, like all the other operations.
 
 \subsection{Package Survey}
+%TODO: dizer como os limites sao calculados com cada package?
 
 \subsubsection{CDAR}
 
@@ -226,7 +268,7 @@ A real number is represented as a list of these approximations, taking advantage
 
 \subsubsection{aern2-real}
 
-\textit{aern2-real} \cite{Aern2} is very similar to \textit{CDAR}, also making use of centered dyadic approximations and lists. However, it implements a lot more utilities and operations, of note: a comparison function between two reals, returning an infinite list of kleenians (the three-valued logic equivalent of booleans: true, false or undecided); parallel branching capabilities receiving a kleenian; handling of partial functions and errors (using another package \textit{collect-errors} \cite{ColErr} of the same author); and the calculation of limits as a built-in operation. Though most of these features aren't of use to our particular use case, an efficient implementation of limits is of the utmost importance to the hybrid simulator, since solving differential equations requires a lot of limits.
+\textit{aern2-real} \cite{Aern2} is very similar to \textit{CDAR}, also making use of centered dyadic approximations and lists. However, it implements a lot more utilities and operations, of note: a comparison function between two reals, returning an infinite list of kleeneans (the three-valued logic equivalent of booleans: true, false or undecided - \cref{fig:kleeneans_dom}); parallel branching capabilities receiving a kleenean; handling of partial functions and errors (using another package \textit{collect-errors} \cite{ColErr} of the same author); and the calculation of limits as a built-in operation. Though most of these features aren't of use to our particular use case, an efficient implementation of limits is of the utmost importance to the hybrid simulator, since solving differential equations requires a lot of limits.
 
 \subsubsection{ERA}
 
@@ -234,9 +276,9 @@ A real number is represented as a list of these approximations, taking advantage
 
 \begin{equation}
 \forall j \in \N, |r - f(j)/2^{j}| < 2^{j}
-\end{equation}\todo{check}
+\end{equation}
 
-Sadly, this implementation doesn't have many utilities to work with its real numbers other than the basic arithmetic operations. It also does not memoize any of its results, making it the slowest of the surveyed packages (detailed benchmarking results are examined in \autoref{chap:results}).
+Sadly, this implementation doesn't have many utilities to work with its real numbers other than the basic arithmetic operations. It also does not memoize any of its results, making it the slowest of the surveyed packages (detailed benchmarking results are examined in \cref{chap:results}).
 
 \subsubsection{exact-real}
 
@@ -244,11 +286,13 @@ Sadly, this implementation doesn't have many utilities to work with its real num
 
 \subsubsection{ireal}
 
-ireal \cite{IReal} expands on the ideas presented so far by merging the concepts of nested intervals and modulus of convergence into a single sequence of nested open intervals with dyadic endpoints with a fixed modulus of convergence, stored as a function $\textit{Int} \rightarrow (\textit{Integer},\textit{Integer})$, which is very close to the formalization of real numbers in domain theory (presented in \autoref{sec:domain}). This is important for \textit{ireal}, since the creator wanted to ensure a solid theoretical ground for their implementation. Their paper explaining the implementation and showing its correctness can be found along with the source code.
+ireal \cite{IReal} expands on the ideas presented so far by merging the concepts of nested intervals and modulus of convergence into a single sequence of nested open intervals with dyadic endpoints with a fixed modulus of convergence, stored as a function $\textit{Int} \rightarrow (\textit{Integer},\textit{Integer})$, which is very close to the formalization of real numbers in domain theory (presented in \cref{sec:domain}). This is important for \textit{ireal}, since the creator wanted to ensure a solid theoretical ground for their implementation. Their paper explaining the implementation and showing its correctness can be found along with the source code.
 
 Formally, an \textit{ireal} value represented by a function $<f,g>$ contains a real number $r$ if
 
-$\forall j \in \N, f(j)/2^{j} < r < g(j)/2^j $
+\begin{equation}
+\forall j \in \N, f(j)/2^{j} < r < g(j)/2^j
+\end{equation}
 
 This representation is redundant when representing a single real number, since the condition imposed by the modulus already creates an interval of possible convergence points. However, this allows \textit{ireal} to directly represent intervals with real endpoints. In this setup, a single real number is simply a sequence of thin intervals, that is, the $j$-th interval's endpoints are exactly $2/2^j$ apart.
 
@@ -272,17 +316,16 @@ Like \textit{exact-real}, \textit{ireal} also implements out-of-order memoizatio
     \caption{Package comparison}
     \label{tab:comparison}
 \end{table}
-%todo: tabela com features (yes/no) e vantagens/desvantagens de cada uma (memoization, repersentation, type of endpoint, supports/generates finite lists, etc)
 
-In a sense, the details of the individual implementations are irrelevant, insofar as all of them support (or can be extended to support) all of the same base features, specified in \autoref{sec:features}. However, these details are still significant for performance.
+In a sense, the details of the individual implementations are irrelevant, insofar as all of them support (or can be extended to support) all of the same base features, specified in \cref{sec:features}. However, these details are still significant for performance.
 
 To summarize how they impact performance:
 \begin{itemize}
   
-  \item Strategy impacts how quickly the approximations converge. Modulus of convergence strategies are fixed and have little to no possibility of optimization, but have a guaranteed convergence speed. On the other hand, nested intervals can have any convergence, which means a lot more care has to be put into optimization
+  \item Strategy impacts how quickly the approximations converge. Modulus of convergence strategies are fixed and have little to no possibility of optimization, but have a guaranteed convergence speed. On the other hand, nested intervals representations can have any convergence speed at all (consecutive intervals' widths may halve, be cut in ten, or even stay the same), which means a lot more care has to be put into optimization when performing operations
   \item Using lists as a data structure has the advantage of automatically granting level 1 memoization (which comes with performance benefits but also memory costs), but the disadvantage of forcing an explicit iteration to access later elements in the list. Functions can support level 2 memoization, but by default have none.
-  \item The choice of approximation affects the way integer and rational values are represented, which may reduce the number of approximations needed. However, more complicated approximations have a greater overhead. All of the analyzed representations use dyadic numbers for their simplicity
-  \item Memoization is absolutely crucial for performance, especially when real values are used multiple times for calculations. Level 1 stores the value of each approximation, causing more intensive memory use. Level 2 only stores the most accurate approximation calculated so far, which is only advantageous when the approximations are used out of order.
+  \item The choice of approximation affects the way integer and rational values are represented, which may reduce the number of approximations needed. However, more complicated approximations have a greater overhead. All of the analyzed representations use dyadic numbers as a base, making use of their simplicity
+  \item Memoization is absolutely crucial for performance, especially when real values are used multiple times for calculations. Level 1 stores the value of each approximation, causing more intensive memory use. Level 2 only stores the most accurate approximation calculated so far, which is only advantageous when the approximations are used out of order (but is significantly less memory intensive).
 \end{itemize}
 
 
@@ -291,23 +334,167 @@ To summarize how they impact performance:
 
 \subsection{Formalizing Hybridness}
 
-The current standard formalism for hybrid systems is hybrid automata. In essence, these are automata where states are labeled with differential equations (continuous behavior), and edges, marked with guards and variable assignments, determine the transition between the states (discrete behavior). While it is a useful model, we don't actually need to consider automata to reason abstractly about hybridness. Instead, we will consider the basic features of hybrid systems in a functional lens and follow them to a monadic description of hybridness - the hybrid monad(s) - which will then be used to implement the concepts in practice.
+The current standard formalism for hybrid systems is the hybrid automaton, originally introduced in \cite{Wit66}. In essence, these are automata where states are labeled with differential equations (continuous behavior), and edges, marked with guards and variable assignments, determine the transition between the states (discrete behavior). While it is a useful model, we don't actually need to consider automata to reason abstractly about hybridness. Instead, we will consider the basic features of hybrid systems in a functional lens and follow them to a monadic description of hybridness - the hybrid monad(s) - which will then be used to implement the concepts in practice.
 
-The main characteristic of hybrid programs is their relation to time, namely, how the state of the program evolves through it. It is important to distinguish the simulated time from the real time, though: some hybrid programs can simulate hundreds of years instantly, while others can take hours to simulate a single second. When talking about time from now on, unless otherwise stated, it refers to simulated time, as opposed to execution time, performance, etc.
+The main characteristic of hybrid programs is their relation to time, namely, how the evolution of the program state may be both continuous and discrete. It is important to distinguish the simulated time from the real time, though: some hybrid programs can simulate hundreds of years instantly, while others can take hours to simulate a single second. When talking about time from now on, unless otherwise stated, it refers to simulated time, as opposed to execution time, performance, etc.
 
-A hybrid program can be modeled as a function that, given a state, returns the evolution of the state through time, also known as a trajectory. For instance, given a state of $n$ real numbers, a hybrid program would be a function of type $\R^n \rightarrow (\R^n)^{\R_{\geqslant 0}}$. Programs usually don't define the trajectory of the state indefinitely though, only up to some positive duration ($d$). This allows programs to be composed: the composition of two programs is a new program whose trajectory follows the first program's trajectory to its end and then feeds the resulting state into the second program and follows its trajectory.
+A hybrid program can be modeled as a function that, given a state, returns the evolution of the state through time, also known as a trajectory. For instance, given a state of $n$ real numbers, a hybrid program would be a function of type $\R^n \rightarrow (\R^n)^{\R_0^+}$\footnote{In this example the program always outputs an infinite trajectory regardless of the input. In the next section this type is refined to allow finite trajectories}. Programs usually don't define the trajectory of the state indefinitely though, only up to some positive duration $d$. This allows programs to be composed: the composition of two programs is a new program whose trajectory follows the first program's trajectory to its end and then feeds the resulting state into the second program and follows its trajectory.
+
+Of course, since hybrid systems allow both continuous and discrete changes, the resulting trajectories may be discontinuous. How these trajectories are generated is not really relevant; whether they come from a hybrid automaton or an imperative hybrid language, this formalization still applies.
 
 \subsection{The Hybrid Monad(s)}
+\label{sec:hybrid_monad}
 
-The features of hybridness presented in the previous section can be used to form a monad, as is described at length in \cite{neves18}. In summary, the hybrid monad describes the effect of a continuous evolution during some time $d$, as expected. This monad's unit function, for some state $x$, generates an instantaneous "evolution" taking zero time and ending in $x$; and the multiplication function collapses an "evolution of evolutions" by evaluating them at their ends and adding their durations.
-
-%In this chapter we introduced the hybrid monad and showed that it captures the basic interaction between programs and physical processes, initially pointed out in the sixties by Witsenhausen [Wit66] (automata) and further examined in the following decades by several people (e. g. [Tav87; Hen96; Höf09; SH11])
-%todo: steal these references from [5]
+The features of hybridness presented in the previous section can be used to form a monad, as is described at length in \cite{neves18}. In summary, the hybrid monad $\monad{H}$ describes the effect of a (possibly discontinuous) evolution during some time $d$, as expected. This monad's unit function, for some state $x$, generates an instantaneous "evolution" taking zero time and ending in $x$; and the multiplication function collapses an "evolution of evolutions" by evaluating them at their ends and adding their durations.
 
 Modeling hybridness as a monadic effect greatly facilitates both reasoning about and implementing simulations of hybrid systems in practice: any instantaneous change in state, in the form of some traditional computation, can be converted into a hybrid program through the hybrid monad's unit function, and continuous evolutions are represented in general as a trajectory. This way, the hybrid monad represents the mix we were looking for of both discrete and continuous changes.
 
-This general description of hybridness allows for any kind of state. However, as pointed out by the creators of Lince - an imperative hybrid programming language - in \cite{goncharov2020}, there are advantages in imposing additional constraints on the allowed state type. Due to its imperative nature, Lince only works with states of $n$ real variables ($\R^n$), using differential equations as trajectory generators. As an advantage, instead of using the general hybrid monad $\monad{H}$ described in \cite{neves18}, Lince formalizes its syntax with a parametrized monad $\monad{H}_S$, where $S$ is the state of the program (which in Lince's case happens to be $\R^n$ for some $n \in \N$).
+This general description of hybridness allows for any kind of state. However, as pointed out by the creators of Lince - an imperative hybrid programming language - in \cite{goncharov2020}, there are advantages in fixing the state type such that every operation both takes and produces the same type of state. Due to its imperative nature, Lince only works with states of $n$ real variables ($\R^n$), using differential equations as trajectory generators. As an advantage, instead of using the general hybrid monad $\monad{H}$ described in \cite{neves18}, Lince formalizes its syntax with a parametrized monad $\monad{H}_S$, where $S$ is the fixed type of the state of the program (which in Lince's case happens to be $\R^n$ for some $n \in \N$):
 
-TODO: aqui eu queria meter a definicao formal de $\monad{H}_S$ e mostrar que cumpre as leis, mas tenho algumas duvidas sobre a notacao do paper e sobre a minha implementação, e queria esclarecer isso primeiro quando reunirmos
+\begin{equation}
+\functor{H}_S\ X = \sum_{I \in [0,\R_0^+)}{S^I} \times X + \sum_{I \in [0,\overline{\R_0^+}\rrparenthesis}{S^I}
+\end{equation}
 
-%As \cite{goncharov2020} shows, these two monads are isomorphic when acting on state $S$; however, $\monad{H}_S$ is 
+Let's break down this definition. $\functor{H}_S X$ is defined as a coproduct. The left-hand side represents what the paper calls \textit{convergent} trajectories, which are trajectories that have a certain duration $d \in \R_0^+$ and a defined endpoint at time $t=d$. The definition separates these into a product: $\sum_{I \in [0,\R^{+})}{S^I}$ is the open trajectory up until the endpoint and $X$ is the endpoint (the duration $d$ is implicitely given as the upper bound of $I$). The right-hand side of the coproduct represents \textit{divergent} trajectories, which are trajectories that don't have an endpoint. These may come about in two situations: either the trajectory has "infinite duration", as in, it is of the form $S^{\R_0^+}$ (these are \textit{open divergent}); or it has a finite duration but no endpoint\todo{é verdade?} (\textit{closed divergent}). This second situation is perhaps the most puzzling, but consider the following example of a closed divergent trajectory:
+
+\begin{lstlisting}[caption=Hybrid program resulting in a closed divergent trajectory]
+  x:=1;
+  while true do { wait x; x := x/2 }
+\end{lstlisting}
+
+Calculating the state of the system at $t=1$ would require an infinite number of iterations of the while loop. The moment $t=1$ is what we call a zeno point (since this situation is reminiscent of Zeno's paradoxes); the state of the system at this point is not defined.
+
+Of course, if $S \neq X$ this definition of $\functor{H}_S X$ doesn't really represent a trajectory; it makes no sense for the state type of a trajectory to be different before and at the endpoint. The whole point of parametrizing the hybrid monad is separating the type of the endpoint $X$, which is used when concatenating two trajectories, and the type of the open trajectory before it, which isn't. This split allows us to define trajectory concatenation (and, using concatenation, all monadic operators) independently of $S$, such that $\monad{H}_S$ is a monad regardless of the type $S$. And in the special case $S = X$, only then does $\functor{H}_S S$ represent a hybrid trajectory.
+
+The limitation of this definition is that, since interpreting $\functor{H}_S X$ as a trajectory requires that $S=X$, using $\monad{H}_S$ for hybrid computations limits all operations to the type $S \rightarrow \functor{H}_S S$ (which an imperative language such as Lince has no problem with). However, even though $\monad{H}_S S$ is naturally isomorphic to $\monad{H}\ S$, as shown in \cite{goncharov2020}, the advantage of $\monad{H}_S$ is its relative simplicity (and the simplicity of its operators) and how it is "mathematically a better behaved structure". The rest of this section defines the monadic operators for $\monad{H}_S$ and shows that they satisfy the monad laws, proving that $\monad{H}_S$ is indeed a monad.
+
+
+
+We first start by defining the concatenation of two open trajectories, $(^\frown) : \sum_{I \in [0,\R_0^+)}{S^I} \times \sum_{I \in [0,\R_0^+)}{S^I} \rightarrow \sum_{I \in [0,\R_0^+)}{S^I}$:
+
+\begin{equation}
+  (i_{I=[0,d_1)}\ e_1) ^\frown (i_{I=[0,d_2)}\ e_2) = i_{I=[0,d_1+d_2)}\ e'
+  , \text{where }
+  \begin{cases}
+    e'\ t = e_1\ t        \ \text{if } t   <  d_1 \\
+    e'\ t = e_2\ (t - d_1)\ \text{if } t \geq d_1 \\
+  \end{cases}
+\end{equation}
+
+The definition for $\sum_{I \in [0,\overline{\R_0^+}\rrparenthesis}{S^I}$ is equivalent. The symbol $(^\frown)$ is used to represent both concatenations, depending on the type of the inputs. Note that this operator is associative: $({a^{}} ^\frown b) ^\frown c^{} = {a^{}} ^\frown ({b^{}} ^\frown c)$\todo{proof?}. Concatenation also has an identity element, the empty trajectory $\epsilon$:
+
+\begin{equation}
+\epsilon = i_{I=\emptyset}\ (!)
+\end{equation}
+
+such that ${a^{}} ^\frown \epsilon = { \epsilon^{}} ^\frown a = a$\todo{proof? its pretty simple}. These properties make trajectories a monoid, which can be specified as the triple $(\functor{Trj}_S, (^\frown), \epsilon)$ where $\functor{Trj}_S = \sum_{I \in [0,\R_0^+)}{S^I}$ for open trajectories and $(\functor{Trj'}_S, (^\frown), \epsilon)$ where $\functor{Trj'}_S = \sum_{I \in [0,\overline{\R_0^+}\rrparenthesis}{S^I}$ for open, closed and infinite trajectories.
+
+We can now define the monad operators for $\monad{H}_S$: the unit function $u : X \rightarrow \functor{H}_S X$, that returns an empty convergent trajectory with the inputted endpoint:
+
+\begin{equation}
+%$ u\ x = i_L (\epsilon, x)$
+u = i_L \circ \langle \underline{\epsilon}, id \rangle
+\end{equation}
+
+and the Kleisli lifting $(^\star)$ (also known as monadic bind), that transforms a function $f : X \rightarrow \functor{H}_S Y$ into a function $f^\star : \functor{H}_S X \rightarrow \functor{H}_S Y$
+
+\begin{equation}
+f^\star = [(\langle (^\frown) \circ (id \times \pi_L), \pi_R \circ \pi_R \rangle + (^\frown)) \circ distr \circ (id \times f), i_R]
+\end{equation}
+
+Informally, if the inputted hybrid trajectory is divergent, it is returned as is; otherwise, $f$ is applied to its endpoint and the resulting hybrid trajectory is concatenated with the first. As expected, the result is convergent only if both trajectories are themselves convergent.
+
+We are finally in a position to prove the three monad laws: left identity, right identity and associativity (here expressed in point-free notation):
+
+\begin{equation*}
+  \begin{split}
+    f^\star \circ u &= f \\
+    u^\star &= id \\
+    f^\star \circ g^\star &= (f^\star \circ g)^\star
+  \end{split}
+\end{equation*}
+
+The following proofs start by expanding the definitions for the unit and the Kleisli lifting and then simplifying the obtained expression until the desired result is reached.
+
+%Left identity: bind f (u x) = f x
+%pointfree: $f^\star \circ u = f$
+\begin{equation}
+  \begin{split}
+    f^\star \circ u =&\ [(\langle (^\frown) \circ (id \times \pi_L), \pi_R \circ \pi_R \rangle + (^\frown)) \circ distr \circ (id \times f), i_R] \circ i_L \circ \langle \underline{\epsilon}, id \rangle \\
+    %Cancelamento-+
+    =&\ (\langle (^\frown) \circ (id \times \pi_L), \pi_R \circ \pi_R \rangle + (^\frown)) \circ distr \circ (id \times f) \circ \langle \underline{\epsilon}, id \rangle \\
+    %Absorcao-×
+    =&\ (\langle (^\frown) \circ (id \times \pi_L), \pi_R \circ \pi_R \rangle + (^\frown)) \circ distr \circ \langle \underline{\epsilon}, f \rangle \\
+    %for this step, we need to prove $distr \circ \langle \underline{x}, g \rangle = [\langle \underline{x}, id \rangle, \langle\underline{x}, id \rangle] \circ g$
+    =&\ (\langle (^\frown) \circ (id \times \pi_L), \pi_R \circ \pi_R \rangle + (^\frown)) \circ (\langle \underline{\epsilon}, id \rangle + \langle \underline{\epsilon}, id \rangle) \circ f \\
+    %Functor-+
+    =&\ ((\langle (^\frown) \circ (id \times \pi_L), \pi_R \circ \pi_R \rangle \circ \langle \underline{\epsilon}, id \rangle) + ((^\frown) \circ \langle \underline{\epsilon}, id \rangle)) \circ f \\
+    %Fusao-× 
+    =&\ (\langle (^\frown) \circ (id \times \pi_L) \circ \langle \underline{\epsilon}, id \rangle, \pi_R \circ \pi_R \circ \langle \underline{\epsilon}, id \rangle \rangle + ((^\frown) \circ \langle \underline{\epsilon}, id \rangle)) \circ f \\
+    %Absorcao-×, Cancelamento-×
+    =&\ (\langle (^\frown) \circ \langle \underline{\epsilon}, \pi_L \rangle, \pi_R \rangle + ((^\frown) \circ \langle \underline{\epsilon}, id \rangle)) \circ f \\
+    %\epsilon is the identity element of (^\frown)
+    =&\ (\langle \pi_L, \pi_R \rangle + id) \circ f \\
+    %Reflexao-×
+    =&\ (id + id) \circ f \\
+    %Functor-id-+
+    =&\ f
+  \end{split}
+\end{equation}
+
+
+%Right identity: bind u x = x
+%pointfree: $u^\star = id$
+\begin{equation}
+  \begin{split}
+    u^\star =&\ [(\langle (^\frown) \circ (id \times \pi_L), \pi_R \circ \pi_R \rangle + (^\frown)) \circ distr \circ (id \times (i_L \circ \langle \underline{\epsilon}, id \rangle)), i_R] \\
+    %$distr \circ (f \times (i_L \circ g)) = i_L \circ (f \times g)$
+    =&\ [(\langle (^\frown) \circ (id \times \pi_L), \pi_R \circ \pi_R \rangle + (^\frown)) \circ i_L \circ (id \times \langle \underline{\epsilon}, id \rangle), i_R] \\
+    %Natural-i1
+    =&\ [i_L \circ \langle (^\frown) \circ (id \times \pi_L), \pi_R \circ \pi_R \rangle \circ (id \times \langle \underline{\epsilon}, id \rangle), i_R] \\
+    %Fusao-×
+    =&\ [i_L \circ \langle (^\frown) \circ (id \times \pi_L) \circ (id \times \langle \underline{\epsilon}, id \rangle), \pi_R \circ \pi_R \circ (id \times \langle \underline{\epsilon}, id \rangle) \rangle, i_R] \\
+    %Functor-×, Natural-π2
+    =&\ [i_L \circ \langle (^\frown) \circ (id \times (\pi_L \circ \langle \underline{\epsilon}, id \rangle)), \pi_R \circ \langle \underline{\epsilon}, id \rangle \circ \pi_R \rangle, i_R] \\
+    %Cancelamento-×
+    =&\ [i_L \circ \langle (^\frown) \circ (id \times \underline{\epsilon}), id \circ \pi_R \rangle, i_R] \\
+    %\epsilon is the identity element of (^\frown)
+    =&\ [i_L \circ \langle \pi_L, \pi_R \rangle, i_R] \\
+    %Reflexao-×
+    =&\ [i_L, i_R] \\
+    %Reflexao-+
+    =&\ id
+  \end{split}
+\end{equation}
+
+
+%Associativity: bind f (bind g x) = bind (bind f . g) x
+%pointfree: $f^\star \circ g^\star = (f^\star \circ g)^\star$
+\begin{equation}
+  \begin{split}
+    f^\star \circ g^\star =&\ [(\langle (^\frown) \circ (id \times \pi_L), \pi_R \circ \pi_R \rangle + (^\frown)) \circ distr \circ (id \times f), i_R] \\
+      &\ \circ [(\langle (^\frown) \circ (id \times \pi_L), \pi_R \circ \pi_R \rangle + (^\frown)) \circ distr \circ (id \times g), i_R] \\
+    %Fusao-+
+    =&\ [[(\langle (^\frown) \circ (id \times \pi_L), \pi_R \circ \pi_R \rangle + (^\frown)) \circ distr \circ (id \times f), i_R] \\
+      &\ \ \circ (\langle (^\frown) \circ (id \times \pi_L), \pi_R \circ \pi_R \rangle + (^\frown)) \circ distr \circ (id \times g), \\
+      &\ [(\langle (^\frown) \circ (id \times \pi_L), \pi_R \circ \pi_R \rangle + (^\frown)) \circ distr \circ (id \times f), i_R] \circ i_R] \\
+    %Absorcao-+, Cancelamento-+
+    =&\ [[(\langle (^\frown) \circ (id \times \pi_L), \pi_R \circ \pi_R \rangle + (^\frown)) \circ distr \circ (id \times f) \circ \langle (^\frown) \circ (id \times \pi_L) \\
+      &\ , \pi_R \circ \pi_R \rangle, i_R \circ (^\frown)] \circ distr \circ (id \times g), i_R] \\
+    %Absorcao-×
+    =&\ [[(\langle (^\frown) \circ (id \times \pi_L), \pi_R \circ \pi_R \rangle + (^\frown)) \circ distr \circ \langle (^\frown) \circ (id \times \pi_L), f \circ \pi_R \circ \pi_R \rangle, \\
+    &\ i_R \circ (^\frown)] \circ distr \circ (id \times g), i_R] \\
+    %
+    =&\  \\
+    %
+    =&\  \\
+    %
+    =&\ [(\langle (^\frown) \circ (id \times \pi_L), \pi_R \circ \pi_R \rangle + (^\frown)) \circ distr \circ (id \times (f^\star \circ g)), i_R] \\
+    %definicao de (^\star)
+    =&\ (f^\star \circ g)^\star
+  \end{split}
+\end{equation}
+\todo{acabar prova}
+
+
+In the paper, $\monad{H}_S$ is also shown to be an Elgot monad \cite{ELGOT1975175} by using the bind operator to define an Elgot iteration operator as a least fixed point. Elgot iteration is later used in the paper to formalize the denotational semantics of Lince's while loops. This thesis doesn't cover this detail, however, since the denotational semantics of the new hybrid language isn't really formalized. To create an operational semantics for the language (\cref{sec:semantics}), the provided concepts are enough.
