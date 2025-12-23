@@ -7,6 +7,7 @@ maintainer:          "pereira.migueltiago@gmail.com"
 copyright:           "2025 Tiago Bacelar"
 
 extra-source-files:
+- src/Lang/Parser.y
 - README.md
 - CHANGELOG.md
 
@@ -25,8 +26,6 @@ dependencies:
 - containers
 - array
 - mtl
-- Chart
-- Chart-cairo
 - mixed-types-num
 - cdar
 - exact-real
@@ -62,6 +61,8 @@ executables:
     - -with-rtsopts=-N
     dependencies:
     - jaguar
+    - Chart
+    - Chart-cairo
 
 tests:
   jaguar-test:

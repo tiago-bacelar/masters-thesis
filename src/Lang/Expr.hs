@@ -13,9 +13,13 @@ module Lang.Expr (
     evalOp,
     evalExpr,
     evalComp,
+    evalCompInf,
     evalBTerm,
-    maybeEvalBExpr) where
+    evalBTermInf,
+    evalBExpr,
+    evalBExprInf) where
 
+import Utils
 import Powers
 import CompOrd hiding (OrderingDomain(..))
 import qualified CompOrd as CompOrd
@@ -80,9 +84,21 @@ evalComp GEQ x y = mCompare (CompOrd.GEQ) . domCompare x y
 evalComp LLT x y = Just . (x <! y)
 evalComp LGT x y = Just . (x >! y)
 
+evalCompInf :: (CompOrd r) => Comparator -> r -> r -> Bool
+evalCompInf LT  = (P.LT==) .-. infCompare
+evalCompInf GT  = (P.GT==) .-. infCompare
+evalCompInf LEQ = (P.GT/=) .-. infCompare
+evalCompInf GEQ = (P.LT/=) .-. infCompare
+evalCompInf LLT = (P.LT==) .-. infCompare
+evalCompInf LGT = (P.GT==) .-. infCompare
+
 evalBTerm :: (Floating r, Powers r, CompOrd r) => BTerm -> (Var -> r) -> Int -> Maybe Bool
 evalBTerm (BConst b)   _ = const (Just b)
 evalBTerm (Comp c a b) s = evalComp c (evalExpr a s) (evalExpr b s)
+
+evalBTermInf :: (Floating r, Powers r, CompOrd r) => BTerm -> (Var -> r) -> Bool
+evalBTermInf (BConst b)   _ = b
+evalBTermInf (Comp c a b) s = evalCompInf c (evalExpr a s) (evalExpr b s)
 
 maybeAnd :: Maybe Bool -> Maybe Bool -> Maybe Bool
 maybeAnd (Just a) (Just b) = Just (a && b)
@@ -96,8 +112,14 @@ maybeOr (Just True) _     = Just True
 maybeOr _ (Just True)     = Just True
 maybeOr _ _               = Nothing
 
-maybeEvalBExpr :: (Floating r, Powers r, CompOrd r) => BExpr -> (Var -> r) -> Int -> Maybe Bool
-maybeEvalBExpr (Term a)  s cmp = evalBTerm a s cmp
-maybeEvalBExpr (Not a)   s cmp = fmap not (maybeEvalBExpr a s cmp)
-maybeEvalBExpr (And a b) s cmp = maybeAnd (maybeEvalBExpr a s cmp) (maybeEvalBExpr b s cmp)
-maybeEvalBExpr (Or a b)  s cmp = maybeOr  (maybeEvalBExpr a s cmp) (maybeEvalBExpr b s cmp)
+evalBExpr :: (Floating r, Powers r, CompOrd r) => BExpr -> (Var -> r) -> Int -> Maybe Bool
+evalBExpr (Term a)  s cmp = evalBTerm a s cmp
+evalBExpr (Not a)   s cmp = fmap not (evalBExpr a s cmp)
+evalBExpr (And a b) s cmp = maybeAnd (evalBExpr a s cmp) (evalBExpr b s cmp)
+evalBExpr (Or a b)  s cmp = maybeOr  (evalBExpr a s cmp) (evalBExpr b s cmp)
+
+evalBExprInf :: (Floating r, Powers r, CompOrd r) => BExpr -> (Var -> r) -> Bool
+evalBExprInf (Term a)  s = evalBTermInf a s
+evalBExprInf (Not a)   s = not (evalBExprInf a s)
+evalBExprInf (And a b) s = evalBExprInf a s && evalBExprInf b s
+evalBExprInf (Or a b)  s = evalBExprInf a s || evalBExprInf b s

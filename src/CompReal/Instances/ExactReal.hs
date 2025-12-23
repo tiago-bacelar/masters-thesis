@@ -108,3 +108,7 @@ instance Powers AnyCReal where
                         | otherwise = shift (x + bit (-n-1)) n
 
 instance Boundable AnyCReal
+
+
+instance Show AnyCReal where
+    show x = getCReal show x 80

@@ -82,3 +82,7 @@ instance Powers CDAR.CR where
     --this implementation of powers is only (slightly) more efficient when later terms require less precision than earlier terms
 
 instance Boundable CDAR.CR
+
+
+instance Show CDAR.CR where
+    show = CDAR.showA . CDAR.require 80

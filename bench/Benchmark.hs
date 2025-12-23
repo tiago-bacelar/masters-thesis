@@ -49,15 +49,26 @@ myConfig = defaultConfig {
            }
 
 main :: IO ()
-main = defaultMainWith myConfig [
-       test "exact_dyadic" [0..10]      $ fromRational $ 35184372088000 % 35184372088832, -- 2^45
-       test "dyadic_division" [0..10]   $ 35184372088000 / 35184372088832,
-       test "exact_rational" [0..10]    $ fromRational (22 % 7)
+main = defaultMainWith myConfig $
+    [ test "exact_dyadic" [0..10]       $ fromRational $ 35184372088000 % 35184372088832 -- 2^45
+    , test "dyadic_division" [0..10]    $ 35184372088000 / 35184372088832
+    , test "exact_rational" [0..10]     $ fromRational (22 % 7)
 
-       --test "gauss_sum" [0..2]          $ gaussSum
-       --test "piLeibniz" [0..6]        $ piLeibniz
-       --test "simple_sum" [8,9]       $ piLeibniz + piLeibniz,
-       --test "memo_sum" [8,9]         $ let x = piLeibniz in x + x,
-       --test "doubling" [8,9]           $ 2 * piLeibniz
-       --test "ball_bounce_9" [0..10] $ ballBounce 9
-                   ]
+    --TODO: fromRational (to test lost accuracy of approximations)
+    --      basic operations (sum, mult, div, nat pow, pow, sqrt) (careful: take into account the fromRational)
+    --      memoization (using sum as an example ig)
+    --      limits (careful: take into account the time taken to generate the terms)
+    --      ode solver (constant, linear, polynomial, exponential/trig/recursive)
+    --      jaguar (exp precision, ACC pilot)
+
+    --TODO: write script to graph benchmark times as a function of accuracy
+    --      write script to graph benchmark times of ode as function of accuracy and time
+
+
+    --test "gauss_sum" [0..2]          $ gaussSum
+    --test "piLeibniz" [0..6]        $ piLeibniz
+    --test "simple_sum" [8,9]       $ piLeibniz + piLeibniz
+    --test "memo_sum" [8,9]         $ let x = piLeibniz in x + x
+    --test "doubling" [8,9]           $ 2 * piLeibniz
+    --test "ball_bounce_9" [0..10] $ ballBounce 9
+    ]

@@ -3,7 +3,9 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 
+import Utils
 import Lang.Parser
+import Lang.Hybrid hiding (Query)
 import Lang.Interpreter
 import Plot
 
@@ -16,17 +18,24 @@ import qualified CompReal.Instances.IReal as IReal
 import Prelude hiding (lookup)
 import Data.Char (toLower)
 import Data.Proxy
+import GHC.Data.Maybe (fromJust, rightToMaybe)
 import System.IO (hPutStrLn, stderr)
 import System.Environment (getProgName, getArgs)
 import System.Console.GetOpt
 import System.Exit (exitWith, ExitCode(..))
 
-printResult :: (Show a, Show b) => [String] -> a -> RunResult [b] -> IO ()
-printResult vars t (Val x) = do
-    putStrLn $ "System terminated at t=" ++ show t ++ " with following state:"
-    sequence_ [putStrLn (var ++ ": " ++ show val) | (var, val) <- zip vars x]
-printResult _ t (Err e) = putStrLn $ "System terminated at t=" ++ show t ++ " with error: " ++ show e
+--TODO: replace Show restriction with something else? (to have consistent formats between implementations)
+printState :: (Show r) => [String] -> [r] -> IO ()
+printState vars vals = sequence_ [putStrLn (var ++ ": " ++ show val) | (var, val) <- zip vars vals]
 
+printUnroll :: (Show t, Show r) => [String] -> t -> Either (Error [r]) [r] -> IO ()
+printUnroll vars t (Left (err, s)) = do
+    putStrLn $ "System terminated at t=" ++ show t ++ " with error: " ++ show err
+    putStrLn "At time of error, the system had the following state:"
+    printState vars s
+printUnroll vars t (Right s) = do
+    putStrLn $ "System terminated at t=" ++ show t ++ " with following state:"
+    printState vars s
 
 --for quick testing with ghci
 test :: (SimNum r) => IO ([String], RunnableProgram r)
@@ -36,16 +45,16 @@ test = do
             Failed err -> error ("Parse error: " ++ show err) --parse error
             Ok (vars, code) -> return (vars, interpret code)
 
-play :: IO (TestType -> RunResult [TestType])
-play = fmap (\(vars,prog) -> query prog (length vars) 20 300) test
+play :: IO (TestType -> [TestType])
+play = fmap (\(vars,prog) -> head . (`runQuery` 20) . query prog (length vars) (Just 20) (Just 300)) test
 
 
 data Mode = Plot | Query | InteractivePlot deriving (Show, Eq)
-data SomeProxy where SomeProxy :: forall r. (Plottable r r, SimNum r) => Proxy r -> SomeProxy
+data SomeProxy where SomeProxy :: forall r. (Plottable r r, SimNum r, Show r) => Proxy r -> SomeProxy
 data Options = Options  { optFile       :: Maybe String
                         , optNumType    :: SomeProxy
-                        , optCompPrec   :: Int
-                        , optIterations :: Integer
+                        , optCompPrec   :: Maybe Int
+                        , optIterations :: Maybe Integer
                         , optPlotConfig :: PlotConfig
                         , optMode       :: Mode
                         }
@@ -53,8 +62,8 @@ data Options = Options  { optFile       :: Maybe String
 startOptions :: Maybe String -> Options
 startOptions f = Options    { optFile       = f
                             , optNumType    = SomeProxy (Proxy :: Proxy IReal.IReal)
-                            , optCompPrec   = 32
-                            , optIterations = 200
+                            , optCompPrec   = Just 32
+                            , optIterations = Just 200
                             , optPlotConfig = defPlotConfig
                             , optMode       = Plot
                             }
@@ -73,11 +82,11 @@ options =
                             _           -> error "TODO: error msg")
             "TYPE")
         "Number type"
-    , Option "c" ["comparison-precision"]
+    , Option "c" ["comparison-accuracy"]
         (ReqArg
             (\arg opt -> return opt { optCompPrec = read arg })
             "INT")
-        "Comparison precision"
+        "Comparison accuracy"
     , Option "n" ["iterations"]
         (ReqArg
             (\arg opt -> return opt { optIterations = read arg })
@@ -155,9 +164,11 @@ mainWith (Options   { optFile       = file
 
     case mode of
         Plot -> do
-                    --TODO: printResult vars tf $ fmap snd $ endpoint system
-                    plotHybrid plotConfig vars system discs
-        Query -> undefined --A read–evaluate–print loop (REPL) environment
+                    plotHybrid plotConfig vars (fmap rightToMaybe system) discs
+                    case rangeT plotConfig of
+                        Just _  -> return ()
+                        Nothing -> uncurry (printUnroll vars) $ fromJust $ unrollCH $ fmap (fmap snd -|- snd) system
+        Query -> undefined
         InteractivePlot -> undefined
 
 
@@ -165,14 +176,12 @@ type TestType = CDAR.CR
 plot :: IO ()
 plot = mainWith Options { optFile       = Just "input.txt"
                         , optNumType    = SomeProxy (Proxy :: Proxy TestType)
-                        , optCompPrec   = 10
-                        , optIterations = 30
-                        , optPlotConfig = defPlotConfig { precision = 6 }
+                        , optCompPrec   = Just 10
+                        , optIterations = Just 30
+                        , optPlotConfig = defPlotConfig { accuracy = 6 }
                         , optMode       = Plot
                         }
 
 
---TODO: query mode (query values, set precision, etc)
+--TODO: query mode (perform queries, set accuracy, etc)
 --TODO: interactive plot (janela a parte que da para fazer zoom, mover e tal)
-
---plot config: { vars: [String], minT: Maybe a, maxT: Maybe a, minX: Maybe a, maxX: Maybe a } --right and left axis??

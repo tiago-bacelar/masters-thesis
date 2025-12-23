@@ -24,6 +24,12 @@ logFloor r | r < a_r = a - 1
 
 (><) :: (a -> b) -> (c -> d) -> (a, c) -> (b, d)
 (><) f g (x, y) = (f x, g y)
+infix 5 ><
+
+(-|-) :: (a -> b) -> (c -> d) -> Either a c -> Either b d
+(-|-) f g (Left x) = Left $ f x
+(-|-) f g (Right y) = Right $ g y
+infix 4 -|-
 
 (.-.) :: (c -> d) -> (a -> b -> c) -> a -> b -> d
 (.-.) f g x y = f (g x y)
@@ -129,7 +135,7 @@ indexOrLastMemo xs = search
 
 --Balanced fold, minimizing depth of call tree. Assumes associative operator.
 --This is useful for CompReals because operations usually try to balance errors by
---splitting it equally among the two terms. Therefore, if an operation is applied across
+--splitting it equally among the two terms. Therefore, if an operation is folded across
 --a list, the first element will take half of the error, the second will take a quarter, etc
 --This function ensures the error is distributed equally across all elements of the list
 foldTree :: (a -> a -> a) -> a -> [a] -> a

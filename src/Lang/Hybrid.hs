@@ -1,8 +1,8 @@
 {-# LANGUAGE DeriveFunctor #-}
 
 module Lang.Hybrid (
-    Hybrid,
-    HProgram,
+    Hybrid(..),
+    smap,
     wait,
     end,
     for,
@@ -10,94 +10,142 @@ module Lang.Hybrid (
     instant,
     eval,
     duration,
-    startpoint,
     endpoint,
-    mEndpoint,
     takeH,
     dropH,
-    join,
-    joinComp,
-    compose,
-    composeComp) where
+    joinH,
+    Query(..),
+    CompHybrid(..),
+    smapCH,
+    instantCH,
+    evalCH,
+    unrollCH,
+    durationCH,
+    endpointCH,
+    joinCH,
+    unCH) where
 
+import Utils
 import CompOrd
 
-import Control.Monad (ap, liftM2)
+import Data.List (singleton)
+import Control.Monad (ap, join)
 
---plugging in a t less than 0 or greater than the duration should be invalid
---endpoint is memo'ed to avoid unnecessary time comparisons
-newtype Hybrid t a = Hybrid (t -> a, Maybe (t, a)) deriving (Functor)
+--the function eval must be defined in [0, d), where d is the duration
+data Hybrid t s a = Hybrid { eval :: t -> s, unroll :: Maybe (t, a) } deriving (Functor)
 
-type HProgram t a = a -> Hybrid t a
-
-
-wait :: t -> HProgram t a
-wait t x = Hybrid (const x, Just (t, x))
-
-end :: HProgram t a
-end x = Hybrid (const x, Nothing)
-
-for :: (t -> a) -> t -> Hybrid t a
-for f d = Hybrid (f, Just (d, f d))
-
-forever :: (t -> a) -> Hybrid t a
-forever f = Hybrid (f, Nothing)
-
-instant :: (Num t) => a -> Hybrid t a
-instant = wait 0
+smap :: (r -> s) -> Hybrid t r a -> Hybrid t s a
+smap f (Hybrid e m) = Hybrid (f . e) m
 
 
-eval :: Hybrid t a -> t -> a
-eval (Hybrid (f, _)) = f --TODO: validate time?
+wait :: t -> s -> Hybrid t s s
+wait t x = Hybrid (const x) (Just (t, x))
 
-duration :: Hybrid t a -> Maybe t
-duration (Hybrid (_, m)) = fmap fst m
+end :: s -> Hybrid t s s
+end x = Hybrid (const x) Nothing
 
-startpoint :: (Num t) => Hybrid t a -> a
-startpoint (Hybrid (f, _)) = f 0
+for :: (t -> s) -> t -> Hybrid t s s
+for f d = Hybrid f (Just (d, f d))
 
-endpoint :: Hybrid t a -> a
-endpoint (Hybrid (_, m)) = maybe (error "endpoint of infinite hybrid program") snd m
+forever :: (t -> s) -> Hybrid t s a
+forever f = Hybrid f Nothing
 
-mEndpoint :: Hybrid t a -> Maybe a
-mEndpoint (Hybrid (_, m)) = fmap snd m
+instant :: (Num t) => a -> Hybrid t s a
+instant x = Hybrid (const undefined) (Just (0, x)) --TODO: is this undefined ok? i feel like it isnt
 
+
+duration :: Hybrid t s a -> Maybe t
+duration = fmap fst . unroll
+
+endpoint :: Hybrid t s a -> Maybe a
+endpoint = fmap snd . unroll
+
+
+takeH :: (Ord t) => t -> Hybrid t s s -> Hybrid t s s
+takeH t (Hybrid f m) = Hybrid f (aux m)
+    --aux is factored out to delay evaluating the Maybe as long as possible
+    where aux (Just (d, x)) = Just (min t d, if t < d then f t else x)
+          aux Nothing       = Just (t, f t)
 
 --assumes t <= duration h
-takeH :: t -> Hybrid t a -> Hybrid t a
-takeH t h = for (eval h) t
+dropH :: (Num t) => t -> Hybrid t s a -> Hybrid t s a
+dropH t (Hybrid f m) = Hybrid (f . (t+)) (fmap (\(d,x) -> (d-t,x)) m)
 
---assumes t <= duration h
-dropH :: (Num t) => t -> Hybrid t a -> Hybrid t a
-dropH t (Hybrid (f, m)) = Hybrid (f . (t+), fmap (\(d,e) -> (d-t,e)) m)
-
-join :: (Num t, Ord t) => Hybrid t a -> Hybrid t a -> Hybrid t a
-join x y = Hybrid (maybe (eval x) h (duration x), liftM2 joinDur (dur x) (dur y))
-    where dur (Hybrid (_, m)) = m
-          joinDur (t1, _) (t2, e) = (t1 + t2, e)
-          h d t | t < d       = eval x t
-                | otherwise   = eval y (t - d)
-
-joinComp :: (Num t, CompOrd t) => Hybrid t a -> Hybrid t a -> Hybrid t (Int -> Either a (a,a))
-joinComp x y = Hybrid (maybe (const . Left . eval x) h (duration x), liftM2 joinDur (dur x) (dur y))
-    where dur (Hybrid (_, m)) = m
-          joinDur (t1, _) (t2, e) = (t1 + t2, const $ Left e)
-          h d t n = case mCompare (Top LT) (domCompare t d n) of
-                        Just True  -> Left $ eval x t                  --The wrong branch is evaluated
-                        Just False -> Left $ eval y (t - d)            --outside its original domain.
-                        Nothing    -> Right (eval x t, eval y (t - d)) --Potentially dangerous
+joinH :: (Num t, Ord t) => Hybrid t s a -> Hybrid t s b -> Hybrid t s b
+joinH (Hybrid f Nothing) _                  = Hybrid f Nothing
+joinH (Hybrid f (Just (d, _))) (Hybrid g m) = Hybrid h (fmap ((d+) >< id) m)
+    where h t | t < d       = f t
+              | otherwise   = g (t - d)
 
 
-compose :: (Num t, Ord t) => HProgram t a -> HProgram t a -> HProgram t a
-compose f g x = let h = f x in join h (g $ endpoint h)
-
-composeComp :: (Num t, CompOrd t) => HProgram t a -> HProgram t a -> a -> Hybrid t (Int -> Either a (a,a))
-composeComp f g x = let h = f x in joinComp h (g $ endpoint h)
-
-
-instance (Num t, Ord t) => Applicative (Hybrid t) where
+instance (Num t, Ord t) => Applicative (Hybrid t s) where
     pure  = instant
     (<*>) = ap
 
-instance (Num t, Ord t) => Monad (Hybrid t) where
-    h >>= f = join (fmap (startpoint . f) h) (endpoint $ fmap f h) --can this be optimized?
+instance (Num t, Ord t) => Monad (Hybrid t s) where
+    h@(Hybrid _ (Just (_,x)))   >>= f = joinH h (f x)
+    (Hybrid e Nothing)          >>= f = Hybrid e Nothing
+
+
+
+
+newtype Query s = Query { runQuery :: Int -> [s] } deriving (Functor)
+
+instance Applicative Query where
+    pure  = Query . const . singleton
+    (<*>) = ap
+
+instance Monad Query where
+    q >>= f = Query $ \n -> runQuery q n >>= (($n) . runQuery . f)
+
+
+--unline Hybrid, the function inside Hyb only needs to be
+--defined in (0,d) (or (0,inf) if duration is infinite)
+data CompHybrid t s a = Ins a | Hyb (Hybrid t (Query s) a) deriving (Functor)
+
+smapCH :: (r -> s) -> CompHybrid t r a -> CompHybrid t s a
+smapCH f (Ins x) = Ins x
+smapCH f (Hyb h) = Hyb $ smap (fmap f) h
+
+instantCH :: a -> CompHybrid t s a
+instantCH = Ins
+
+evalCH :: CompHybrid t s a -> t -> Query s
+evalCH (Hyb h) = eval h
+
+unrollCH :: (Num t) => CompHybrid t s a -> Maybe (t, a)
+unrollCH (Ins x) = Just (0, x)
+unrollCH (Hyb h) = unroll h
+
+durationCH :: (Num t) => CompHybrid t s a -> Maybe t
+durationCH (Ins x) = Just 0
+durationCH (Hyb h) = duration h
+
+endpointCH :: CompHybrid t s a -> Maybe a
+endpointCH (Ins x) = Just x
+endpointCH (Hyb h) = endpoint h
+
+joinCH :: (Num t, CompOrd t) => Hybrid t (Query s) a -> Hybrid t (Query s) b -> Hybrid t (Query s) b
+joinCH (Hybrid f Nothing) _                     = Hybrid f Nothing
+joinCH (Hybrid f (Just (d, _))) (Hybrid g m)    = Hybrid (join . Query . h) (fmap ((d+) >< id) m)
+    where h t n = case mCompare (Top LT) (domCompare t d n) of
+                    Just True  -> [f t]             --The wrong branch is evaluated
+                    Just False -> [g (t - d)]       --outside its original domain.
+                    Nothing    -> [f t, g (t - d)]  --Potentially dangerous
+
+unCH :: (Num t) => CompHybrid t s a -> Hybrid t (Query s) a
+unCH (Ins x) = instant x
+unCH (Hyb h) = h
+
+
+instance (Num t, CompOrd t) => Applicative (CompHybrid t s) where
+    pure  = Ins
+    (<*>) = ap
+
+instance (Num t, CompOrd t) => Monad (CompHybrid t s) where
+    (Ins x)                         >>= f = f x
+    (Hyb h@(Hybrid e Nothing))      >>= f = Hyb $ Hybrid e Nothing
+    (Hyb h@(Hybrid e (Just (d,x)))) >>= f
+        = Hyb $ case f x of
+                Ins y -> Hybrid e (Just (d,y))
+                Hyb i -> joinCH h i
