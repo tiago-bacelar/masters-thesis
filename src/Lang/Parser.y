@@ -95,6 +95,7 @@ Program     :: { AnyProgram }
     | Program ';' Program                   { AnyProgram $ Seq (anyProgram $1) (anyProgram $3) }
     | Program ';'                           { $1 }
     | '{' Program '}'                       { $2 }
+    | '{' '}'                               { AnyProgram Nop }
 
 
 For         :: { [(Ident, Expr)] }

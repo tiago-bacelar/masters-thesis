@@ -58,6 +58,13 @@ joinWith f (x:xs) (y:ys) = f x y : joinWith f xs ys
 joinWith _ xs [] = xs
 joinWith _ [] ys = ys
 
+split :: (Eq a) => a -> [a] -> [[a]]
+split x [] = []
+split x (y:ys) | x == y    = [] : split x ys
+               | otherwise = appendHead y $ split x ys
+    where appendHead y [] = [[y]]
+          appendHead y (ys:yss) = (y : ys) : yss
+
 --lists must be ordered. f is applied to the same values multiple times (could be optimized)
 mergeOn :: (Ord b) => (a -> b) -> [a] -> [a] -> [a]
 mergeOn _ xs [] = xs
@@ -75,6 +82,17 @@ setInsert x (h : t) | x < h = x : h : t
 --TODO: make it strict?
 replaceIndex :: Int -> a -> [a] -> [a]
 replaceIndex i x xs = take i xs ++ x : drop (i+1) xs
+
+--indexes must be increasing
+getIndexes :: [Int] -> [a] -> [a]
+getIndexes []       = const []
+getIndexes (i:is)   = aux (i : difs)
+    where difs = map (uncurry (-)) $ zip is (i:is)
+          aux _ [] = []
+          aux [] _ = []
+          aux (d:ds) xs = case drop d xs of
+                                []      -> []
+                                (y:ys)  -> y : aux ds (y:ys)
 
 --list must be ordered by index and mustn't contain repeated indexes
 maybeIndexes :: (Num a, Eq a) => [(a,b)] -> [Maybe b]

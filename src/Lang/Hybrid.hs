@@ -3,6 +3,7 @@
 module Lang.Hybrid (
     Hybrid(..),
     smap,
+    fsmap,
     wait,
     end,
     for,
@@ -17,6 +18,7 @@ module Lang.Hybrid (
     Query(..),
     CompHybrid(..),
     smapCH,
+    fsmapCH,
     instantCH,
     evalCH,
     unrollCH,
@@ -36,6 +38,9 @@ data Hybrid t s a = Hybrid { eval :: t -> s, unroll :: Maybe (t, a) } deriving (
 
 smap :: (r -> s) -> Hybrid t r a -> Hybrid t s a
 smap f (Hybrid e m) = Hybrid (f . e) m
+
+fsmap :: (r -> s) -> Hybrid t r r -> Hybrid t s s
+fsmap f = fmap f . smap f
 
 
 wait :: t -> s -> Hybrid t s s
@@ -89,7 +94,7 @@ instance (Num t, Ord t) => Monad (Hybrid t s) where
 
 
 
-newtype Query s = Query { runQuery :: Int -> [s] } deriving (Functor)
+newtype Query s = Query { runQuery :: Maybe Int -> [s] } deriving (Functor)
 
 instance Applicative Query where
     pure  = Query . const . singleton
@@ -106,6 +111,9 @@ data CompHybrid t s a = Ins a | Hyb (Hybrid t (Query s) a) deriving (Functor)
 smapCH :: (r -> s) -> CompHybrid t r a -> CompHybrid t s a
 smapCH f (Ins x) = Ins x
 smapCH f (Hyb h) = Hyb $ smap (fmap f) h
+
+fsmapCH :: (r -> s) -> CompHybrid t r r -> CompHybrid t s s
+fsmapCH f = fmap f . smapCH f
 
 instantCH :: a -> CompHybrid t s a
 instantCH = Ins
@@ -128,10 +136,11 @@ endpointCH (Hyb h) = endpoint h
 joinCH :: (Num t, CompOrd t) => Hybrid t (Query s) a -> Hybrid t (Query s) b -> Hybrid t (Query s) b
 joinCH (Hybrid f Nothing) _                     = Hybrid f Nothing
 joinCH (Hybrid f (Just (d, _))) (Hybrid g m)    = Hybrid (join . Query . h) (fmap ((d+) >< id) m)
-    where h t n = case mCompare (Top LT) (domCompare t d n) of
-                    Just True  -> [f t]             --The wrong branch is evaluated
-                    Just False -> [g (t - d)]       --outside its original domain.
-                    Nothing    -> [f t, g (t - d)]  --Potentially dangerous
+    where h t Nothing  = if infCompare t d == LT then [f t] else [g (t - d)]
+          h t (Just n) = case mCompare (Top LT) (domCompare t d n) of
+                            Just True  -> [f t]             --The wrong branch is evaluated
+                            Just False -> [g (t - d)]       --outside its original domain.
+                            Nothing    -> [f t, g (t - d)]  --Potentially dangerous
 
 unCH :: (Num t) => CompHybrid t s a -> Hybrid t (Query s) a
 unCH (Ins x) = instant x

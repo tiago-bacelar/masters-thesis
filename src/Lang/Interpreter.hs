@@ -112,7 +112,7 @@ skipDiscE = do
                             
 
 
-type Step = Int
+type Step = Integer
 data PState r = PState { time :: r, step :: Step, variables :: [r] }
 type RunnableProgram r = PState r -> E r (PState r) (PState r)
 

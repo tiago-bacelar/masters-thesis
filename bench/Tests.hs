@@ -66,7 +66,7 @@ geometricSeriesCR = _listLimit $ map fromRational $ aux (1%2) $ scanl1 (+) $ ite
 
 -- [y, v] (nVars=2)
 ballBounce :: (SimNum r) => Rational -> r
-ballBounce t = runQuery (query (interpret prog) 2 (Just 16) (Just 100) (fromRational t)) 16 !! 0 !! 0
+ballBounce t = runQuery (query (interpret prog) 2 (Just 16) (Just 100) (fromRational t)) (Just 16) !! 0 !! 0
     where prog = Seq (Assign 0 (Num 0)) $ Seq (Assign 1 (Num 1)) $ loop
           loop = WhileDo (Term $ BConst True) (Seq arc bounce)
           arc = getFor [(0, Var $ V 1), (1, Num $ -1)] (Just $ Op Mult (Num 2) (Var $ V 1))

@@ -26,21 +26,23 @@ import System.IO (hPutStrLn, stderr)
 import System.Exit (exitWith, ExitCode(..))
 
 --TODO: chart uses Doubles to place features on the plot. We need to
---      make up some sort of workaround to avoid exhausting the accuracy
+--      make up some sort of workaround to avoid exhausting the precision
 --      of a Double when very zoomed in
 
 
 data PlotConfig = PlotConfig    { outputPath    :: String
                                 , sampleNo      :: Integer
-                                , accuracy      :: Int
+                                , queryAccuracy :: Maybe Int
+                                , realAccuracy  :: Int
                                 , rangeT        :: Maybe (Rational, Rational)
                                 , rangeX        :: Maybe (Rational, Rational)
                                 }
 
 defPlotConfig :: PlotConfig
 defPlotConfig = PlotConfig  { outputPath    = "output.png"
-                            , sampleNo      = 200
-                            , accuracy      = 32
+                            , sampleNo      = 500
+                            , queryAccuracy = Just 32
+                            , realAccuracy  = 32
                             , rangeT        = Nothing
                             , rangeX        = Nothing
                             }
@@ -124,19 +126,20 @@ getRangeT Nothing (Hyb h)
             --will never resolve, so there's no point in showing this error message
             exitWith $ ExitFailure 1
 
-getSampleTs :: (Fractional a) => Integer -> a -> [(Rational, a)]
-getSampleTs num tf = [(s % num, tf * fromRational (s % num)) | s <- [0..num-1]]
+getSampleTs :: (Fractional a) => Integer -> a -> a -> [(Rational, a)]
+getSampleTs num ti tf = [let s = i % num in (s, (1 - fromRational s) * ti + fromRational s * tf) | i <- [0..num-1]]
 
-getSamples :: (Fractional a) => (a -> [b]) -> Integer -> Maybe a -> Maybe b -> [(Rational, a, [b])]
-getSamples f num mtf mxf = body ++ endp
-    where body = maybe [] (\tf -> [(s, t, f t) | (s, t) <- getSampleTs num tf]) mtf
-          endp = maybe [] (\xf -> [(1, fromMaybe 0 mtf, [xf])]) mxf
+getSamples :: (Fractional a) => (a -> [b]) -> Integer -> Maybe (a,a) -> Maybe b -> [(Rational, a, [b])]
+getSamples f num mt mxf = body ++ endp
+    where body = maybe [] (\(ti,tf) -> [(s, t, f t) | (s, t) <- getSampleTs num ti tf]) mt
+          endp = maybe [] (\xf -> [(1, maybe 0 fst mt, [xf])]) mxf
 
+data Aux = L | M | R deriving (Eq, Ord)
 segments :: [(a, [(Step, b)])] -> [(a, (Step, b), (Step, b))] -> [[(a, b)]]
-segments evol ds = map (map snd) $ foldr groupify [] $ sortOn fst $ [((i,1),(t,x)) | (t,rr) <- evol, (i,x) <- rr] ++ concat [[((i,2 :: Integer),(t,x)),((j,0),(t,y))] | (t,(i,x),(j,y)) <- ds]
+segments evol ds = map (map snd) $ foldr groupify [] $ sortOn fst $ [((i,M),(t,x)) | (t,rr) <- evol, (i,x) <- rr] ++ concat [[((i,R),(t,x)),((j,L),(t,y))] | (t,(i,x),(j,y)) <- ds]
     where groupify x [] = [[x]]
-          groupify x@((_,2),_) xss@((((_,0),_):_):_) = [x] : xss
-          groupify x@((_,2),_) ((_:xs):xss) = groupify x (xs:xss)
+          groupify x@((_,R),_) xss@((((_,L),_):_):_) = [x] : xss
+          groupify x@((_,R),_) ((_:xs):xss) = groupify x (xs:xss)
           groupify x (ys:yss) = (x : ys) : yss
 
 toDouble :: (Real a) => a -> Double
@@ -147,10 +150,10 @@ type Disc a b = (a, Step, Step, [Maybe (b, b)])
 class Plottable a b where
     plotHybrid :: PlotConfig -> [String] -> CompHybrid a (S b) (Maybe (S b)) -> [Disc a b] -> IO ()
 
-    default plotHybrid :: (RealFrac a, Real b) => PlotConfig -> [String] -> CompHybrid a (S b) (Maybe (S b)) -> [(a, Int, Int, [Maybe (b, b)])] -> IO ()
+    default plotHybrid :: (RealFrac a, Real b) => PlotConfig -> [String] -> CompHybrid a (S b) (Maybe (S b)) -> [Disc a b] -> IO ()
     plotHybrid config vars h discs = do
         (mt, xf) <- getRangeT (rangeT config) h
-        let samples = getSamples ((`runQuery` accuracy config) . evalCH h) (sampleNo config) (fmap snd mt) xf
+        let samples = getSamples ((`runQuery` queryAccuracy config) . evalCH h) (sampleNo config) mt xf
         let system = transpose [map (t,) $ getZipList $ sequenceA $ fmap (ZipList . sequenceA) xs | (_,t,xs) <- samples]
         let filterDiscs = case mt of
                             Just (ti,tf) -> takeWhile ((<= tf) . fstOf4) . dropWhile ((< ti) . fstOf4)
@@ -176,11 +179,11 @@ boundDouble n r = let (l, u) = bound r n in (fromRational l, fromRational u)
 
 instance {-# OVERLAPPABLE #-} (CompReal a, CompReal b) => Plottable a b where
     plotHybrid config vars h discs = do
-        let n = accuracy config
+        let n = realAccuracy config
         (mt, xf) <- getRangeT (rangeT config) h
-        let boundRat = maybe (const (0,0)) (\(_,tf) s -> (s*) >< (s*) $ boundDouble n tf) mt
-        let approxRat = maybe (const 0) (\(_,tf) s -> s * approxDouble n tf) mt
-        let samples = getSamples ((`runQuery` accuracy config) . evalCH h) (sampleNo config) (fmap snd mt) xf
+        let boundS = maybe (const (0,0)) (\((til,tir),(tfl,tfr)) s -> ((1-s)*til + s*tfl, (1-s)*tir + s*tfr)) $ fmap (boundDouble n >< boundDouble n) mt
+        let approxS = maybe (const 0) (\(ti,tf) s -> (1-s)*ti + s*tf) $ fmap (approxDouble n >< approxDouble n) mt
+        let samples = getSamples ((`runQuery` queryAccuracy config) . evalCH h) (sampleNo config) mt xf
         let system = transpose [map (fromRational s,) $ getZipList $ sequenceA $ fmap (ZipList . sequenceA) xs | (s,_,xs) <- samples]
         let filterDiscs = case mt of
                             Just (ti,tf) -> takeWhile (flip (<! tf) n . fstOf4) . dropWhile (flip (<! ti) n . fstOf4)
@@ -192,7 +195,7 @@ instance {-# OVERLAPPABLE #-} (CompReal a, CompReal b) => Plottable a b where
             sequence_ $ (<$> zip3 vars (system ++ repeat []) (discsByVar ++ repeat [])) $ \(var, evol, ds) -> do
                 color <- takeColor
                 let segs = segments [(Left t, rr) | (t,rr) <- evol] [(Right t, l, r) | (t,l,r) <- ds]
-                joinRects var color [[(either boundRat (boundDouble n) t, boundDouble n v) | (t,v) <- vs] | vs <- segs]
-                lines var color [[(either approxRat (approxDouble n) t, approxDouble n v) | (t,v) <- vs] | vs <- segs]
+                joinRects var color [[(either boundS (boundDouble n) t, boundDouble n v) | (t,v) <- vs] | vs <- segs]
+                lines var color [[(either approxS (approxDouble n) t, approxDouble n v) | (t,v) <- vs] | vs <- segs]
                 hollowPoints color [(approxDouble n t, approxDouble n x) | (t,(_,x),_) <- ds]
                 filledPoints color [(approxDouble n t, approxDouble n x) | (t,_,(_,x)) <- ds]

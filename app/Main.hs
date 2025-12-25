@@ -19,6 +19,7 @@ import Prelude hiding (lookup)
 import Data.Char (toLower)
 import Data.Proxy
 import GHC.Data.Maybe (fromJust, rightToMaybe)
+import qualified Data.Set as S
 import System.IO (hPutStrLn, stderr)
 import System.Environment (getProgName, getArgs)
 import System.Console.GetOpt
@@ -46,7 +47,7 @@ test = do
             Ok (vars, code) -> return (vars, interpret code)
 
 play :: IO (TestType -> [TestType])
-play = fmap (\(vars,prog) -> head . (`runQuery` 20) . query prog (length vars) (Just 20) (Just 300)) test
+play = fmap (\(vars,prog) -> head . (`runQuery` Just 20) . query prog (length vars) (Just 20) (Just 300)) test
 
 
 data Mode = Plot | Query | InteractivePlot deriving (Show, Eq)
@@ -55,6 +56,7 @@ data Options = Options  { optFile       :: Maybe String
                         , optNumType    :: SomeProxy
                         , optCompPrec   :: Maybe Int
                         , optIterations :: Maybe Integer
+                        , optPlotVars   :: S.Set String
                         , optPlotConfig :: PlotConfig
                         , optMode       :: Mode
                         }
@@ -64,6 +66,7 @@ startOptions f = Options    { optFile       = f
                             , optNumType    = SomeProxy (Proxy :: Proxy IReal.IReal)
                             , optCompPrec   = Just 32
                             , optIterations = Just 200
+                            , optPlotVars   = S.empty
                             , optPlotConfig = defPlotConfig
                             , optMode       = Plot
                             }
@@ -97,9 +100,9 @@ options =
             (\arg opt -> return opt { optPlotConfig = (optPlotConfig opt) { outputPath = arg }})
             "FILE")
         "Output path"
-    , Option "o" ["output"] --TODO: incompatible with modes other than Plot
+    , Option "v" ["variables"] --TODO: incompatible with modes other than Plot
         (ReqArg
-            (\arg opt -> return opt { optPlotConfig = (optPlotConfig opt) { outputPath = arg }})
+            (\arg opt -> return opt { optPlotVars = S.fromList $ split ',' arg })
             "FILE")
         "Output path"
 
@@ -151,6 +154,7 @@ mainWith (Options   { optFile       = file
                     , optNumType    = numType
                     , optCompPrec   = compPrec
                     , optIterations = iterations
+                    , optPlotVars   = plotVars
                     , optPlotConfig = plotConfig
                     , optMode       = mode }) = case numType of
   SomeProxy (_ :: Proxy r) -> do
@@ -164,7 +168,15 @@ mainWith (Options   { optFile       = file
 
     case mode of
         Plot -> do
-                    plotHybrid plotConfig vars (fmap rightToMaybe system) discs
+                    let varIndexes = [i | (i,v) <- zip [0..] vars, S.member v plotVars]
+                    let filterIndexes :: forall a. [a] -> [a]
+                        filterIndexes = if S.null plotVars then id else (getIndexes varIndexes)
+
+                    let filteredVars = filterIndexes vars
+                    let filteredSystem = smapCH (id >< filterIndexes) $ fmap (fmap (id >< filterIndexes) . rightToMaybe) system
+                    let filteredDiscs = map (\(w,x,y,z) -> (w,x,y,filterIndexes z)) discs
+
+                    plotHybrid plotConfig filteredVars filteredSystem filteredDiscs
                     case rangeT plotConfig of
                         Just _  -> return ()
                         Nothing -> uncurry (printUnroll vars) $ fromJust $ unrollCH $ fmap (fmap snd -|- snd) system
@@ -176,9 +188,10 @@ type TestType = CDAR.CR
 plot :: IO ()
 plot = mainWith Options { optFile       = Just "input.txt"
                         , optNumType    = SomeProxy (Proxy :: Proxy TestType)
-                        , optCompPrec   = Just 10
-                        , optIterations = Just 30
-                        , optPlotConfig = defPlotConfig { accuracy = 6 }
+                        , optCompPrec   = Just 50
+                        , optIterations = Just 500
+                        , optPlotVars   = S.fromList []
+                        , optPlotConfig = defPlotConfig { realAccuracy = 6 }
                         , optMode       = Plot
                         }
 
