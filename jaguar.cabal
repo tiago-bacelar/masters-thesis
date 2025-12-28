@@ -29,6 +29,7 @@ library
       Boundable
       CompOrd
       CompReal
+      CompReal.Instances
       CompReal.Instances.AERN2
       CompReal.Instances.CDAR
       CompReal.Instances.ERA

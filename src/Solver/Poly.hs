@@ -27,7 +27,7 @@ numCoef r = Coef (1, Just r)
 
 evalCoef :: (Fractional r) => Coef r -> r
 evalCoef (Coef (n, Nothing)) = fromRational n
-evalCoef (Coef (0, Just c)) = 0
+evalCoef (Coef (0, Just _)) = 0
 evalCoef (Coef (1, Just c)) = c
 evalCoef (Coef (-1, Just c)) = negate c
 evalCoef (Coef (n, Just c)) = fromRational n * c
@@ -141,7 +141,7 @@ fromConstPoly (Poly [([], c)]) = c
 fromConstPoly _ = error "fromConstPoly: failed to parse non const poly"
 
 instance (Fractional r) => Num (Poly r) where
-    p + q = Poly $ map (\((k,c):t) -> (k, sum (c:map snd t))) $ groupWith fst $ mergeOn fst (unPoly p) (unPoly q)
+    p + q = Poly [(k, sum (c : map snd t)) | ((k,c):t) <- groupWith fst $ mergeSortOn fst (unPoly p) (unPoly q)]
     p - q = p + negate q
     p * q = Poly $ concat $ map (unPoly . foldr1 (+) . map (Poly . singleton)) $ diags (unPoly p) (unPoly q)
         where mult (k1,c1) (k2,c2) = (joinWith (+) k1 k2, c1 * c2)
@@ -272,7 +272,7 @@ shortConst2 x y f g h i = do
 
 
 polyGen :: (Floating r, Powers r) => Gen Expr (B (Map Expr) (C r)) (St (Map Expr) (C r))
-polyGen (Var T) rec = addVar (Var T) >>= returnNotConst . return . (,1)
+polyGen (Var T) _ = addVar (Var T) >>= returnNotConst . return . (,1)
 polyGen (Var (V i)) rec = do
     mv <- gets ((Map.lookup (Var (V i))) . vars)
     if isNothing mv

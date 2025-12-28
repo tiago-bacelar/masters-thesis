@@ -1,3 +1,5 @@
+{-# OPTIONS_GHC -fno-warn-orphans #-}
+
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FlexibleInstances #-}
 
@@ -12,7 +14,7 @@ import Limit
 
 import qualified Data.Number.IReal as IReal
 import qualified Data.Number.IReal.IReal as IReal (ir, appr)
-import qualified Data.Number.IReal.IntegerInterval as IReal (IntegerInterval(..), upperI)
+import qualified Data.Number.IReal.IntegerInterval as IReal (IntegerInterval(..))
 
 import GHC.Real (Ratio(..), (%))
 

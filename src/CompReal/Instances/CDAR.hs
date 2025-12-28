@@ -1,3 +1,5 @@
+{-# OPTIONS_GHC -fno-warn-orphans #-}
+
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FlexibleInstances #-}
 
@@ -13,12 +15,10 @@ import Limit
 import qualified Data.CDAR as CDAR
 
 import Control.Applicative
-import Data.Maybe
-import Data.List (zip4)
 
 
 instance CompReal CDAR.CR where
-    approx r n = toRational $ fromJust $ CDAR.centre $ CDAR.require n r
+    bound x n = split (toRational . CDAR.lowerBound) (toRational . CDAR.upperBound) $ CDAR.require n x
 
 instance Limit Rational CDAR.CR where
     listLimit xs = CDAR.CR $ ZipList [CDAR.Approx (round $ x * toRational (pow2 i)) 1 (-i) | (i,x) <- zip [0..] (repeatLast xs)]
@@ -38,6 +38,9 @@ instance Limit CDAR.CR CDAR.CR where
     errorLimit = errorLimitDef --TODO??
 
 
+domCompareA :: CDAR.Approx -> CDAR.Approx -> OrderingDomain
+domCompareA a b = domCompareAux (CDAR.lowerBound a, CDAR.upperBound a) (CDAR.lowerBound b, CDAR.upperBound b)
+
 minA :: CDAR.Approx -> CDAR.Approx -> CDAR.Approx
 minA a b = CDAR.endToApprox (CDAR.lowerBound a `min` CDAR.lowerBound b) (CDAR.upperBound a `min` CDAR.upperBound b)
 
@@ -46,7 +49,7 @@ maxA a b = CDAR.endToApprox (CDAR.lowerBound a `max` CDAR.lowerBound b) (CDAR.up
 
 instance CompOrd CDAR.CR where
     domCompare = domCompareDef
-    infCompare x y = head $ catMaybes $ getZipList $ CDAR.compareCR x y
+    infCompare (CDAR.CR x) (CDAR.CR y) = infCompareAux $ getZipList $ domCompareA <$> x <*> y
     compMin (CDAR.CR x) (CDAR.CR y) = CDAR.CR $ minA <$> x <*> y
     compMax (CDAR.CR x) (CDAR.CR y) = CDAR.CR $ maxA <$> x <*> y
 
@@ -61,25 +64,10 @@ powA n (CDAR.Approx m e s)
           a = (m + e)^(n :: Int)
           b = (m - e)^(n :: Int)
 
---return the powers of the approx, starting from power 2
-powersA :: CDAR.Approx -> [CDAR.Approx]
-powersA CDAR.Bottom = repeat CDAR.Bottom
-powersA (CDAR.Approx m e s) = map aux $ tail $ zip4 [1..] (iterate (ame0*) ame0) (iterate (a0*) a0) (iterate (b0*) b0)
-    where am = abs m
-          ame0 = am + e
-          a0 = m + e
-          b0 = m - e
-          aux (n, ame, a, b)
-            | even n && am <= e = CDAR.Approx ame ame (n*s-1)
-            | even n && m < 0   = CDAR.Approx (a+b) (b-a) (n*s-1)
-            | otherwise         = CDAR.Approx (a+b) (a-b) (n*s-1)
-
 instance Powers CDAR.CR where
     pow _ 0 = 1
     pow x 1 = x
     pow x n = CDAR.CR $ fmap (powA n) $ CDAR.unCR x
-    --powers x = 1 : x : (map (CDAR.CR . ZipList) $ transpose $ map powersA $ getZipList $ CDAR.unCR x)
-    --this implementation of powers is only (slightly) more efficient when later terms require less precision than earlier terms
 
 instance Boundable CDAR.CR
 

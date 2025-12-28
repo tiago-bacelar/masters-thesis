@@ -1,3 +1,6 @@
+{-# OPTIONS_GHC -fno-warn-missing-signatures #-}
+{-# OPTIONS_GHC -fno-warn-unused-top-binds #-}
+
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE DefaultSignatures #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -19,8 +22,9 @@ import Prelude hiding (lines)
 import Control.Applicative (ZipList(..))
 import Control.Monad (when)
 import Data.Ratio ((%))
-import Data.List (transpose, sortOn, insert)
-import Data.Maybe (isJust, fromJust, catMaybes, fromMaybe)
+import Data.List (transpose, sortOn)
+import Data.List.NonEmpty (NonEmpty(..), insert, toList)
+import Data.Maybe (isJust, fromJust, catMaybes)
 import GHC.Utils.Misc (sndOf3, thdOf3)
 import System.IO (hPutStrLn, stderr)
 import System.Exit (exitWith, ExitCode(..))
@@ -97,9 +101,9 @@ joinRects caption color rectss = capt >> sequence_ (map fill rectss)
           fillAreas (((t1,t2),(x1,x2)):rects) [] = (t1,(x1,x2)) : fillAreas rects [(t2,x1,x2)]
           fillAreas [] ss@((t,_,_):ss') = (t, barX ss) : fillAreas [] ss'
           fillAreas rs@(((t1,t2),(x1,x2)):rs') ss@((t,_,_):ss') 
-            | t1 < t = let ss'' = insert (t2,x1,x2) ss in (t1, barX ss'') : fillAreas rs' ss''
+            | t1 < t = let ss'' = toList $ insert (t2,x1,x2) ss in (t1, barX ss'') : fillAreas rs' ss''
             | t < t1 = (t, barX ss) : fillAreas rs ss'
-            | otherwise = let ss'' = insert (t2,x1,x2) ss in (t, barX ss'') : fillAreas rs' (tail ss'')
+            | otherwise = let (_:|ss'') = insert (t2,x1,x2) ss in (t, barX ss'') : fillAreas rs' ss''
           barX ss = (minimum $ map sndOf3 ss, maximum $ map thdOf3 ss)
 
 --hollowPoints :: AlphaColour Double -> [(Double, Double)] -> ...

@@ -19,9 +19,8 @@ module Lang.Expr (
     evalBExpr,
     evalBExprInf) where
 
-import Utils
 import Powers
-import CompOrd hiding (OrderingDomain(..))
+import CompOrd hiding (LEQ, GEQ)
 import qualified CompOrd as CompOrd
 
 import Prelude hiding (Ordering(..))
@@ -77,20 +76,20 @@ evalExpr (Op op a b) s  = evalOp op (evalExpr a s) (evalExpr b s)
 evalExpr (NatPow a n) s = pow (evalExpr a s) n
 
 evalComp :: (CompOrd r) => Comparator -> r -> r -> Int -> Maybe Bool
-evalComp LT  x y = mCompare (CompOrd.Top P.LT) . domCompare x y
-evalComp GT  x y = mCompare (CompOrd.Top P.GT) . domCompare x y
-evalComp LEQ x y = mCompare (CompOrd.LEQ) . domCompare x y
-evalComp GEQ x y = mCompare (CompOrd.GEQ) . domCompare x y
+evalComp LT  x y = mCompare (Top P.LT) . domCompare x y
+evalComp GT  x y = mCompare (Top P.GT) . domCompare x y
+evalComp LEQ x y = mCompare (Middle CompOrd.LEQ) . domCompare x y
+evalComp GEQ x y = mCompare (Middle CompOrd.GEQ) . domCompare x y
 evalComp LLT x y = Just . (x <! y)
 evalComp LGT x y = Just . (x >! y)
 
 evalCompInf :: (CompOrd r) => Comparator -> r -> r -> Bool
-evalCompInf LT  = (P.LT==) .-. infCompare
-evalCompInf GT  = (P.GT==) .-. infCompare
-evalCompInf LEQ = (P.GT/=) .-. infCompare
-evalCompInf GEQ = (P.LT/=) .-. infCompare
-evalCompInf LLT = (P.LT==) .-. infCompare
-evalCompInf LGT = (P.GT==) .-. infCompare
+evalCompInf LT  = lesserInf
+evalCompInf GT  = greaterInf
+evalCompInf LEQ = lesserEqInf
+evalCompInf GEQ = greaterEqInf
+evalCompInf LLT = lesserInf
+evalCompInf LGT = greaterInf
 
 evalBTerm :: (Floating r, Powers r, CompOrd r) => BTerm -> (Var -> r) -> Int -> Maybe Bool
 evalBTerm (BConst b)   _ = const (Just b)

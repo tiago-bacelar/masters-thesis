@@ -15,10 +15,9 @@ import Lang.Hybrid
 import Lang.Parser
 import Lang.Expr hiding (E)
 
-import Data.List (singleton)
 import Data.Maybe (fromMaybe)
 import GHC.Data.Maybe (rightToMaybe)
-import Control.Monad (ap, (>=>))
+import Control.Monad (ap)
 
 type SimNum r = (Floating r, Powers r, CompOrd r, Limit r r, Boundable r)
 
@@ -76,8 +75,9 @@ failE err = E $ const $ (instantCH $ Left err, id)
 getEState :: E t s (EState s)
 getEState = E $ \eState -> (instantCH $ Right (eState, eState), id)
 
-setEState :: EState s -> E t s ()
-setEState eState = E $ const (instantCH $ Right ((), eState), id)
+--unused
+--setEState :: EState s -> E t s ()
+--setEState eState = E $ const (instantCH $ Right ((), eState), id)
 
 updateEState :: (EState s -> EState s) -> E t s ()
 updateEState f = E $ \eState -> (instantCH $ Right ((), f eState), id)

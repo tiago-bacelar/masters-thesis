@@ -2,22 +2,33 @@
 
 module CompOrd (
     OrderingDomain(..),
+    MidOrdering(..),
     asTop,
     extendedBy,
     consistent,
     mCompare,
     CompOrd(..),
+    domCompareAux,
+    infCompareAux,
     compMinDef,
     compMaxDef,
+    lesserInf,
+    greaterInf,
+    equalInf,
+    lesserEqInf,
+    greaterEqInf,
+    differentInf,
     compMinimum,
     compMaximum) where
 
 import Utils
 
-import Data.Maybe
+import Data.List (uncons)
+import Data.Maybe (catMaybes)
 
 
-data OrderingDomain = Bottom | LEQ | NEQ | GEQ | Top Ordering deriving (Eq)
+data MidOrdering = LEQ | NEQ | GEQ deriving (Eq)
+data OrderingDomain = Bottom | Middle MidOrdering | Top Ordering deriving (Eq)
 
 asTop :: OrderingDomain -> Maybe Ordering
 asTop (Top o) = Just o
@@ -26,12 +37,12 @@ asTop _ = Nothing
 --complete partial order (cpo)
 extendedBy :: OrderingDomain -> OrderingDomain -> Bool
 extendedBy Bottom _ = True
-extendedBy LEQ (Top LT) = True
-extendedBy LEQ (Top EQ) = True
-extendedBy NEQ (Top LT) = True
-extendedBy NEQ (Top GT) = True
-extendedBy GEQ (Top EQ) = True
-extendedBy GEQ (Top GT) = True
+extendedBy (Middle LEQ) (Top LT) = True
+extendedBy (Middle LEQ) (Top EQ) = True
+extendedBy (Middle NEQ) (Top LT) = True
+extendedBy (Middle NEQ) (Top GT) = True
+extendedBy (Middle GEQ) (Top EQ) = True
+extendedBy (Middle GEQ) (Top GT) = True
 extendedBy x y | x == y = True
                | otherwise = False
 
@@ -48,7 +59,7 @@ mCompare x y | not (consistent x y) = Just False
 class CompOrd a where
     --the following must be true: extendedBy (domCompare x y n) (domCompare x y (n+1))
     domCompare :: a -> a -> Int -> OrderingDomain
-    infCompare :: a -> a -> Ordering
+    infCompare :: a -> a -> (Maybe MidOrdering, Ordering)
     (<!) :: a -> a -> Int -> Bool
     (>!) :: a -> a -> Int -> Bool
     compMin :: a -> a -> a
@@ -56,24 +67,71 @@ class CompOrd a where
 
     default domCompare :: (Ord a) => a -> a -> Int -> OrderingDomain
     domCompare x y _ = Top (compare x y)
-    infCompare x y = head $ catMaybes $ map (asTop . domCompare x y) [0..]
+    infCompare x y = infCompareAux $ domCompare x y <$> [0..]
     x <! y = extendedBy (Top LT) . domCompare x y
     x >! y = extendedBy (Top GT) . domCompare x y
     
-    --TODO: rewrite using domCompare (to search for GEQ and LEQ)
     compMin x y = case infCompare x y of
-                    LT -> x
-                    _  -> y
+                    (Just LEQ, _)   -> x
+                    (Just GEQ, _)   -> y
+                    (_, LT)         -> x
+                    _               -> y
     compMax x y = case infCompare x y of
-                    LT -> y
-                    _  -> x
+                    (Just LEQ, _)   -> y
+                    (Just GEQ, _)   -> x
+                    (_, LT)         -> y
+                    _               -> x
 
-    {-# MINIMAL domCompare #-}
+--performs an ordering domain comparison by comparing the bounds of the two values
+domCompareAux :: (Ord a) => (a, a) -> (a, a) -> OrderingDomain
+domCompareAux (xl, xr) (yl, yr)
+    | xl == xr && xr == yl && yl == yr  = Top EQ
+    | xr == yl                          = Middle LEQ
+    | xl == yr                          = Middle GEQ
+    | xr < yl                           = Top LT
+    | xl > yr                           = Top GT
+    | otherwise                         = Bottom
+
+infCompareAux :: [OrderingDomain] -> (Maybe MidOrdering, Ordering)
+infCompareAux (Bottom : xs)     = infCompareAux xs
+infCompareAux (Middle m : xs)   = (Just m, maybe (error "infCompareAux: expected infinite list") fst $ uncons $ catMaybes $ map asTop xs)
+infCompareAux (Top o : _)       = (Nothing, o)
+infCompareAux [] = error "infCompareAux: expected infinite list"
     
 
 instance CompOrd Double
 instance CompOrd Integer
 
+
+lesserInf :: (CompOrd a) => a -> a -> Bool
+lesserInf x y = case infCompare x y of
+                    (Just GEQ, _)   -> False
+                    (_, o)          -> o == LT
+
+greaterInf :: (CompOrd a) => a -> a -> Bool
+greaterInf x y = case infCompare x y of
+                    (Just LEQ, _)   -> False
+                    (_, o)          -> o == GT
+
+equalInf :: (CompOrd a) => a -> a -> Bool
+equalInf x y = case infCompare x y of
+                    (Just NEQ, _)   -> False
+                    (_, o)          -> o == EQ
+
+lesserEqInf :: (CompOrd a) => a -> a -> Bool
+lesserEqInf x y = case infCompare x y of
+                    (Just LEQ, _)   -> True
+                    (_, o)          -> o /= GT
+
+greaterEqInf :: (CompOrd a) => a -> a -> Bool
+greaterEqInf x y = case infCompare x y of
+                    (Just GEQ, _)   -> True
+                    (_, o)          -> o /= LT
+
+differentInf :: (CompOrd a) => a -> a -> Bool
+differentInf x y = case infCompare x y of
+                    (Just NEQ, _)   -> True
+                    (_, o)          -> o /= EQ
 
 --a default implementation of compMin using a Fractional constraint
 compMinDef :: (Fractional a) => a -> a -> a

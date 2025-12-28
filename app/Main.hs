@@ -1,3 +1,5 @@
+{-# OPTIONS_GHC -fno-warn-unused-top-binds #-}
+
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -63,7 +65,7 @@ data Options = Options  { optFile       :: Maybe String
 
 startOptions :: Maybe String -> Options
 startOptions f = Options    { optFile       = f
-                            , optNumType    = SomeProxy (Proxy :: Proxy IReal.IReal)
+                            , optNumType    = SomeProxy (Proxy :: Proxy CDAR.CR)
                             , optCompPrec   = Just 32
                             , optIterations = Just 200
                             , optPlotVars   = S.empty
@@ -102,7 +104,7 @@ options =
         "Output path"
     , Option "v" ["variables"] --TODO: incompatible with modes other than Plot
         (ReqArg
-            (\arg opt -> return opt { optPlotVars = S.fromList $ split ',' arg })
+            (\arg opt -> return opt { optPlotVars = S.fromList $ strSplit ',' arg })
             "FILE")
         "Output path"
 
@@ -196,5 +198,5 @@ plot = mainWith Options { optFile       = Just "input.txt"
                         }
 
 
---TODO: query mode (perform queries, set accuracy, etc)
+--TODO: query mode (perform queries, set accuracy, etc (plot with current settings???))
 --TODO: interactive plot (janela a parte que da para fazer zoom, mover e tal)

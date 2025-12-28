@@ -2,9 +2,8 @@ module Utils (module Utils) where
 
 import GHC.Num
 import Data.Bits
-import Data.List
 import Data.Ratio
-import qualified Data.IntMap as IM
+import Data.List.NonEmpty as NE (NonEmpty(..), head)
 import GHC.Utils.Misc (thdOf3)
 
 
@@ -26,9 +25,12 @@ logFloor r | r < a_r = a - 1
 (><) f g (x, y) = (f x, g y)
 infix 5 ><
 
+split :: (a -> b) -> (a -> c) -> a -> (b, c)
+split f g x = (f x, g x)
+
 (-|-) :: (a -> b) -> (c -> d) -> Either a c -> Either b d
-(-|-) f g (Left x) = Left $ f x
-(-|-) f g (Right y) = Right $ g y
+(-|-) f _ (Left x) = Left $ f x
+(-|-) _ g (Right y) = Right $ g y
 infix 4 -|-
 
 (.-.) :: (c -> d) -> (a -> b -> c) -> a -> b -> d
@@ -58,19 +60,19 @@ joinWith f (x:xs) (y:ys) = f x y : joinWith f xs ys
 joinWith _ xs [] = xs
 joinWith _ [] ys = ys
 
-split :: (Eq a) => a -> [a] -> [[a]]
-split x [] = []
-split x (y:ys) | x == y    = [] : split x ys
-               | otherwise = appendHead y $ split x ys
-    where appendHead y [] = [[y]]
-          appendHead y (ys:yss) = (y : ys) : yss
+strSplit :: (Eq a) => a -> [a] -> [[a]]
+strSplit _ [] = []
+strSplit x (y:ys) | x == y    = [] : strSplit x ys
+                  | otherwise = case strSplit x ys of
+                                    []      -> [[y]]
+                                    zs:zss  -> (y : zs) : zss
 
 --lists must be ordered. f is applied to the same values multiple times (could be optimized)
-mergeOn :: (Ord b) => (a -> b) -> [a] -> [a] -> [a]
-mergeOn _ xs [] = xs
-mergeOn _ [] ys = ys
-mergeOn f (x:xs) (y:ys) | f x <= f y = x : mergeOn f xs (y:ys)
-                        | otherwise  = y : mergeOn f (x:xs) ys
+mergeSortOn :: (Ord b) => (a -> b) -> [a] -> [a] -> [a]
+mergeSortOn _ xs [] = xs
+mergeSortOn _ [] ys = ys
+mergeSortOn f (x:xs) (y:ys) | f x <= f y = x : mergeSortOn f xs (y:ys)
+                            | otherwise  = y : mergeSortOn f (x:xs) ys
 
 --inserts an element into an ordered list. if the element already exists in the list, nothing changes
 setInsert :: Ord a => a -> [a] -> [a]
@@ -157,22 +159,27 @@ indexOrLastMemo xs = search
 --a list, the first element will take half of the error, the second will take a quarter, etc
 --This function ensures the error is distributed equally across all elements of the list
 foldTree :: (a -> a -> a) -> a -> [a] -> a
-foldTree _ u []        = u
-foldTree f u (x:xs)    = foldTree f (f u x) (g xs)
-  where g (x:y:xs)  = f x y : g xs
-        g xs        = xs
+foldTree _ u []     = u
+foldTree f u (x:xs) = foldTree f (f u x) (g xs)
+    where g (y:z:zs)    = f y z : g zs
+          g zs          = zs
 
 -- Balanced fold for associative operator over non-empty list.
 foldTree1 :: (a -> a -> a) -> [a] -> a
 foldTree1 f (x:xs) = foldTree f x xs
 foldTree1 _ []     = error "foldTree1: expected non-empty list"
 
---same as foldTree1, but generates all partial results (from the left)
+--same as foldTree, but generates all partial results (from the left)
 --evaluating the partial results may require additional applications of f
--- (e.g. scanlTree1 (+) [1,2,3,4] will return [1, 1+2, (1+2)+3, (1+2)+(3+4)]
+-- (e.g. scanlTree (+) 1 [2,3,4] will return [1, 1+2, (1+2)+3, (1+2)+(3+4)]
 -- notice how the value (1+2)+3 isn't used in the next term)
+scanlTree :: (a -> a -> a) -> a -> [a] -> [a]
+scanlTree f x0 = map (thdOf3 . NE.head) . scanl (aux 0) ((x0, 0 :: Integer, x0) :| [])
+    where aux i ((y,j,acc) :| ys) x | i < j = (x,i,f acc x) :| (y,j,acc) : ys
+                                    | otherwise = case ys of
+                                                    []   -> let z = f y x in (z, i+1, z) :| []
+                                                    z:zs -> aux (i+1) (z:|zs) (f y x)
+
 scanlTree1 :: (a -> a -> a) -> [a] -> [a]
-scanlTree1 f = map (thdOf3 . head) . tail . scanl (aux (0 :: Integer)) []
-    where aux i [] x = [(x,i,x)]
-          aux i ((y,j,acc):ys) x | i < j = (x,i,f x acc) : (y,j,acc) : ys
-                                 | otherwise = aux (i+1) ys (f x y)
+scanlTree1 f (x:xs) = scanlTree f x xs
+scanlTree1 _ []     = error "scanlTree1: expected non-empty list"

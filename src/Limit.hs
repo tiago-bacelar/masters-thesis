@@ -29,7 +29,8 @@ class Limit a r where
     errorLimit :: [(a, a)] -> r
     --This default uses a Real constraint, which most CompReal instances implement as
     --toRational = undefined (or even worse, toRational r = approx r 40 or equivalent)
-    --as such, this default isn't useful for Limit r r, but is still used in Limit Rational r
+    --as such, this default isn't useful for Limit r r (and all CompReal instances
+    --must override it), but is still used in Limit Rational r
     default errorLimit :: (Real a) => [(a, a)] -> r
     errorLimit = listLimit . errorLimitAux (\n -> (<= (1 % pow2 (n+1))) . toRational)
 
@@ -42,17 +43,21 @@ class Limit a r where
 --The predicate can only return True if the condition is met. If it
 --returns False, the condition may be true or false
 errorLimitAux :: (Int -> a -> Bool) -> [(a, a)] -> [a]
-errorLimitAux p l = aux (map p [0..]) l
+errorLimitAux p = aux 0
         where aux _ [(x,_)] = [x]
-              aux (pn:ps) ((x,e):xs) | pn e = x : aux ps ((x,e):xs)
-                                     | otherwise = aux (pn:ps) xs
+              aux i ((x,e):xs)  | p i e = x : aux (i+1) ((x,e):xs)
+                                | otherwise = aux i xs
               aux _ [] = error "errorLimitAux: empty list"
 
+--To find limits of floating point sequences we just take the first elemnt of the sequence
+--whose error is not significant (as in, doesn't change when the two are added together)
 instance Limit Rational Double where
+    listLimit = errorLimit . (`zip` map ((1%) . pow2) [1..])
     errorLimit = fromRational . fst . findOrLast p
         where p (x, e) = fromRational (x + e) == (fromRational x :: Double)
 
 instance Limit Double Double where
+    listLimit = errorLimit . (`zip` map (fromRational . (1%) . pow2) [1..])
     errorLimit = fst . findOrLast p
         where p (x, e) = x + e == x
 
@@ -65,6 +70,7 @@ alternatingSeriesSum :: (Num a, Limit a r) => [a] -> r
 alternatingSeriesSum = errorLimit . scanl1 (\(x,_) (y,e) -> (x+y,e)) . aux False
     where aux neg [x] = [(if neg then negate x else x, 0)]
           aux neg (x:y:t) = (if neg then negate x else x, y) : aux (not neg) (y : t)
+          aux _ [] = error "alternatingSeriesSum: empty list"
 
 --calculates the sum of an alternating serires with Calabrese's error bound
 --It requires that the sequence b_n := a_n − a_(n+1) also converges monotonically to 0

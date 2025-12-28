@@ -9,7 +9,6 @@ module Lang.Hybrid (
     for,
     forever,
     instant,
-    eval,
     duration,
     endpoint,
     takeH,
@@ -89,7 +88,7 @@ instance (Num t, Ord t) => Applicative (Hybrid t s) where
 
 instance (Num t, Ord t) => Monad (Hybrid t s) where
     h@(Hybrid _ (Just (_,x)))   >>= f = joinH h (f x)
-    (Hybrid e Nothing)          >>= f = Hybrid e Nothing
+    (Hybrid e Nothing)          >>= _ = Hybrid e Nothing
 
 
 
@@ -101,7 +100,7 @@ instance Applicative Query where
     (<*>) = ap
 
 instance Monad Query where
-    q >>= f = Query $ \n -> runQuery q n >>= (($n) . runQuery . f)
+    q >>= f = Query $ \n -> runQuery q n >>= (($ n) . runQuery . f)
 
 
 --unline Hybrid, the function inside Hyb only needs to be
@@ -109,7 +108,7 @@ instance Monad Query where
 data CompHybrid t s a = Ins a | Hyb (Hybrid t (Query s) a) deriving (Functor)
 
 smapCH :: (r -> s) -> CompHybrid t r a -> CompHybrid t s a
-smapCH f (Ins x) = Ins x
+smapCH _ (Ins x) = Ins x
 smapCH f (Hyb h) = Hyb $ smap (fmap f) h
 
 fsmapCH :: (r -> s) -> CompHybrid t r r -> CompHybrid t s s
@@ -120,13 +119,14 @@ instantCH = Ins
 
 evalCH :: CompHybrid t s a -> t -> Query s
 evalCH (Hyb h) = eval h
+evalCH (Ins _) = error "evalCH: Failed to evaluate instantaneous CompHybrid"
 
 unrollCH :: (Num t) => CompHybrid t s a -> Maybe (t, a)
 unrollCH (Ins x) = Just (0, x)
 unrollCH (Hyb h) = unroll h
 
 durationCH :: (Num t) => CompHybrid t s a -> Maybe t
-durationCH (Ins x) = Just 0
+durationCH (Ins _) = Just 0
 durationCH (Hyb h) = duration h
 
 endpointCH :: CompHybrid t s a -> Maybe a
@@ -136,7 +136,7 @@ endpointCH (Hyb h) = endpoint h
 joinCH :: (Num t, CompOrd t) => Hybrid t (Query s) a -> Hybrid t (Query s) b -> Hybrid t (Query s) b
 joinCH (Hybrid f Nothing) _                     = Hybrid f Nothing
 joinCH (Hybrid f (Just (d, _))) (Hybrid g m)    = Hybrid (join . Query . h) (fmap ((d+) >< id) m)
-    where h t Nothing  = if infCompare t d == LT then [f t] else [g (t - d)]
+    where h t Nothing  = if lesserInf t d then [f t] else [g (t - d)]
           h t (Just n) = case mCompare (Top LT) (domCompare t d n) of
                             Just True  -> [f t]             --The wrong branch is evaluated
                             Just False -> [g (t - d)]       --outside its original domain.
@@ -153,7 +153,7 @@ instance (Num t, CompOrd t) => Applicative (CompHybrid t s) where
 
 instance (Num t, CompOrd t) => Monad (CompHybrid t s) where
     (Ins x)                         >>= f = f x
-    (Hyb h@(Hybrid e Nothing))      >>= f = Hyb $ Hybrid e Nothing
+    (Hyb (Hybrid e Nothing))        >>= _ = Hyb $ Hybrid e Nothing
     (Hyb h@(Hybrid e (Just (d,x)))) >>= f
         = Hyb $ case f x of
                 Ins y -> Hybrid e (Just (d,y))

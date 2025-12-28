@@ -1,10 +1,10 @@
 {-# LANGUAGE DefaultSignatures #-}
 
-module Boundable where
+module Boundable (Boundable(..), lowerBound, upperBound, powDef) where
 
 import Utils
 import Powers
-import CompReal
+import CompReal (CompReal, bound)
 
 
 class Boundable r where
@@ -30,7 +30,7 @@ upperBound = snd . bounds
 
 --a default implementation of Powers's pow. this code was taken from
 --ireal and adapted to work with Integer as well as IntegerInterval
-powDef :: (Num r, Num a, Powers a, Boundable a) => (r -> Int -> a) -> ((Int -> a) -> r) -> (a -> Int -> a) -> r -> Int -> r
+powDef :: (Num r, Powers a, Boundable a) => (r -> Int -> a) -> ((Int -> a) -> r) -> (a -> Int -> a) -> r -> Int -> r
 powDef approx cons scale = aux
     where aux _ 0 = 1
           aux x 1 = x

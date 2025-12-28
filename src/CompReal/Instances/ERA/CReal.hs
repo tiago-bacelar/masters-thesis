@@ -12,7 +12,8 @@
 
 --           (2000-2001)
 
-
+{-# OPTIONS_GHC -fno-warn-x-partial #-}
+{-# OPTIONS_GHC -fno-warn-incomplete-patterns #-}
 
 module CompReal.Instances.ERA.CReal(CReal (..), round_uk, showCReal) where
 

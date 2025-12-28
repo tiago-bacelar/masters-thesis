@@ -3,12 +3,10 @@
 module CompReal (module CompReal) where
 
 import Utils
-import Powers
 import CompOrd
 import Limit (Limit)
 import qualified Limit
 
-import Data.Bits
 import Data.Ratio
 
 
@@ -50,11 +48,4 @@ errorLimitDef = listLimit . Limit.errorLimitAux p
 
 --TODO: slowly increase accuracy if needed?
 domCompareDef :: (CompReal r) => r -> r -> Int -> OrderingDomain
-domCompareDef x y p | lx == ux && ux == ly && ly == uy  = Top EQ
-                    | ux == ly                          = LEQ
-                    | lx == uy                          = GEQ
-                    | ux < ly                           = Top LT
-                    | lx > uy                           = Top GT
-                    | otherwise                         = Bottom
-    where (lx, ux) = bound x p
-          (ly, uy) = bound y p
+domCompareDef x y p = domCompareAux (bound x p) (bound y p)

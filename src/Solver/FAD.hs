@@ -17,7 +17,12 @@
 -- 
 -- No attempt is made to handle functions of several variables or perturbation confusion.
 
-module Solver.FAD (Dif, con, var, mkDif, fromDif) where
+{-# OPTIONS_GHC -fno-warn-x-partial #-}
+{-# OPTIONS_GHC -fno-warn-unused-matches #-}
+{-# OPTIONS_GHC -fno-warn-name-shadowing #-}
+{-# OPTIONS_GHC -fno-warn-incomplete-patterns #-}
+
+module Solver.FAD (Dif, con, var, mkDif, fromDif, unDif, deriv, derivs) where
 
 import Utils
 import Powers
@@ -114,7 +119,7 @@ instance (Floating a, Powers a) => Floating (Dif a) where
    atanh    = chain atanh (recip . (1-) . sq) 
 
 instance (Num a, Powers a) => Powers (Dif a) where
-   pow x 0  = con 1
+   pow _ 0  = con 1
    pow x 1  = x --this case isn't needed but adding it improves performance
    pow x n  = chain (flip pow n) ((fromIntegral n *) . flip pow (n-1)) x 
    -- Note: This is linear in n, but behaves correctly on intervals
