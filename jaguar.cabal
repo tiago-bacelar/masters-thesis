@@ -42,12 +42,12 @@ library
       Lang.Parser
       Limit
       Powers
+      SnocList
       Solver.FAD
       Solver.Poly
       Solver.Solver
       Tracing
       Utils
-      WithLast
   other-modules:
       Paths_jaguar
   autogen-modules:

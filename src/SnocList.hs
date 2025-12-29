@@ -6,14 +6,14 @@ This module represents lists as a body and a last element
 This is useful when the last element of a (finite) list should be treated in some
 special way (e.g. functions findOrLast and repeatLast)
 
-Because of Haskell's laziness, infinite lists are represented as WithLast (...) _|_
-Therefore, always keep in mind that evaluating the last element of a WithLast
+Because of Haskell's laziness, infinite lists are represented as SnocList (...) _|_
+Therefore, always keep in mind that evaluating the last element of a SnocList
 is equivalent to iterating the full list that created it, and if that list is
 infinite that operation will never halt
 -}
 
-module WithLast (
-    WithLast,
+module SnocList (
+    SnocList,
     singleton,
     fromList,
     toList,
@@ -40,67 +40,67 @@ import Data.List (find)
 import Data.Maybe (fromMaybe)
 
 
-data WithLast a = WithLast [a] a deriving (P.Functor)
+data SnocList a = SnocList [a] a deriving (P.Functor)
 
-lFunc :: ([a] -> [a]) -> WithLast a -> WithLast a
-lFunc f (WithLast xs y) = WithLast (f xs) y
+lFunc :: ([a] -> [a]) -> SnocList a -> SnocList a
+lFunc f ~(SnocList xs y) = SnocList (f xs) y
 
-singleton :: a -> WithLast a
-singleton y = WithLast [] y
+singleton :: a -> SnocList a
+singleton y = SnocList [] y
 
-fromList :: [a] -> WithLast a
+fromList :: [a] -> SnocList a
 fromList [] = error "fromList: expected non-empty list"
-fromList [x] = WithLast [] x
+fromList [x] = singleton x
 fromList (x:xs) = lFunc (x:) (fromList xs)
 
-toList :: WithLast a -> [a]
-toList (WithLast xs y) = xs ++ [y]
+toList :: SnocList a -> [a]
+toList (SnocList xs y) = xs ++ [y]
 --toList = foldr (:) singleton
 
-foldr :: (a -> b -> b) -> (a -> b) -> WithLast a -> b
-foldr f g (WithLast xs y) = P.foldr f (g y) xs
+foldr :: (a -> b -> b) -> (a -> b) -> SnocList a -> b
+foldr f g (SnocList xs y) = P.foldr f (g y) xs
 
-unfoldr :: (b -> Either a (a, b)) -> b -> WithLast a
+unfoldr :: (b -> Either a (a, b)) -> b -> SnocList a
 unfoldr f = aux
     where aux x = either singleton (\(a,b) -> lFunc (a:) (aux b)) (f x)
 
-head :: WithLast a -> a
-head (WithLast (x:_) _) = x
-head (WithLast [] y)    = y
+head :: SnocList a -> a
+head (SnocList (x:_) _) = x
+head (SnocList [] y)    = y
 
-last :: WithLast a -> a
-last (WithLast _ y) = y
+last :: SnocList a -> a
+last (SnocList _ y) = y
 
-drop :: Int -> WithLast a -> [a]
+drop :: Int -> SnocList a -> [a]
 drop i = P.drop i . toList
 
-dropOrLast :: Int -> WithLast a -> WithLast a
+dropOrLast :: Int -> SnocList a -> SnocList a
 dropOrLast i = lFunc (P.drop i)
 
-zip :: WithLast a -> WithLast b -> WithLast (a,b)
+zip :: SnocList a -> SnocList b -> SnocList (a,b)
 zip = zipWith (,)
 
-zipWith :: (a -> b -> c) -> WithLast a -> WithLast b -> WithLast c
+zipWith :: (a -> b -> c) -> SnocList a -> SnocList b -> SnocList c
 zipWith f = aux
-    where aux (WithLast (w:ws) x) (WithLast (y:ys) z) = lFunc (f w y :) $ aux (WithLast ws x) (WithLast ys z)
+    where aux (SnocList (w:ws) x) (SnocList (y:ys) z) = lFunc (f w y :) $ aux (SnocList ws x) (SnocList ys z)
           aux wl1 wl2 = singleton $ f (head wl1) (head wl2)
 
-zip3 :: WithLast a -> WithLast b -> WithLast c -> WithLast (a,b,c)
+zip3 :: SnocList a -> SnocList b -> SnocList c -> SnocList (a,b,c)
 zip3 = zipWith3 (,,)
 
-zipWith3 :: (a -> b -> c -> d) -> WithLast a -> WithLast b -> WithLast c -> WithLast d
+zipWith3 :: (a -> b -> c -> d) -> SnocList a -> SnocList b -> SnocList c -> SnocList d
 zipWith3 f = aux
-    where aux (WithLast (u:us) v) (WithLast (w:ws) x) (WithLast (y:ys) z) = lFunc (f u w y :) $ aux (WithLast us v) (WithLast ws x) (WithLast ys z)
+    where aux (SnocList (u:us) v) (SnocList (w:ws) x) (SnocList (y:ys) z) = lFunc (f u w y :) $ aux (SnocList us v) (SnocList ws x) (SnocList ys z)
           aux wl1 wl2 wl3 = singleton $ f (head wl1) (head wl2) (head wl3)
 
-iterate :: (a -> a) -> a -> WithLast a
-iterate f x = WithLast (P.iterate f x) undefined
+iterate :: (a -> a) -> a -> SnocList a
+iterate f x = SnocList (P.iterate f x) undefined
 
-indexOrLast :: WithLast a -> Int -> a
+indexOrLast :: SnocList a -> Int -> a
 indexOrLast wl i = head $ dropOrLast i wl
 
 --when using, watch out for polymorphism
-indexOrLastMemo :: WithLast a -> Int -> a
+indexOrLastMemo :: SnocList a -> Int -> a
 indexOrLastMemo = indexOrLast --TODO
 {-
 data LeafTree a = Leaf a | LNode (LeafTree a) | Node (LeafTree a) (LeafTree a)
@@ -124,20 +124,20 @@ indexOrLastMemo xs = search
 -}
 
 
-findOrLast :: (a -> Bool) -> WithLast a -> a
-findOrLast f (WithLast xs y) = fromMaybe y (find f xs)
+findOrLast :: (a -> Bool) -> SnocList a -> a
+findOrLast f (SnocList xs y) = fromMaybe y (find f xs)
 
-repeatLast :: WithLast a -> [a]
-repeatLast (WithLast xs y)  = xs ++ P.repeat y
+repeatLast :: SnocList a -> [a]
+repeatLast (SnocList xs y)  = xs ++ P.repeat y
 
 --indexes must be increasing. if there are multiple indexes greater
 --than the size of the list, the last element is only appended once
-getIndexesOrLast :: [Int] -> WithLast a -> WithLast a
-getIndexesOrLast []       = \(WithLast _ y) -> WithLast [] y
+getIndexesOrLast :: [Int] -> SnocList a -> SnocList a
+getIndexesOrLast []       = singleton . last
 getIndexesOrLast (i:is)   = aux (i : difs)
     where difs = map (uncurry (-)) $ P.zip is (i:is)
-          aux [] (WithLast _ y) = WithLast [] y
-          aux _ (WithLast [] y) = WithLast [] y
+          aux [] (SnocList _ y) = singleton y
+          aux _ (SnocList [] y) = singleton y
           aux (d:ds) wl = case dropOrLast d wl of
-                                (WithLast [] y)     -> WithLast [] y
-                                (WithLast (x:_) _)  -> lFunc (x:) (aux ds wl)
+                                (SnocList [] y)     -> singleton y
+                                (SnocList (x:_) _)  -> lFunc (x:) (aux ds wl)

@@ -6,7 +6,7 @@
 module CompReal.Instances.CDAR (CDAR.CR) where
 
 import Utils
-import qualified WithLast as WL
+import qualified SnocList as SL
 import CompOrd
 import CompReal
 import Boundable
@@ -22,7 +22,7 @@ instance CompReal CDAR.CR where
     bound x n = split (toRational . CDAR.lowerBound) (toRational . CDAR.upperBound) $ CDAR.require n x
 
 instance Limit Rational CDAR.CR where
-    listLimit xs = CDAR.CR $ ZipList [CDAR.Approx (round $ x * toRational (pow2 i)) 1 (-i) | (i,x) <- zip [0..] (WL.repeatLast $ WL.fromList xs)]
+    listLimit xs = CDAR.CR $ ZipList [CDAR.Approx (round $ x * toRational (pow2 i)) 1 (-i) | (i,x) <- zip [0..] (SL.repeatLast $ SL.fromList xs)]
     --This implementation keeps all approximations in the list. the problem is, if the
     --approximations converge slowly, the list gets huge and causes a heap overflow
     {-
@@ -35,19 +35,19 @@ instance Limit Rational CDAR.CR where
     -}
 
 
-resources :: WL.WithLast Int
-resources = WL.iterate bumpLimit 80
+resources :: SL.SnocList Int
+resources = SL.iterate bumpLimit 80
     where bumpLimit n = n * 3 `div` 2
 
 instance Limit CDAR.CR CDAR.CR where
-    limit f = CDAR.limCR (f . (max 0) . pred)
+    limit f = CDAR.limCR (f . (max 0) . pred) --internally uses resources too
     
-    -- listLimit xs = CDAR.CR $ ZipList $ WL.foldr aux1 aux2 $ WL.zip3 (WL.iterate succ 0) resources (WL.getIndexesOrLast (WL.toList resources) $ WL.fromList xs)
-    --     where aux1 (i,p,x)  = ((getZipList $ CDAR.unCR $ CDAR.scale CDAR.unitError (-p) + x) !! i :)
-    --           aux2 (i,_,x)  = drop i $ getZipList $ CDAR.unCR x
-              
+    listLimit xs = CDAR.CR $ ZipList $ SL.foldr aux1 aux2 $ SL.zip3 (SL.iterate succ 0) resources elems
+        where elems = SL.getIndexesOrLast (SL.toList resources) (SL.fromList xs)
+              aux1 (i,p,x)  = ((getZipList $ CDAR.unCR $ CDAR.scale CDAR.unitError (-p) + x) !! i :)
+              aux2 (i,_,x)  = drop i $ getZipList $ CDAR.unCR x
 
-    errorLimit = errorLimitDef --TODO??
+    errorLimit = errorLimitDef
 
 
 domCompareA :: CDAR.Approx -> CDAR.Approx -> OrderingDomain

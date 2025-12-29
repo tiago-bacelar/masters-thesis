@@ -2,10 +2,12 @@
 
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FlexibleContexts #-}
 
 module CompReal.Instances.AERN2 (AERN2.CReal) where
 
 import Utils
+import qualified SnocList as SL
 import CompOrd
 import CompReal
 import Boundable
@@ -39,7 +41,7 @@ instance Limit Rational AERN2.CReal where
 
     --this is basically the same, but on lists instead (better when all terms of the list are used, which they are)
     listLimit xs = AERN2.CSequence [(MTNP.cn $ AERN2.mpBallP p x) AERN2.+- ((0.5 :: AERN2.MPFloat) ^ (MTNP.integer p)) | (p,x) <- zip [0..] xs]
- 
+
 --So apparently, AERN2 straight up has a max precision of 5000000 for limits buried in its code
 --It's easy to miss, it's buried among all the bloat
 --So, you know, don't put too much faith in this instance. At any time it can just.. run out of precision
@@ -48,7 +50,13 @@ instance Limit Rational AERN2.CReal where
 --Can you tell I'm angry? I've been digging in this bloated library for days now. Please send help
 instance Limit AERN2.CReal AERN2.CReal where
     limit f = AERN2.limit (f . (max 0) . pred)
-    errorLimit = errorLimitDef --TODO?
+
+    listLimit xs = AERN2.CSequence $ SL.foldr aux1 aux2 $ SL.zip (SL.fromList AERN2.cseqPrecisions) elems
+        where elems = SL.getIndexesOrLast (map (fromInteger . MTNP.integer) AERN2.cseqPrecisions) (SL.fromList xs)
+              aux1 (p, x) = ((x AERN2.? p) AERN2.+- ((0.5 :: AERN2.MPFloat) ^ (MTNP.integer p)) :)
+              aux2 (p, x) = MTNP.drop (AERN2.cseqIndexForPrecision p) (AERN2.unCSequence x)
+
+    errorLimit = errorLimitDef
 
 asIntervals :: AERN2.CReal -> [(AERN2.MPFloat,AERN2.MPFloat)]
 asIntervals = map (AERN2.endpoints . MTNP.unCN) . AERN2.unCSequence
