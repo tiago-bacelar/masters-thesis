@@ -59,6 +59,7 @@ mCompare x y | not (consistent x y) = Just False
 class CompOrd a where
     --the following must be true: extendedBy (domCompare x y n) (domCompare x y (n+1))
     domCompare :: a -> a -> Int -> OrderingDomain
+    --the Maybe MidOrdering is lazier than the Ordering, and the two must be consistent
     infCompare :: a -> a -> (Maybe MidOrdering, Ordering)
     (<!) :: a -> a -> Int -> Bool
     (>!) :: a -> a -> Int -> Bool

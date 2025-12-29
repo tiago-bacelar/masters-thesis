@@ -3,6 +3,7 @@
 module Solver.Solver (solvePoly) where
 
 import Utils
+import qualified WithLast as WL
 import Limit
 import Powers
 import CompOrd
@@ -74,8 +75,8 @@ solvePoly ps = ans . numCoef
           dt = traceCR "dt" $ fromRational r / _M
 
           genTermsDT = generalTerms $ evalCoef dt
-          stepDT xi = map (Limit.listLimit . uncurry dropOrLast) $ zip ks terms --TODO: optimize list access?
-            where terms = map (scanlTree1 (+) . zipWith (*) genTermsDT) $ odeDerivs f xi
+          stepDT xi = map (Limit.listLimit . WL.toList . uncurry WL.dropOrLast) $ zip ks terms --TODO: optimize list access?
+            where terms = map (WL.fromList . scanlTree1 (+) . zipWith (*) genTermsDT) $ odeDerivs f xi
                   ks = traceX "ks" $ map ((1+) . lg2 . max 1 . pred . (2*) . upperBound . abs) xi
 
           {-
@@ -86,9 +87,9 @@ solvePoly ps = ans . numCoef
                   ks = traceX "ks" $ map (\a -> ) xi --TODO: take delta into account
           -}
           --this definition of stepDelta is correct, but can be improved. check the comented version (not done yet)
-          stepDelta delta xi = map (Limit.listLimit . uncurry dropOrLast) $ zip ks terms
+          stepDelta delta xi = map (Limit.listLimit . WL.toList . uncurry WL.dropOrLast) $ zip ks terms
             where genTerms = generalTerms $ evalCoef delta
-                  terms = map (scanlTree1 (+) . zipWith (*) genTerms) $ odeDerivs f xi
+                  terms = map (WL.fromList . scanlTree1 (+) . zipWith (*) genTerms) $ odeDerivs f xi
                   ks = traceX "ks" $ map ((1+) . lg2 . max 1 . pred . (2*) . upperBound . abs) xi
 
           --steps[t][j][k] --TODO: steps[t][acc k][j] not do steps after reaching end of derivs

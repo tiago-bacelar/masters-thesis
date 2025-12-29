@@ -3,7 +3,8 @@ module Utils (module Utils) where
 import GHC.Num
 import Data.Bits
 import Data.Ratio
-import Data.List.NonEmpty as NE (NonEmpty(..), head)
+import Data.List.NonEmpty as NE (NonEmpty(..))
+import qualified Data.List.NonEmpty as NE
 import GHC.Utils.Misc (thdOf3)
 
 
@@ -96,6 +97,7 @@ getIndexes (i:is)   = aux (i : difs)
                                 []      -> []
                                 (y:ys)  -> y : aux ds (y:ys)
 
+
 --list must be ordered by index and mustn't contain repeated indexes
 maybeIndexes :: (Num a, Eq a) => [(a,b)] -> [Maybe b]
 maybeIndexes xs = rec 0 xs
@@ -103,54 +105,7 @@ maybeIndexes xs = rec 0 xs
           rec n ((i, x) : t) | n == i    = Just x  : rec (n + 1) t
                              | otherwise = Nothing : rec (n + 1) ((i, x) : t)
 
-repeatLast :: [a] -> [a]
-repeatLast [x] = repeat x
-repeatLast (x:xs) = x : repeatLast xs
-repeatLast [] = error "repeatLast: expected non-empty list"
 
-replaceLast :: (a -> a) -> [a] -> [a]
-replaceLast f [x]    = [f x]
-replaceLast f (x:xs) = x : replaceLast f xs
-replaceLast _ []     = error "replaceLast: expected non-empty list"
-
-findOrLast :: (a -> Bool) -> [a] -> a
-findOrLast _ [x] = x
-findOrLast p (x:xs) | p x = x
-                    | otherwise = findOrLast p xs
-findOrLast _ []  = error "findOrLast: expected non-empty list"
-
-dropOrLast :: Int -> [a] -> [a]
-dropOrLast _ [x] = [x]
-dropOrLast 0 (x:xs) = x : xs
-dropOrLast p (_:xs) = dropOrLast (p-1) xs
-dropOrLast _ []     = error "dropOrLast: expected non-empty list"
-
-indexOrLast :: [a] -> Int -> a
-indexOrLast xs p = last $ take (p+1) xs
-
---when using, watch out for polymorphism
-indexOrLastMemo :: [a] -> Int -> a
-indexOrLastMemo = indexOrLast --TODO
-{-
-data LeafTree a = Leaf a | LNode (LeafTree a) | Node (LeafTree a) (LeafTree a)
-indexOrLastMemo xs = search
-  where trees = map (uncurry buildTree) $ splitPow xs
-        splitPow xs = unfoldr aux (1,xs)
-            where aux (n,[]) = Nothing
-                  aux (n,ys) = let (l,r) = splitAt n ys in Just ((n,l),(2*n,r))
-        buildTree _ [] = Empty
-        buildTree n xs = Node (head r) (buildTree m l) (buildTree m (tail r))
-          where m = n `div` 2
-                (l,r) = splitAt m xs
-        search n = indexTree (n + 1 - 2^i) (2^i) $ indexOrLast trees i
-            where i = lg2 $ toInteger $ n + 1
-        lastTree (Leaf x) = x
-        lastTree (LNode t) = lastTree t
-        lastTree (Node _ t) = lastTree t
-        indexTree 0 _ (Leaf x) = x
-        indexTree n m (Node l r) | 2 * n < m = indexTree (2 * n) m l
-                                 | otherwise = indexTree (2 * n - m) m r
--}
 
 
 --Balanced fold, minimizing depth of call tree. Assumes associative operator.

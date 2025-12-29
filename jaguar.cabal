@@ -47,6 +47,7 @@ library
       Solver.Solver
       Tracing
       Utils
+      WithLast
   other-modules:
       Paths_jaguar
   autogen-modules:

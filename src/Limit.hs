@@ -5,6 +5,7 @@
 module Limit (Limit(..), errorLimitAux, alternatingSeriesSum, calabreseSum) where
 
 import Utils
+import qualified WithLast as WL
 
 import Data.Ratio ((%))
 
@@ -20,7 +21,7 @@ class Limit a r where
     --same as limit, but allows finite lists, in which case the last
     --element of the list is the value of the limit (has zero error)
     listLimit :: [a] -> r
-    listLimit xs = limit (indexOrLastMemo xs)
+    listLimit xs = limit (WL.indexOrLastMemo $ WL.fromList xs)
 
     --limit from list of approximation and error pairs
     --the error is assumed to be decreasing (<=), at no specific rate, and
@@ -53,12 +54,12 @@ errorLimitAux p = aux 0
 --whose error is not significant (as in, doesn't change when the two are added together)
 instance Limit Rational Double where
     listLimit = errorLimit . (`zip` map ((1%) . pow2) [1..])
-    errorLimit = fromRational . fst . findOrLast p
+    errorLimit = fromRational . fst . WL.findOrLast p . WL.fromList
         where p (x, e) = fromRational (x + e) == (fromRational x :: Double)
 
 instance Limit Double Double where
     listLimit = errorLimit . (`zip` map (fromRational . (1%) . pow2) [1..])
-    errorLimit = fst . findOrLast p
+    errorLimit = fst . WL.findOrLast p . WL.fromList
         where p (x, e) = x + e == x
 
 
