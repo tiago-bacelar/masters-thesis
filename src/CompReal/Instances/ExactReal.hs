@@ -83,7 +83,7 @@ instance Floating AnyCReal where
 --So, because exact-real has a dumb implementation of limits, we have to do it ourselves
 --really tho. it uses equality to test if the value of the limit was reached. like, bruhh
 instance Limit Rational AnyCReal where
-    limit f = AnyCReal $ ExactReal.crMemoize (\i -> let (a :% b) = f (max 0 $ i-1) in roundD (shiftL a i) b)
+    limit f = AnyCReal $ ExactReal.crMemoize (\i -> let (a :% b) = f i in roundD (shiftL a i) b)
         where roundD n d = case divMod n d of
                               (q, r) -> case compare (unsafeShiftL r 1) d of
                                 LT -> q

@@ -15,24 +15,22 @@ import Limit
 
 import qualified Data.CDAR as CDAR
 
-import Control.Applicative
+import Data.List (find)
+import Data.Maybe (fromMaybe)
+import Control.Applicative (ZipList(..))
 
-
+--We can't use CDAR.require because it's wrong (returns approximations with 2 more precision
+--than required), but this function does essentially the same
 instance CompReal CDAR.CR where
-    bound x n = split (toRational . CDAR.lowerBound) (toRational . CDAR.upperBound) $ CDAR.require n x
+    bound x n = split (toRational . CDAR.lowerBound) (toRational . CDAR.upperBound) goodApprox
+        where goodApprox = fromMaybe (error "bound: expected infinite list in CDAR.CR")
+                            $ find good $ getZipList $ CDAR.unCR x
+              good (CDAR.Approx _ 0 _) = True
+              good (CDAR.Approx _ e s) = - s - (lg2 e) > n
+              good CDAR.Bottom         = False
 
 instance Limit Rational CDAR.CR where
     listLimit xs = CDAR.CR $ ZipList [CDAR.Approx (round $ x * toRational (pow2 i)) 1 (-i) | (i,x) <- zip [0..] (SL.repeatLast $ SL.fromList xs)]
-    --This implementation keeps all approximations in the list. the problem is, if the
-    --approximations converge slowly, the list gets huge and causes a heap overflow
-    {-
-    errorLimit = CDAR.CR . ZipList . aux 0
-        where resources startLimit = ZipList $ iterate bumpLimit $ min 80 startLimit
-              bumpLimit p = p * 3 `div` 2
-              aux p [(a,_)] = getZipList $ CDAR.toApprox <$> resources p <*> pure a
-              aux _ ((a,e):as) = CDAR.Approx (round (a*(toRational $ pow2 p))) 1 (-p) : aux p as
-                where p = negate $ min 0 $ logFloor e
-    -}
 
 
 resources :: SL.SnocList Int

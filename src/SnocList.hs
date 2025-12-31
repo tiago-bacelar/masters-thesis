@@ -1,10 +1,13 @@
 {-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE DeriveFoldable #-}
+{-# LANGUAGE DeriveTraversable #-}
 
 {-
 This module represents lists as a body and a last element
 
 This is useful when the last element of a (finite) list should be treated in some
-special way (e.g. functions findOrLast and repeatLast)
+special way (e.g. functions findOrLast and repeatLast). It also has performance
+benefits when the last element is repeatedly accessed
 
 Because of Haskell's laziness, infinite lists are represented as SnocList (...) _|_
 Therefore, always keep in mind that evaluating the last element of a SnocList
@@ -34,13 +37,20 @@ module SnocList (
     repeatLast,
     getIndexesOrLast) where
 
+import Utils
+
 import Prelude hiding (foldr, head, last, take, drop, zip, zipWith, zip3, zipWith3, iterate)
 import qualified Prelude as P
-import Data.List (find)
+import Data.List (unsnoc, find)
 import Data.Maybe (fromMaybe)
+import Control.Concurrent.MVar (newMVar, readMVar, modifyMVar_)
+import System.IO.Unsafe (unsafePerformIO)
 
 
-data SnocList a = SnocList [a] a deriving (P.Functor)
+data SnocList a = SnocList [a] a deriving (P.Functor, P.Foldable, P.Traversable)
+
+instance (Show a) => Show (SnocList a) where
+    showsPrec p xs = showParen (p > 10) $ showString "fromList " . shows (toList xs)
 
 lFunc :: ([a] -> [a]) -> SnocList a -> SnocList a
 lFunc f ~(SnocList xs y) = SnocList (f xs) y
@@ -49,9 +59,7 @@ singleton :: a -> SnocList a
 singleton y = SnocList [] y
 
 fromList :: [a] -> SnocList a
-fromList [] = error "fromList: expected non-empty list"
-fromList [x] = singleton x
-fromList (x:xs) = lFunc (x:) (fromList xs)
+fromList = maybe (error "fromList: expected non-empty list") (uncurry SnocList) . unsnoc
 
 toList :: SnocList a -> [a]
 toList (SnocList xs y) = xs ++ [y]
@@ -83,7 +91,7 @@ zip = zipWith (,)
 zipWith :: (a -> b -> c) -> SnocList a -> SnocList b -> SnocList c
 zipWith f = aux
     where aux (SnocList (w:ws) x) (SnocList (y:ys) z) = lFunc (f w y :) $ aux (SnocList ws x) (SnocList ys z)
-          aux wl1 wl2 = singleton $ f (head wl1) (head wl2)
+          aux sl1 sl2 = singleton $ f (head sl1) (head sl2)
 
 zip3 :: SnocList a -> SnocList b -> SnocList c -> SnocList (a,b,c)
 zip3 = zipWith3 (,,)
@@ -91,17 +99,30 @@ zip3 = zipWith3 (,,)
 zipWith3 :: (a -> b -> c -> d) -> SnocList a -> SnocList b -> SnocList c -> SnocList d
 zipWith3 f = aux
     where aux (SnocList (u:us) v) (SnocList (w:ws) x) (SnocList (y:ys) z) = lFunc (f u w y :) $ aux (SnocList us v) (SnocList ws x) (SnocList ys z)
-          aux wl1 wl2 wl3 = singleton $ f (head wl1) (head wl2) (head wl3)
+          aux sl1 sl2 sl3 = singleton $ f (head sl1) (head sl2) (head sl3)
 
 iterate :: (a -> a) -> a -> SnocList a
 iterate f x = SnocList (P.iterate f x) undefined
 
 indexOrLast :: SnocList a -> Int -> a
-indexOrLast wl i = head $ dropOrLast i wl
+indexOrLast sl i = head $ dropOrLast i sl
 
---when using, watch out for polymorphism
+--when using, watch out for polymorphism, since free type variables prevent memoization
+--doesn't work:     f = indexOrLastMemo (fromList [0..100000000]);                  f 200000000
+--but this works:   f = indexOrLastMemo (fromList [0..100000000] :: SnocList Int);  f 200000000
 indexOrLastMemo :: SnocList a -> Int -> a
-indexOrLastMemo = indexOrLast --TODO
+indexOrLastMemo (SnocList xs y) = unsafePerformIO $ do
+    var <- newMVar Nothing
+    return $ \i -> unsafePerformIO $ do
+        mLen <- readMVar var
+        case mLen of
+            Nothing -> case indexOrLength xs i of
+                        Left x      -> return x
+                        Right len   -> modifyMVar_ var (const $ return $  Just len) >> return y
+            Just len -> return (if i < len then xs !! i else y)
+
+
+--TODO: memoize more indexes and not just last?
 {-
 data LeafTree a = Leaf a | LNode (LeafTree a) | Node (LeafTree a) (LeafTree a)
 indexOrLastMemo xs = search
@@ -129,6 +150,7 @@ findOrLast f (SnocList xs y) = fromMaybe y (find f xs)
 
 repeatLast :: SnocList a -> [a]
 repeatLast (SnocList xs y)  = xs ++ P.repeat y
+--repeatLast = foldr (:) P.repeat
 
 --indexes must be increasing. if there are multiple indexes greater
 --than the size of the list, the last element is only appended once
@@ -138,6 +160,6 @@ getIndexesOrLast (i:is)   = aux (i : difs)
     where difs = map (uncurry (-)) $ P.zip is (i:is)
           aux [] (SnocList _ y) = singleton y
           aux _ (SnocList [] y) = singleton y
-          aux (d:ds) wl = case dropOrLast d wl of
+          aux (d:ds) sl = case dropOrLast d sl of
                                 (SnocList [] y)     -> singleton y
-                                (SnocList (x:_) _)  -> lFunc (x:) (aux ds wl)
+                                (SnocList (x:_) _)  -> lFunc (x:) (aux ds sl)

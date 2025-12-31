@@ -27,7 +27,7 @@ instance CompReal IReal.IReal where
     bound r n = let IReal.I (l,u) = IReal.appr r (n+1); d = pow2 (n+1) in (l % d, u % d)
 
 instance Limit Rational IReal.IReal where
-    limit f = IReal.ir (\i -> let (a :% b) = f (i+1) in fromInteger (pow2 i * a `div` b))
+    limit f = IReal.ir (\i -> let (a :% b) = f (i-1) in fromInteger (pow2 i * a `div` b))
 
 instance Limit IReal.IReal IReal.IReal where
     limit f = IReal.ir (\i -> let IReal.I (l,u) = IReal.appr (f i) (i+1) in IReal.I (l `div` 2, u `div` 2))

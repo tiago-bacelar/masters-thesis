@@ -13,8 +13,8 @@ import Lang.Interpreter
 import Data.Ratio ((%))
 
 --the leibniz series for pi converges slowly, making it useful for benchmarking
-piLeibniz :: (Num r, Limit Rational r) => r
-piLeibniz = 4 * calabreseSum [1 % (2 * k + 1) :: Rational | k <- [0..]]
+piLeibniz :: (Limit Rational r) => r
+piLeibniz = calabreseSum [4 % (2 * k + 1) :: Rational | k <- [0..]]
 
 
 --given the actual value of a CompReal (as a Rational), tests the correction of all its approximations

@@ -82,6 +82,11 @@ setInsert x (h : t) | x < h = x : h : t
                     | x > h = h : setInsert x t
                     | otherwise = h : t
 
+indexOrLength :: [a] -> Int -> Either a Int
+indexOrLength xs i = foldr (\x r j -> case j of
+                                        0 -> Left x
+                                        _ -> r (j-1)) (Right . (i-)) xs i
+
 --TODO: make it strict?
 replaceIndex :: Int -> a -> [a] -> [a]
 replaceIndex i x xs = take i xs ++ x : drop (i+1) xs
