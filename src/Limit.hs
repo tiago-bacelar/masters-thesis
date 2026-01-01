@@ -7,6 +7,7 @@ module Limit (Limit(..), errorLimitAux, alternatingSeriesSum, calabreseSum) wher
 import Utils
 import qualified SnocList as SL
 
+import Data.List (singleton)
 import Data.Ratio ((%))
 
 class Limit a r where
@@ -43,11 +44,9 @@ class Limit a r where
 --The predicate can only return True if the condition is met. If it
 --returns False, the condition may be true or false
 errorLimitAux :: (Int -> a -> Bool) -> [(a, a)] -> [a]
-errorLimitAux p = aux 0
-        where aux _ [(x,_)] = [x]
-              aux i ((x,e):xs)  | p i e = x : aux (i+1) ((x,e):xs)
-                                | otherwise = aux i xs
-              aux _ [] = error "errorLimitAux: empty list"
+errorLimitAux p xs = SL.foldr aux (const . singleton . fst) (SL.fromList xs) 0
+        where aux (x,e) rec n   | p n e     = x : aux (x,e) rec (n+1)
+                                | otherwise = rec n
 
 --To find limits of floating point sequences we just take the first elemnt of the sequence
 --whose error is not significant (as in, doesn't change when the two are added together)

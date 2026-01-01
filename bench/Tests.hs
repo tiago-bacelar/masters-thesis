@@ -33,14 +33,18 @@ normalize l = aux (1%2)
 --this serves as a test for the CompReal instance
 --if any of its methods are poorly implemented, 'correctionPi pi'
 --or 'correctionPi piLeibniz' may return false
+--of course, since pi isn't rational, correctionPi may also return false if
+--the CompReal generates a bound too tight, even if the bound is correct
 correctionPi :: (CompReal r) => r -> [Bool]
 correctionPi = take 300 . correction ratPi
-    where ratPi = 31415926535897932384626433832795028841971693993751058209749445923078164062862089986280348253421170679 % 10^(100 :: Integer)
+    where ratPi = 3141592653589793238462643383279502884197169399375105820974944592307816406286208998628034825342117067982148 % 10^(105 :: Integer)
 
 --if any of CompReals methods are poorly implemented, 'correctionSqrt2 (2 ** 0.5)' may return false
+--of course, since sqrt 2 isn't rational, correctionSqrt2 may also return false if
+--the CompReal generates a bound too tight, even if the bound is correct
 correctionSqrt2 :: (CompReal r) => r -> [Bool]
 correctionSqrt2 = take 300 . correction ratSqrt2
-    where ratSqrt2 = 14142135623730950488016887242096980785696718753769480731766797379907324784621070388503875343276415727 % 10^(100 :: Integer)
+    where ratSqrt2 = 1414213562373095048801688724209698078569671875376948073176679737990732478462107038850387534327641572735013 % 10^(105 :: Integer)
 
 
 gaussSum :: (Num r) => r
@@ -68,9 +72,14 @@ geometricSeriesCR = _listLimit $ map fromRational $ normalize (1%2) $ scanl1 (+)
     where _listLimit = Limit.listLimit :: [r] -> r
 
 
--- [y, v] (nVars=2)
+{-
+Runs the following Jaguar program and evaluates it at t=10:
+
+y := 0; v := 1;
+while true do { y'=v,v'=-1 for 2 * v; v := -0.8 * v }
+-}
 ballBounce :: (SimNum r) => Rational -> r
-ballBounce t = runQuery (query (interpret prog) 2 (Just 16) (Just 100) (fromRational t)) (Just 16) !! 0 !! 0
+ballBounce t = (!! 0) $ (!! 0) $ (`runQueryJust` 16) $ query (interpret prog) 2 (Just 16) (Just 100) (fromRational t)
     where prog = Seq (Assign 0 (Num 0)) $ Seq (Assign 1 (Num 1)) $ loop
           loop = WhileDo (Term $ BConst True) (Seq arc bounce)
           arc = getFor [(0, Var $ V 1), (1, Num $ -1)] (Just $ Op Mult (Num 2) (Var $ V 1))

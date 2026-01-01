@@ -80,23 +80,20 @@ instance Floating AnyCReal where
     acosh = mapCReal acosh
     atanh = mapCReal atanh
 
+roundD :: Integer -> Integer -> Integer
+roundD n d = case divMod n d of
+              (q, r) -> case compare (unsafeShiftL r 1) d of
+                LT -> q
+                EQ -> if testBit q 0 then q + 1 else q
+                GT -> q + 1
+
 --So, because exact-real has a dumb implementation of limits, we have to do it ourselves
 --really tho. it uses equality to test if the value of the limit was reached. like, bruhh
 instance Limit Rational AnyCReal where
     limit f = AnyCReal $ ExactReal.crMemoize (\i -> let (a :% b) = f i in roundD (shiftL a i) b)
-        where roundD n d = case divMod n d of
-                              (q, r) -> case compare (unsafeShiftL r 1) d of
-                                LT -> q
-                                EQ -> if testBit q 0 then q + 1 else q
-                                GT -> q + 1
 
 instance Limit AnyCReal AnyCReal where
     limit f = AnyCReal $ ExactReal.crMemoize (\i -> let x = f i in roundD (atPrecision x (i+1)) 2)
-        where roundD n d = case divMod n d of
-                              (q, r) -> case compare (unsafeShiftL r 1) d of
-                                LT -> q
-                                EQ -> if testBit q 0 then q + 1 else q
-                                GT -> q + 1
     errorLimit = errorLimitDef
 
 instance CompOrd AnyCReal where

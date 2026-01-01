@@ -15,6 +15,8 @@ module Lang.Hybrid (
     dropH,
     joinH,
     Query(..),
+    runQueryJust,
+    runQueryInf,
     CompHybrid(..),
     smapCH,
     fsmapCH,
@@ -55,7 +57,7 @@ forever :: (t -> s) -> Hybrid t s a
 forever f = Hybrid f Nothing
 
 instant :: (Num t) => a -> Hybrid t s a
-instant x = Hybrid (const undefined) (Just (0, x)) --TODO: is this undefined ok? i feel like it isnt
+instant x = Hybrid (const undefined) (Just (0, x))
 
 
 duration :: Hybrid t s a -> Maybe t
@@ -94,6 +96,12 @@ instance (Num t, Ord t) => Monad (Hybrid t s) where
 
 
 newtype Query s = Query { runQuery :: Maybe Int -> [s] } deriving (Functor)
+
+runQueryJust :: Query s -> Int -> [s]
+runQueryJust q = runQuery q . Just
+
+runQueryInf :: Query s -> [s]
+runQueryInf q = runQuery q Nothing
 
 instance Applicative Query where
     pure  = Query . const . singleton

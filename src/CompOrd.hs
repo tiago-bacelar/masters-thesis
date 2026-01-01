@@ -3,7 +3,9 @@
 module CompOrd (
     OrderingDomain(..),
     MidOrdering(..),
+    isTop,
     asTop,
+    isBottom,
     extendedBy,
     consistent,
     mCompare,
@@ -30,9 +32,17 @@ import Data.Maybe (catMaybes)
 data MidOrdering = LEQ | NEQ | GEQ deriving (Eq)
 data OrderingDomain = Bottom | Middle MidOrdering | Top Ordering deriving (Eq)
 
+isTop :: OrderingDomain -> Bool
+isTop (Top _) = True
+isTop _       = False
+
 asTop :: OrderingDomain -> Maybe Ordering
 asTop (Top o) = Just o
-asTop _ = Nothing
+asTop _       = Nothing
+
+isBottom :: OrderingDomain -> Bool
+isBottom Bottom = True
+isBottom _      = False
 
 --complete partial order (cpo)
 extendedBy :: OrderingDomain -> OrderingDomain -> Bool

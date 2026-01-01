@@ -48,8 +48,8 @@ test = do
             Failed err -> error ("Parse error: " ++ show err) --parse error
             Ok (vars, code) -> return (vars, interpret code)
 
-play :: IO (TestType -> [TestType])
-play = fmap (\(vars,prog) -> head . (`runQuery` Just 20) . query prog (length vars) (Just 20) (Just 300)) test
+play :: IO (TestType -> Int -> [[TestType]])
+play = fmap (\(vars,prog) -> runQueryJust . query prog (length vars) (Just 20) (Just 300)) test
 
 
 data Mode = Plot | Query | InteractivePlot deriving (Show, Eq)

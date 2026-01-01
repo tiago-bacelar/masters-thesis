@@ -46,6 +46,11 @@ errorLimitDef = listLimit . Limit.errorLimitAux p
     where p n = (<= (1 % pow2 (n+1))) . snd . flip bound (n+1)
 
 
---TODO: slowly increase accuracy if needed?
+--A default implementation of domCompare for CompReals
+--Both definitions below are correct. The second definition is more efficient when the
+--values being compared are far apart, since a top ordering may be achieved using low accuracy
+--However, that logic can be more efficiently implemented by each type. As a default, this function
+--doesn't perform such optimizations (but you should definitely do so in your implementation)
 domCompareDef :: (CompReal r) => r -> r -> Int -> OrderingDomain
-domCompareDef x y p = domCompareAux (bound x p) (bound y p)
+domCompareDef x y n = domCompareAux (bound x n) (bound y n)
+--domCompareDef x y n = SL.findOrLast isTop $ (\i -> domCompareAux (bound x i) (bound y i)) <$> SL.fromList [0..n]
