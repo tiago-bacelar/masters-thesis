@@ -43,6 +43,13 @@ mapCReal f x = AnyCReal $ f $ anyCReal x
 mapCReal2 :: (forall n. KnownNat n => ExactReal.CReal n -> ExactReal.CReal n -> ExactReal.CReal n) -> AnyCReal -> AnyCReal -> AnyCReal
 mapCReal2 f x y = AnyCReal $ f (anyCReal x) (anyCReal y)
 
+{-
+Same thing as ERA. If instead of the current definition we were to write:
+approx x n = getCReal toRational x n
+
+then some approximations (my tests revealed sqrt 2, but there are probably others) would be wrong
+It also wouldn't be possible to sensibly implement rational limits
+-}
 instance CompReal AnyCReal where
     approx x n = getCReal toRational x (n+1)
 

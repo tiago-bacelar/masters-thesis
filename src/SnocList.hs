@@ -16,19 +16,23 @@ infinite that operation will never halt
 -}
 
 module SnocList (
-    SnocList,
+    SnocList(..),
     singleton,
     fromList,
     toList,
     foldr,
     unfoldr,
     head,
+    tailOrLast,
     last,
     drop,
     dropOrLast,
+    takeUntil,
     zip,
+    zipOrLast,
     zip3,
     zipWith,
+    zipOrLastWith,
     zipWith3,
     iterate,
     indexOrLast,
@@ -76,6 +80,10 @@ head :: SnocList a -> a
 head (SnocList (x:_) _) = x
 head (SnocList [] y)    = y
 
+tailOrLast :: SnocList a -> SnocList a
+tailOrLast (SnocList (_:xs) y) = SnocList xs y
+tailOrLast sl = sl
+
 last :: SnocList a -> a
 last (SnocList _ y) = y
 
@@ -85,6 +93,12 @@ drop i = P.drop i . toList
 dropOrLast :: Int -> SnocList a -> SnocList a
 dropOrLast i = lFunc (P.drop i)
 
+--creates a SnocList whose last element is the first on the list to satisfy the given property
+takeUntil :: (a -> Bool) -> [a] -> SnocList a
+takeUntil f = P.foldr aux (error "takeUntil: no element in list satisfies property")
+    where aux x rec | f x       = SnocList [] x
+                    | otherwise = lFunc (x:) rec
+
 zip :: SnocList a -> SnocList b -> SnocList (a,b)
 zip = zipWith (,)
 
@@ -92,6 +106,15 @@ zipWith :: (a -> b -> c) -> SnocList a -> SnocList b -> SnocList c
 zipWith f = aux
     where aux (SnocList (w:ws) x) (SnocList (y:ys) z) = lFunc (f w y :) $ aux (SnocList ws x) (SnocList ys z)
           aux sl1 sl2 = singleton $ f (head sl1) (head sl2)
+
+zipOrLast :: SnocList a -> SnocList b -> SnocList (a,b)
+zipOrLast = zipOrLastWith (,)
+
+zipOrLastWith :: (a -> b -> c) -> SnocList a -> SnocList b -> SnocList c
+zipOrLastWith f = aux
+    where aux (SnocList (w:ws) x) (SnocList (y:ys) z) = lFunc (f w y :) $ aux (SnocList ws x) (SnocList ys z)
+          aux (SnocList [] x) (SnocList [] z) = singleton (f x z)
+          aux sl1 sl2 = lFunc (f (head sl1) (head sl2) :) $ aux (tailOrLast sl1) (tailOrLast sl2)
 
 zip3 :: SnocList a -> SnocList b -> SnocList c -> SnocList (a,b,c)
 zip3 = zipWith3 (,,)

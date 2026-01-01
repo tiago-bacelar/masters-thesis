@@ -15,7 +15,7 @@ import Powers
 import Limit
 
 import qualified AERN2.Real as AERN2
-import qualified AERN2.MP as AERN2 (endpoints, (+-), mpBallP)
+import qualified AERN2.MP as AERN2 (endpoints, (+-), mpBallP, getAccuracy)
 import qualified AERN2.MP.Float as AERN2 (MPFloat)
 
 import qualified MixedTypesNumPrelude as MTNP
@@ -28,7 +28,8 @@ import qualified MixedTypesNumPrelude as MTNP
 --later terms, but either way there is never any risk of giving a wrong value, so I guess it's fine? yay?
 --this library is so bloated
 instance CompReal AERN2.CReal where
-    bound x n = toRational >< toRational $ AERN2.endpoints $ MTNP.unCN $ x AERN2.? AERN2.bits n
+    --AERN2's accuracy is 2 less than CompReal's, so we need to add 2
+    bound x n = toRational >< toRational $ AERN2.endpoints $ MTNP.unCN $ x AERN2.? AERN2.bits (n+2)
 
 instance Limit Rational AERN2.CReal where
     {-
@@ -71,8 +72,11 @@ instance Limit AERN2.CReal AERN2.CReal where
 asIntervals :: AERN2.CReal -> [(AERN2.MPFloat,AERN2.MPFloat)]
 asIntervals = map (AERN2.endpoints . MTNP.unCN) . AERN2.unCSequence
 
+asIntervalsUntil :: Int -> AERN2.CReal -> SL.SnocList (AERN2.MPFloat,AERN2.MPFloat)
+asIntervalsUntil n = fmap (AERN2.endpoints . MTNP.unCN) . SL.takeUntil ((>= AERN2.bits (n+2)) . AERN2.getAccuracy) . AERN2.unCSequence
+
 instance CompOrd AERN2.CReal where
-    domCompare = domCompareDef
+    domCompare x y n = SL.findOrLast isTop $ SL.zipOrLastWith domCompareAux (asIntervalsUntil n x) (asIntervalsUntil n y)
     infCompare x y = infCompareAux $ zipWith domCompareAux (asIntervals x) (asIntervals y)
     compMin = MTNP.min
     compMax = MTNP.max

@@ -22,7 +22,7 @@ class Boundable r where
     bounds :: r -> (Integer, Integer)
 
     default bounds :: (CompReal r) => r -> (Integer, Integer)
-    bounds = (floor >< ceiling) . flip bound 0 --TODO: change?
+    bounds = (floor >< ceiling) . flip bound 0
 
 
 instance Boundable Double where

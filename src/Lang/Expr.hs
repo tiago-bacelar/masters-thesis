@@ -75,13 +75,16 @@ evalExpr (Func f a) s   = evalFunc f (evalExpr a s)
 evalExpr (Op op a b) s  = evalOp op (evalExpr a s) (evalExpr b s)
 evalExpr (NatPow a n) s = pow (evalExpr a s) n
 
+evalCompAux :: Comparator -> OrderingDomain -> Maybe Bool
+evalComp LT  = mCompare (Top P.LT)
+evalComp GT  = mCompare (Top P.GT)
+evalComp LEQ = mCompare (Middle CompOrd.LEQ)
+evalComp GEQ = mCompare (Middle CompOrd.GEQ)
+evalComp LLT = Just . extendedBy (Top LT)
+evalComp LGT = Just . extendedBy (Top GT)
+
 evalComp :: (CompOrd r) => Comparator -> r -> r -> Int -> Maybe Bool
-evalComp LT  x y = mCompare (Top P.LT) . domCompare x y
-evalComp GT  x y = mCompare (Top P.GT) . domCompare x y
-evalComp LEQ x y = mCompare (Middle CompOrd.LEQ) . domCompare x y
-evalComp GEQ x y = mCompare (Middle CompOrd.GEQ) . domCompare x y
-evalComp LLT x y = Just . (x <! y)
-evalComp LGT x y = Just . (x >! y)
+evalComp c x y = evalCompAux . domCompare x y
 
 evalCompInf :: (CompOrd r) => Comparator -> r -> r -> Bool
 evalCompInf LT  = lesserInf

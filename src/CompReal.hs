@@ -3,6 +3,7 @@
 module CompReal (module CompReal) where
 
 import Utils
+import qualified SnocList as SL
 import CompOrd
 import Limit (Limit)
 import qualified Limit
@@ -49,8 +50,8 @@ errorLimitDef = listLimit . Limit.errorLimitAux p
 --A default implementation of domCompare for CompReals
 --Both definitions below are correct. The second definition is more efficient when the
 --values being compared are far apart, since a top ordering may be achieved using low accuracy
---However, that logic can be more efficiently implemented by each type. As a default, this function
---doesn't perform such optimizations (but you should definitely do so in your implementation)
+--However, that logic can be more efficiently implemented by each type, so if possible do so
 domCompareDef :: (CompReal r) => r -> r -> Int -> OrderingDomain
-domCompareDef x y n = domCompareAux (bound x n) (bound y n)
---domCompareDef x y n = SL.findOrLast isTop $ (\i -> domCompareAux (bound x i) (bound y i)) <$> SL.fromList [0..n]
+--domCompareDef x y n = domCompareAux (bound x n) (bound y n)
+domCompareDef x y n = SL.findOrLast isTop $ (\i -> domCompareAux (bound x i) (bound y i)) <$> is
+    where is = SL.SnocList (takeWhile (<n) $ 0 : iterate (*2) 1) n

@@ -31,14 +31,11 @@ approx x n = unCR x n % pow2 n
 However... when testing, I noticed that unCR pi 9 equals 1609, even though 1608/512 is
 closer to the actual value of pi. So either the implementation of pi in the package is wrong,
 or my assumptions about the error bound of CReal are wrong... Either way, writing approx
-like I did seems to fix the problem, even though it makes every operation require a precision of
-one greater than what should be theoretically necessary
+as below seems to fix the problem
 -}
 instance CompReal ERA.CReal where
     approx x n = unCR x (n+1) % pow2 (n+1)
 
---This instance of Limit is consistent with the implementation of approx, so that
---approx'ing a limit doesn't consume an extra term of the list
 instance Limit Rational ERA.CReal where
     limit f = ERA.CR (\i -> ERA.round_uk (f i * toRational (pow2 i)))
 

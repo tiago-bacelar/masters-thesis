@@ -2,6 +2,7 @@
 
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 
@@ -52,8 +53,9 @@ play :: IO (TestType -> Int -> [[TestType]])
 play = fmap (\(vars,prog) -> runQueryJust . query prog (length vars) (Just 20) (Just 300)) test
 
 
+type AppNum r = (SimNum r, Plottable r r, Show r)
 data Mode = Plot | Query | InteractivePlot deriving (Show, Eq)
-data SomeProxy where SomeProxy :: forall r. (Plottable r r, SimNum r, Show r) => Proxy r -> SomeProxy
+data SomeProxy where SomeProxy :: forall r. AppNum r => Proxy r -> SomeProxy
 data Options = Options  { optFile       :: Maybe String
                         , optNumType    :: SomeProxy
                         , optCompPrec   :: Maybe Int

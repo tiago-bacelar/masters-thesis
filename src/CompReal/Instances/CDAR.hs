@@ -19,15 +19,19 @@ import Data.List (find)
 import Data.Maybe (fromMaybe)
 import Control.Applicative (ZipList(..))
 
+good :: Int -> CDAR.Approx -> Bool
+good _ CDAR.Bottom         = False
+good _ (CDAR.Approx _ 0 _) = True
+good n (CDAR.Approx _ e s) = - s - (lg2 e) > n
+
+goodApprox :: CDAR.CR -> Int -> CDAR.Approx
+goodApprox x n = fromMaybe (error "bound: expected infinite list in CDAR.CR")
+                    $ find (good n) $ getZipList $ CDAR.unCR x
+
 --We can't use CDAR.require because it's wrong (returns approximations with 2 more precision
 --than required), but this function does essentially the same
 instance CompReal CDAR.CR where
-    bound x n = split (toRational . CDAR.lowerBound) (toRational . CDAR.upperBound) goodApprox
-        where goodApprox = fromMaybe (error "bound: expected infinite list in CDAR.CR")
-                            $ find good $ getZipList $ CDAR.unCR x
-              good (CDAR.Approx _ 0 _) = True
-              good (CDAR.Approx _ e s) = - s - (lg2 e) > n
-              good CDAR.Bottom         = False
+    bound = split (toRational . CDAR.lowerBound) (toRational . CDAR.upperBound) .-. goodApprox
 
 instance Limit Rational CDAR.CR where
     listLimit xs = CDAR.CR $ ZipList [CDAR.Approx (round $ x * toRational (pow2 i)) 1 (-i) | (i,x) <- zip [0..] (SL.repeatLast $ SL.fromList xs)]
@@ -58,7 +62,8 @@ maxA :: CDAR.Approx -> CDAR.Approx -> CDAR.Approx
 maxA a b = CDAR.endToApprox (CDAR.lowerBound a `max` CDAR.lowerBound b) (CDAR.upperBound a `max` CDAR.upperBound b)
 
 instance CompOrd CDAR.CR where
-    domCompare = domCompareDef
+    domCompare x y n = SL.findOrLast isTop $ SL.zipOrLastWith domCompareA (aux x) (aux y)
+        where aux = SL.takeUntil (good n) . getZipList . CDAR.unCR
     infCompare (CDAR.CR x) (CDAR.CR y) = infCompareAux $ getZipList $ domCompareA <$> x <*> y
     compMin (CDAR.CR x) (CDAR.CR y) = CDAR.CR $ minA <$> x <*> y
     compMax (CDAR.CR x) (CDAR.CR y) = CDAR.CR $ maxA <$> x <*> y

@@ -71,16 +71,12 @@ class CompOrd a where
     domCompare :: a -> a -> Int -> OrderingDomain
     --the Maybe MidOrdering is lazier than the Ordering, and the two must be consistent
     infCompare :: a -> a -> (Maybe MidOrdering, Ordering)
-    (<!) :: a -> a -> Int -> Bool
-    (>!) :: a -> a -> Int -> Bool
     compMin :: a -> a -> a
     compMax :: a -> a -> a
 
     default domCompare :: (Ord a) => a -> a -> Int -> OrderingDomain
     domCompare x y _ = Top (compare x y)
     infCompare x y = infCompareAux $ domCompare x y <$> [0..]
-    x <! y = extendedBy (Top LT) . domCompare x y
-    x >! y = extendedBy (Top GT) . domCompare x y
     
     compMin x y = case infCompare x y of
                     (Just LEQ, _)   -> x
@@ -113,6 +109,12 @@ infCompareAux [] = error "infCompareAux: expected infinite list"
 instance CompOrd Double
 instance CompOrd Integer
 
+
+(<!) :: a -> a -> Int -> Bool
+x <! y = extendedBy (Top LT) . domCompare x y
+
+(>!) :: a -> a -> Int -> Bool
+x >! y = extendedBy (Top GT) . domCompare x y
 
 lesserInf :: (CompOrd a) => a -> a -> Bool
 lesserInf x y = case infCompare x y of
