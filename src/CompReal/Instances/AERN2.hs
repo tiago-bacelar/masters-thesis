@@ -20,26 +20,27 @@ import qualified AERN2.MP.Float as AERN2 (MPFloat)
 
 import qualified MixedTypesNumPrelude as MTNP
 
---This is a bit scuffed, because when working with accuracy AERN2.(?) performs an optimization of
---skipping some elements of the list before starting a one by one search. And that skipping assumes that
---the values in the list follow cseqPrecisions, which is a standart list of precisions (it starts at 10
---and then grows exponentially). I *think* the way I implemented the limits doesn't break anything. But who
---knows? Worse case scenario, the library just skips perfectly fine terms and takes a long time to compute
---later terms, but either way there is never any risk of giving a wrong value, so I guess it's fine? yay?
---this library is so bloated
+-- This is a bit scuffed, because when working with accuracy AERN2.(?) performs an optimization
+-- of skipping some elements of the list before starting a one by one search. And that skipping
+-- assumes that the values in the list follow cseqPrecisions, which is a standart list of
+-- precisions (it starts at 10 and then grows exponentially). Therefore, depending on how limits
+-- are impemented, extracting approximations may force many more terms of the limited list than
+-- necessary, tanking performance when the list is slow to compute
 instance CompReal AERN2.CReal where
-    --AERN2's accuracy is 2 less than CompReal's, so we need to add 2
-    bound x n = toRational >< toRational $ AERN2.endpoints $ MTNP.unCN $ x AERN2.? AERN2.bits (n+2)
+    bound x n = toRational >< toRational $ AERN2.endpoints $ MTNP.unCN $ x AERN2.? AERN2.bits (n+1)
 
 instance Limit Rational AERN2.CReal where
+    -- This implementation was copied from AERN2.limit and adapted for lists and rationals
+    listLimit xs = AERN2.CSequence $ map aux xs'
+        where xs' = getIndexes (map (fromInteger . MTNP.integer) AERN2.cseqPrecisions) $ zip [1..] $ SL.repeatLast $ SL.fromList xs
+              aux (p,x) = (MTNP.cn $ AERN2.mpBallP (max 2 p) x) AERN2.+- ((0.5 :: AERN2.MPFloat) ^ (MTNP.integer p))
+
     {-
-    This implementation was copied from AERN2.limit and adapted for rationals
-    Instead of using cseqPrecisions (which slows everything down when the input list is
-    slow to compute), the precisions and indexes are taken from [0..]
-    We also use lists instead of a function, which is faster when all terms of the list are used
+    Instead of using cseqPrecisions (which slows everything down when the input list is slow
+    to compute), we could also use all elements of xs
     -}
-    listLimit xs = AERN2.CSequence $ map aux $ zip [0..] (SL.repeatLast $ SL.fromList xs)
-        where aux (p,x) = (MTNP.cn $ AERN2.mpBallP p x) AERN2.+- ((0.5 :: AERN2.MPFloat) ^ (MTNP.integer p))
+    -- listLimit xs = AERN2.CSequence $ map aux $ zip [1..] (SL.repeatLast $ SL.fromList xs)
+    --     where aux (p,x) = (MTNP.cn $ AERN2.mpBallP (max 2 p) x) AERN2.+- ((0.5 :: AERN2.MPFloat) ^ (MTNP.integer p))
 
     {-
     Alternatively, we could use an index of the list different from the precision of the dyad
@@ -62,8 +63,8 @@ instance Limit Rational AERN2.CReal where
 instance Limit AERN2.CReal AERN2.CReal where
     limit f = AERN2.limit (f . (max 0) . pred)
 
-    listLimit xs = AERN2.CSequence $ SL.foldr aux1 aux2 $ SL.zip (SL.fromList AERN2.cseqPrecisions) elems
-        where elems = SL.getIndexesOrLast (map (fromInteger . MTNP.integer) AERN2.cseqPrecisions) (SL.fromList xs)
+    listLimit xs = AERN2.CSequence $ SL.foldr aux1 aux2 xs'
+        where xs' = SL.getIndexesOrLast (map (fromInteger . MTNP.integer) AERN2.cseqPrecisions) $ SL.fromList $ zip [1..] xs
               aux1 (p, x) = ((x AERN2.? p) AERN2.+- ((0.5 :: AERN2.MPFloat) ^ (MTNP.integer p)) :)
               aux2 (p, x) = MTNP.drop (AERN2.cseqIndexForPrecision p) (AERN2.unCSequence x)
 

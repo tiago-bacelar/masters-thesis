@@ -17,6 +17,7 @@ import qualified Data.Number.IReal.IReal as IReal (ir, appr)
 import qualified Data.Number.IReal.IntegerInterval as IReal (IntegerInterval(..))
 
 import GHC.Real (Ratio(..), (%))
+import Data.Bits
 
 --ireal is a bit unique, because it explicitely uses IReals to represent open real intervals
 --as well as real numbers. This means an IReal value, which is a function Int->(Integer,Integer),
@@ -27,10 +28,10 @@ instance CompReal IReal.IReal where
     bound r n = let IReal.I (l,u) = IReal.appr r (n+1); d = pow2 (n+1) in (l % d, u % d)
 
 instance Limit Rational IReal.IReal where
-    limit f = IReal.ir (\i -> let (a :% b) = f (i-1) in fromInteger (pow2 i * a `div` b))
+    limit f = IReal.ir (\i -> let (a :% b) = f i in fromInteger ((shiftL a i + b `div` 2) `div` b))
 
 instance Limit IReal.IReal IReal.IReal where
-    limit f = IReal.ir (\i -> let IReal.I (l,u) = IReal.appr (f i) (i+1) in IReal.I (l `div` 2, u `div` 2))
+    limit f = IReal.ir (\i -> let IReal.I (l,u) = IReal.appr (f i) (i+1) in IReal.I (l `div` 2, u `div` 2 + 1))
     errorLimit = errorLimitDef
 
 instance CompOrd IReal.IReal where

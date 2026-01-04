@@ -104,6 +104,8 @@ test-suite jaguar-test
   type: exitcode-stdio-1.0
   main-is: Spec.hs
   other-modules:
+      Assert
+      Generators
       Paths_jaguar
   autogen-modules:
       Paths_jaguar
@@ -117,6 +119,7 @@ test-suite jaguar-test
     , aern2-real
     , array
     , base >=4.7 && <5
+    , call-stack
     , cdar
     , containers
     , exact-real
@@ -125,6 +128,10 @@ test-suite jaguar-test
     , jaguar
     , mixed-types-num
     , mtl
+    , smallcheck
+    , tasty
+    , tasty-hunit
+    , tasty-smallcheck
   default-language: Haskell2010
 
 benchmark jaguar-bench

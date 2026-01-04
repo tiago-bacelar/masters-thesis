@@ -6,6 +6,7 @@ module CompOrd (
     isTop,
     asTop,
     isBottom,
+    invert,
     extendedBy,
     consistent,
     mCompare,
@@ -14,6 +15,8 @@ module CompOrd (
     infCompareAux,
     compMinDef,
     compMaxDef,
+    (<!),
+    (>!),
     lesserInf,
     greaterInf,
     equalInf,
@@ -43,6 +46,13 @@ asTop _       = Nothing
 isBottom :: OrderingDomain -> Bool
 isBottom Bottom = True
 isBottom _      = False
+
+invert :: OrderingDomain -> OrderingDomain
+invert (Top LT)     = Top GT
+invert (Top GT)     = Top LT
+invert (Middle LEQ) = Middle GEQ
+invert (Middle GEQ) = Middle LEQ
+invert d            = d
 
 --complete partial order (cpo)
 extendedBy :: OrderingDomain -> OrderingDomain -> Bool
@@ -110,10 +120,10 @@ instance CompOrd Double
 instance CompOrd Integer
 
 
-(<!) :: a -> a -> Int -> Bool
+(<!) :: (CompOrd a) => a -> a -> Int -> Bool
 x <! y = extendedBy (Top LT) . domCompare x y
 
-(>!) :: a -> a -> Int -> Bool
+(>!) :: (CompOrd a) => a -> a -> Int -> Bool
 x >! y = extendedBy (Top GT) . domCompare x y
 
 lesserInf :: (CompOrd a) => a -> a -> Bool

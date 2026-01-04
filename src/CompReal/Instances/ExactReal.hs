@@ -100,7 +100,7 @@ instance Limit Rational AnyCReal where
     limit f = AnyCReal $ ExactReal.crMemoize (\i -> let (a :% b) = f i in roundD (shiftL a i) b)
 
 instance Limit AnyCReal AnyCReal where
-    limit f = AnyCReal $ ExactReal.crMemoize (\i -> let x = f i in roundD (atPrecision x (i+1)) 2)
+    limit f = AnyCReal $ ExactReal.crMemoize (\i -> let x = f i in (atPrecision x (i+1) + 1) `div` 2)
     errorLimit = errorLimitDef
 
 instance CompOrd AnyCReal where

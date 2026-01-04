@@ -46,6 +46,11 @@ fstOf4 (x,_,_,_) = x
 count :: (Eq a) => a -> [a] -> Int
 count x = length . filter (x ==)
 
+interleave :: [a] -> [a] -> [a]
+interleave (x:xs) (y:ys) = x : y : interleave xs ys
+interleave xs [] = xs
+interleave [] ys = ys
+
 uninterleave :: [a] -> ([a], [a])
 uninterleave (x:y:t) = let (xs,ys) = uninterleave t in (x:xs,y:ys)
 uninterleave xs = (xs,[])
@@ -110,6 +115,11 @@ maybeIndexes xs = rec 0 xs
           rec n ((i, x) : t) | n == i    = Just x  : rec (n + 1) t
                              | otherwise = Nothing : rec (n + 1) ((i, x) : t)
 
+
+leftDiagonals :: [[a]] -> [[a]]
+leftDiagonals []           = []
+leftDiagonals ([]:xss)     = leftDiagonals xss
+leftDiagonals ((x:xs):xss) = [x] : zipWith (:) xs (leftDiagonals xss)
 
 
 

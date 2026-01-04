@@ -74,6 +74,11 @@ tests:
     - -with-rtsopts=-N
     dependencies:
     - jaguar
+    - tasty
+    - tasty-hunit
+    - smallcheck
+    - tasty-smallcheck
+    - call-stack
 
 benchmarks:
   jaguar-bench:

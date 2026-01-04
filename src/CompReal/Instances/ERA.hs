@@ -16,7 +16,7 @@ import Limit
 --that version doesn't export CR, making it kinda useless
 import qualified CompReal.Instances.ERA.CReal as ERA
 
-import Data.Ratio
+import GHC.Real (Ratio(..), (%))
 import Data.Bits
 
 unCR :: ERA.CReal -> Int -> Integer
@@ -37,7 +37,7 @@ instance CompReal ERA.CReal where
     approx x n = unCR x (n+1) % pow2 (n+1)
 
 instance Limit Rational ERA.CReal where
-    limit f = ERA.CR (\i -> ERA.round_uk (f i * toRational (pow2 i)))
+    limit f = ERA.CR (\i -> let (a :% b) = f i in ERA.round_uk (shiftL a i % b))
 
 instance Limit ERA.CReal ERA.CReal where
     limit f = ERA.CR (\i -> ERA.round_uk (unCR (f i) (i+1) % 2))
