@@ -33,19 +33,30 @@ goodApprox x n = fromMaybe (error "bound: expected infinite list in CDAR.CR")
 instance CompReal CDAR.CR where
     bound = split (toRational . CDAR.lowerBound) (toRational . CDAR.upperBound) .-. goodApprox
 
-instance Limit Rational CDAR.CR where
-    listLimit xs = CDAR.CR $ ZipList [CDAR.Approx (round $ x * toRational (pow2 i)) 1 (-i) | (i,x) <- zip [0..] (SL.repeatLast $ SL.fromList xs)]
 
-
-resources :: SL.SnocList Int
-resources = SL.iterate bumpLimit 80
+--CDAR doesn't export this, so we have to redefine it
+resources :: [Int]
+resources = iterate bumpLimit 80
     where bumpLimit n = n * 3 `div` 2
+
+instance Limit Rational CDAR.CR where
+    --This implementation was copied from CDAR.limCR and adapted for Rationals and lists
+    listLimit xs = CDAR.CR $ ZipList $ map aux $ zip resources $ SL.repeatLast elems
+        where elems     = SL.getIndexesOrLast resources (SL.fromList xs)
+              aux (p,x) = CDAR.Approx (round $ x * toRational (pow2 p)) 1 (-p)
+
+    {-
+    This one is the same but uses all elements of xs instead of skipping according
+    to resources. It is much more efficient when xs is slow to compute, but otherwise
+    messes with CDAR's expectations of precision in its internal representation of CR.
+    -}
+    --listLimit xs = CDAR.CR $ ZipList [CDAR.Approx (round $ x * toRational (pow2 p)) 1 (-p) | (p,x) <- zip [0..] (SL.repeatLast $ SL.fromList xs)]
 
 instance Limit CDAR.CR CDAR.CR where
     limit f = CDAR.limCR (f . (max 0) . pred) --internally uses resources too
     
-    listLimit xs = CDAR.CR $ ZipList $ SL.foldr aux1 aux2 $ SL.zip3 (SL.iterate succ 0) resources elems
-        where elems = SL.getIndexesOrLast (SL.toList resources) (SL.fromList xs)
+    listLimit xs = CDAR.CR $ ZipList $ SL.foldr aux1 aux2 $ SL.zip3 (SL.iterate succ 0) (SL.fromList resources) elems
+        where elems = SL.getIndexesOrLast resources (SL.fromList xs)
               aux1 (i,p,x)  = ((getZipList $ CDAR.unCR $ CDAR.scale CDAR.unitError (-p) + x) !! i :)
               aux2 (i,_,x)  = drop i $ getZipList $ CDAR.unCR x
 
@@ -68,9 +79,9 @@ instance CompOrd CDAR.CR where
     compMin (CDAR.CR x) (CDAR.CR y) = CDAR.CR $ minA <$> x <*> y
     compMax (CDAR.CR x) (CDAR.CR y) = CDAR.CR $ maxA <$> x <*> y
 
-powA :: Int -> CDAR.Approx -> CDAR.Approx
-powA _ CDAR.Bottom = CDAR.Bottom
-powA n (CDAR.Approx m e s)
+powA :: CDAR.Approx -> Int -> CDAR.Approx
+powA CDAR.Bottom _ = CDAR.Bottom
+powA (CDAR.Approx m e s) n
     | even n && am <= e = CDAR.Approx ame ame (n*s-1)
     | even n && m < 0   = CDAR.Approx (a+b) (b-a) (n*s-1)
     | otherwise         = CDAR.Approx (a+b) (a-b) (n*s-1)
@@ -82,7 +93,7 @@ powA n (CDAR.Approx m e s)
 instance Powers CDAR.CR where
     pow _ 0 = 1
     pow x 1 = x
-    pow x n = CDAR.CR $ fmap (powA n) $ CDAR.unCR x
+    pow x n = CDAR.CR $ (\a l -> CDAR.ok (-100) $ CDAR.limitAndBound l (powA a n)) <$> CDAR.unCR x <*> ZipList resources
 
 instance Boundable CDAR.CR
 

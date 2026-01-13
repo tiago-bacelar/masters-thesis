@@ -64,7 +64,7 @@ geometricSeriesDyadRat = listCons geometricSeriesDyad
 
 --2
 geometricSeriesDyadCR :: (CompReal r) => r
-geometricSeriesDyadCR = listLimit $ (fromRational . (1+)) <$> geometricSeriesDyad
+geometricSeriesDyadCR = listLimit $ fromRational . (1+) <$> geometricSeriesDyad
 
 --0.5
 geometricSeriesRat :: (CompReal r) => r
@@ -72,7 +72,7 @@ geometricSeriesRat = listCons geometricSeries
 
 --1.5
 geometricSeriesCR :: (CompReal r) => r
-geometricSeriesCR = listLimit $ (fromRational . (1+)) <$> geometricSeries
+geometricSeriesCR = listLimit $ fromRational . (1+) <$> geometricSeries
 
 --2/7
 finiteListRat :: (CompReal r) => r

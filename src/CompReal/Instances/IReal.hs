@@ -41,6 +41,7 @@ instance CompOrd IReal.IReal where
 
 instance Powers IReal.IReal where
     pow = powDef IReal.appr IReal.ir IReal.scale
+    --pow = IReal.pow --exactly the same, as the code for powDef is taken from IReal.pow
 
 instance Boundable IReal.IReal
 

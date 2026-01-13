@@ -47,7 +47,7 @@ instance Limit Rational AERN2.CReal where
     approximation of the rational (a non diagonal limit). While faster in some cases (more
     specifically, when the list of rationals is slow to compute), on others (when the list is
     fast) it quickly gets bogged down by the excessive precision.
-    And of course, because AERN2 is great, if the precision ever goes above 5000000 we get an error
+    And of course, if the precision ever goes above 5000000 we get an error (read comment below)
     -}
     -- listLimit xs = AERN2.CSequence $ map aux $ zip3 [0..] AERN2.cseqPrecisions (SL.repeatLast $ SL.fromList xs)
     --     where aux :: (Integer, AERN2.Precision, Rational) -> MTNP.CN AERN2.MPBall
@@ -55,11 +55,9 @@ instance Limit Rational AERN2.CReal where
 
 
 --So apparently, AERN2 straight up has a max precision of 5000000 for limits buried in its code (AERN2.cseqPrecisions)
---It's easy to miss, it's buried among all the bloat
 --So, you know, don't put too much faith in this instance. At any time it can just.. run out of precision
 --It's always cool when your arbitrary precision library runs out of precision
 --And it's such an artificial limitation, too. It's literally a hardcoded constant, after which AERN2 simply refuses to compute
---Can you tell I'm angry? I've been digging in this bloated library for days now. Please send help
 instance Limit AERN2.CReal AERN2.CReal where
     limit f = AERN2.limit (f . (max 0) . pred)
 

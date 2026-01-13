@@ -18,6 +18,8 @@ import CompOrd
 import CompReal
 import Boundable
 import Powers
+import Solver.Poly
+import Solver.Solver
 import Generators
 import Assert
 
@@ -28,7 +30,7 @@ import qualified CompReal.Instances.ExactReal as ExactReal
 import qualified CompReal.Instances.IReal as IReal
 
 
-type TestNum r = (CompReal r, Powers r, Show r)
+type TestNum r = (CompReal r, Powers r, Boundable r, Show r)
 data SomeProxy where SomeProxy :: forall r. TestNum r => Proxy r -> SomeProxy
 
 {-
@@ -55,6 +57,7 @@ unitTests name someProxy = case someProxy of
         , rationalLimitTests proxy
         , limitTests proxy
         , compOrdTests proxy
+        , odeTests proxy
         ]
 
 compRealTests :: forall r. (TestNum r, HasCallStack) => Proxy r -> TestTree
@@ -80,6 +83,19 @@ compRealTests _ = testGroup "CompReal instance"
     , SC.testProperty "division" $
         \(Rat a) (NonZero (Rat b)) -> (fromRational a / fromRational b :: r) @?~ a / b
 
+    , SC.testProperty "recip" $
+        \(NonZero (Rat a)) -> (recip $ fromRational a :: r) @?~ recip a
+
+    --I was going to use this as a test for sin and cos, but CDAR's trig is so slow I can't lol
+    -- , SC.testProperty "pythagorean identity (sin^2 + cos^2 = 1)" $
+    --     \(CRS x) -> (sin x ^ 2 + cos x ^ 2 :: r) @?~ 1
+
+    {-
+        An error in any of the following 3 tests may not be a problem of the
+        CompReal. Since the approximations here only have an accuracy of 300,
+        should the CompReal generate a more accurate approximation the test
+        may report a failure. 
+    -}
     , SC.testProperty "pi" $
         (pi :: r) @?~ ratPi --only accurate up to n ~ 300
 
@@ -88,10 +104,6 @@ compRealTests _ = testGroup "CompReal instance"
 
     , SC.testProperty "sqrt 2" $
         (sqrt 2 :: r) @?~ ratSqrt2 --only accurate up to n ~ 300
-
-    --I was going to use this as a test for sin and cos, but CDAR is so slow I can't lol
-    -- , SC.testProperty "pythagorean identity (sin^2 + cos^2 = 1)" $
-    --     \(CRS x) -> (sin x ^ 2 + cos x ^ 2 :: r) @?~ 1
     ]
     where ratPi    = 3141592653589793238462643383279502884197169399375105820974944592307816406286208998628034825342117067982148 % 10^(105 :: Int)
           ratE     = 2718281828459045235360287471352662497757247093699959574966967627724076630353547594571382178525166427427466 % 10^(105 :: Int)
@@ -157,3 +169,23 @@ compOrdTests _ = testGroup "CompOrd instance"
     , SC.testProperty "max" $
         \(Rat a) (Rat b) -> compMax (fromRational a :: r) (fromRational b :: r) @?~ max a b
     ]
+
+--These tests aren't really testing the CompReal instance.
+--Rather, they are testing the ODE solver. If a CompReal instance 
+--passed all previous tests but failed here, the problem is likely
+--in the implementation of solvePoly, not on the instance.
+odeTests :: forall r. (TestNum r, HasCallStack) => Proxy r -> TestTree
+odeTests _ = testGroup "ODE solver"
+    [ SC.testProperty "linear ODE" $
+        \(Rat a) (Rat x) -> solvePoly [(0, constPoly $ fromRational a)] (fromRational x :: r) !! 0 @?~ a * x
+
+    , SC.testProperty "quadratic ODE (varying a)" $
+        \(Rat a) (Rat x) -> solvePoly [(0, varPoly 1), (0, constPoly $ fromRational a)] (fromRational x :: r) !! 0 @?~ a/2 * x*x
+
+    , SC.testProperty "quadratic ODE (varying b)" $
+        \(Rat b) (Rat x) -> solvePoly [(0, varPoly 1), (fromRational b, constPoly 2)] (fromRational x :: r) !! 0 @?~ x*x + b*x
+
+    , SC.testProperty "exponential ODE" $
+        solvePoly [(1, varPoly 0)] (1 :: r) !! 0 @?~ ratE
+    ]
+    where ratE = 2718281828459045235360287471352662497757247093699959574966967627724076630353547594571382178525166427427466 % 10^(105 :: Int)
