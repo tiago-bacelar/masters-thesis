@@ -32,8 +32,8 @@ import Data.List (uncons)
 import Data.Maybe (catMaybes)
 
 
-data MidOrdering = LEQ | NEQ | GEQ deriving (Eq)
-data OrderingDomain = Bottom | Middle MidOrdering | Top Ordering deriving (Eq)
+data MidOrdering = LEQ | NEQ | GEQ deriving (Show, Eq)
+data OrderingDomain = Bottom | Middle MidOrdering | Top Ordering deriving (Show, Eq)
 
 isTop :: OrderingDomain -> Bool
 isTop (Top _) = True

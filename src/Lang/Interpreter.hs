@@ -66,7 +66,7 @@ instance (Num t, CompOrd t) => Monad (E t s) where
 
 --duration of hybrid must be greater than 0
 fromHybrid :: Hybrid t s a -> E t s a
-fromHybrid h = E $ \eState -> (Hyb $ smap pure $ (Right . (,eState)) <$> h, id)
+fromHybrid h = E $ \eState -> (hybridCH $ (Right . (,eState)) <$> h, id)
 
 --if there was already an error, we keep it. if not, we add the new one
 failE :: Error s -> E t s a
@@ -132,7 +132,7 @@ evalVar s (V v) = variables s !! v
 
 
 
-evalFor :: (Floating r, Powers r, CompOrd r, Limit r r, Boundable r) => [Ident] -> [(Expr, Poly r)] -> PState r -> r -> PState r
+evalFor :: (SimNum r) => [Ident] -> [(Expr, Poly r)] -> PState r -> r -> PState r
 evalFor [] _ s = \dt -> s { time = time s + dt }
 evalFor is ps s = \dt -> s { time = time s + dt, variables = updateVars (variables s) (f dt) }
     where f = solvePoly $ map ((`evalExpr` (evalVar s)) >< id) ps

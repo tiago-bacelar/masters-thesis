@@ -42,7 +42,9 @@ library
       Lang.Parser
       Limit
       Powers
+      Shortcut
       SnocList
+      Solver.Coef
       Solver.FAD
       Solver.Poly
       Solver.Solver
@@ -138,6 +140,8 @@ benchmark jaguar-bench
   type: exitcode-stdio-1.0
   main-is: Benchmark.hs
   other-modules:
+      Group
+      PlotBench
       Tests
       Paths_jaguar
   autogen-modules:
@@ -148,17 +152,22 @@ benchmark jaguar-bench
   build-tools:
       happy
   build-depends:
-      aern2-mp
+      Chart
+    , Chart-cairo
+    , aern2-mp
     , aern2-real
     , array
     , base >=4.7 && <5
     , cdar
     , containers
     , criterion
+    , directory
     , exact-real
     , ghc
     , ireal
     , jaguar
     , mixed-types-num
     , mtl
+    , regex-tdfa
+    , time
   default-language: Haskell2010

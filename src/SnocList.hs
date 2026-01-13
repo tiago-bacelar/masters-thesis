@@ -28,6 +28,7 @@ module SnocList (
     drop,
     dropOrLast,
     takeUntil,
+    mapOrLast,
     zip,
     zipOrLast,
     zip3,
@@ -42,13 +43,12 @@ module SnocList (
     getIndexesOrLast) where
 
 import Utils
+import Shortcut
 
 import Prelude hiding (foldr, head, last, take, drop, zip, zipWith, zip3, zipWith3, iterate)
 import qualified Prelude as P
 import Data.List (unsnoc, find)
 import Data.Maybe (fromMaybe)
-import Control.Concurrent.MVar (newMVar, readMVar, modifyMVar_)
-import System.IO.Unsafe (unsafePerformIO)
 
 
 data SnocList a = SnocList [a] a deriving (P.Functor, P.Foldable, P.Traversable)
@@ -99,6 +99,9 @@ takeUntil f = P.foldr aux (error "takeUntil: no element in list satisfies proper
     where aux x rec | f x       = SnocList [] x
                     | otherwise = lFunc (x:) rec
 
+mapOrLast :: (a -> b) -> (a -> b) -> SnocList a -> SnocList b
+mapOrLast f g (SnocList xs y) = SnocList (map f xs) (g y)
+
 zip :: SnocList a -> SnocList b -> SnocList (a,b)
 zip = zipWith (,)
 
@@ -134,15 +137,10 @@ indexOrLast sl i = head $ dropOrLast i sl
 --doesn't work:     f = indexOrLastMemo (fromList [0..100000000]);                  f 200000000
 --but this works:   f = indexOrLastMemo (fromList [0..100000000] :: SnocList Int);  f 200000000
 indexOrLastMemo :: SnocList a -> Int -> a
-indexOrLastMemo (SnocList xs y) = unsafePerformIO $ do
-    var <- newMVar Nothing
-    return $ \i -> unsafePerformIO $ do
-        mLen <- readMVar var
-        case mLen of
-            Nothing -> case indexOrLength xs i of
-                        Left x      -> return x
-                        Right len   -> modifyMVar_ var (const $ return $  Just len) >> return y
-            Just len -> return (if i < len then xs !! i else y)
+indexOrLastMemo (SnocList xs y) = readShortFunc short
+    where short = makeShort beforeOpen afterOpen
+          beforeOpen open i = either id (\l -> open l `seq` y) $ indexOrLength xs i
+          afterOpen l i = if i < l then xs !! i else y
 
 
 --TODO: memoize more indexes and not just last?
@@ -180,9 +178,9 @@ repeatLast (SnocList xs y)  = xs ++ P.repeat y
 getIndexesOrLast :: [Int] -> SnocList a -> SnocList a
 getIndexesOrLast []       = singleton . last
 getIndexesOrLast (i:is)   = aux (i : difs)
-    where difs = map (uncurry (-)) $ P.zip is (i:is)
+    where difs = P.zipWith (-) is (i:is)
           aux [] (SnocList _ y) = singleton y
           aux _ (SnocList [] y) = singleton y
           aux (d:ds) sl = case dropOrLast d sl of
-                                (SnocList [] y)     -> singleton y
-                                (SnocList (x:_) _)  -> lFunc (x:) (aux ds sl)
+                                (SnocList [] y)         -> singleton y
+                                sl2@(SnocList (x:_) _)  -> lFunc (x:) (aux ds sl2)

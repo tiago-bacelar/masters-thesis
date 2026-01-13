@@ -91,3 +91,8 @@ benchmarks:
     dependencies:
     - jaguar
     - criterion
+    - regex-tdfa
+    - directory
+    - time
+    - Chart
+    - Chart-cairo

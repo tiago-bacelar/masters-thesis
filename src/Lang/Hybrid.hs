@@ -1,7 +1,9 @@
 {-# LANGUAGE DeriveFunctor #-}
 
 module Lang.Hybrid (
-    Hybrid(..),
+    Hybrid,
+    eval,
+    unroll,
     smap,
     fsmap,
     wait,
@@ -21,6 +23,7 @@ module Lang.Hybrid (
     smapCH,
     fsmapCH,
     instantCH,
+    hybridCH,
     evalCH,
     unrollCH,
     durationCH,
@@ -34,7 +37,15 @@ import CompOrd
 import Data.List (singleton)
 import Control.Monad (ap, join)
 
---the function eval must be defined in [0, d), where d is the duration
+{-
+The function eval assumes t in [0, d), where d is the duration.
+Of course, if the duration is not known beforehand it is impossible to make safe
+queries without evaluating it. Unfortunately, the duration may be _|_ (which can
+happen from concatenating an infinite number of hybrids, for example), so
+evaluating it is never safe. A truly safe eval would require an alternative
+definition of Hybrid, which I opted not to do since it would require Ord
+restrictions, which don't generalize well into CompHybrid
+-}
 data Hybrid t s a = Hybrid { eval :: t -> s, unroll :: Maybe (t, a) } deriving (Functor)
 
 smap :: (r -> s) -> Hybrid t r a -> Hybrid t s a
@@ -42,6 +53,11 @@ smap f (Hybrid e m) = Hybrid (f . e) m
 
 fsmap :: (r -> s) -> Hybrid t r r -> Hybrid t s s
 fsmap f = fmap f . smap f
+
+--Transform an eval into a safeEval
+-- guard :: (Ord t) => (t -> s) -> t -> (t -> Maybe s)
+-- guard f d t | t < d     = Just (f t)
+--             | otherwise = Nothing
 
 
 wait :: t -> s -> Hybrid t s s
@@ -67,19 +83,20 @@ endpoint :: Hybrid t s a -> Maybe a
 endpoint = fmap snd . unroll
 
 
+--assumes t >= 0
 takeH :: (Ord t) => t -> Hybrid t s s -> Hybrid t s s
 takeH t (Hybrid f m) = Hybrid f (aux m)
     --aux is factored out to delay evaluating the Maybe as long as possible
     where aux (Just (d, x)) = Just (min t d, if t < d then f t else x)
           aux Nothing       = Just (t, f t)
 
---assumes t <= duration h
+--assumes 0 <= t <= duration h
 dropH :: (Num t) => t -> Hybrid t s a -> Hybrid t s a
 dropH t (Hybrid f m) = Hybrid (f . (t+)) (fmap (\(d,x) -> (d-t,x)) m)
 
 joinH :: (Num t, Ord t) => Hybrid t s a -> Hybrid t s b -> Hybrid t s b
-joinH (Hybrid f Nothing) _                  = Hybrid f Nothing
-joinH (Hybrid f (Just (d, _))) (Hybrid g m) = Hybrid h (fmap ((d+) >< id) m)
+joinH (Hybrid f Nothing) _                   = Hybrid f Nothing
+joinH (Hybrid f (Just (d, _))) ~(Hybrid g m) = Hybrid h (fmap ((d+) >< id) m)
     where h t | t < d       = f t
               | otherwise   = g (t - d)
 
@@ -100,8 +117,10 @@ newtype Query s = Query { runQuery :: Maybe Int -> [s] } deriving (Functor)
 runQueryJust :: Query s -> Int -> [s]
 runQueryJust q = runQuery q . Just
 
-runQueryInf :: Query s -> [s]
-runQueryInf q = runQuery q Nothing
+runQueryInf :: Query s -> s
+runQueryInf q = case runQuery q Nothing of
+                    [x] -> x
+                    _ -> error "runQueryInf: expected singleton list"
 
 instance Applicative Query where
     pure  = Query . const . singleton
@@ -125,6 +144,9 @@ fsmapCH f = fmap f . smapCH f
 instantCH :: a -> CompHybrid t s a
 instantCH = Ins
 
+hybridCH :: Hybrid t s a -> CompHybrid t s a
+hybridCH = Hyb . smap pure
+
 evalCH :: CompHybrid t s a -> t -> Query s
 evalCH (Hyb h) = eval h
 evalCH (Ins _) = error "evalCH: Failed to evaluate instantaneous CompHybrid"
@@ -143,7 +165,7 @@ endpointCH (Hyb h) = endpoint h
 
 joinCH :: (Num t, CompOrd t) => Hybrid t (Query s) a -> Hybrid t (Query s) b -> Hybrid t (Query s) b
 joinCH (Hybrid f Nothing) _                     = Hybrid f Nothing
-joinCH (Hybrid f (Just (d, _))) (Hybrid g m)    = Hybrid (join . Query . h) (fmap ((d+) >< id) m)
+joinCH (Hybrid f (Just (d, _))) ~(Hybrid g m)   = Hybrid (join . Query . h) (fmap ((d+) >< id) m)
     where h t Nothing  = if lesserInf t d then [f t] else [g (t - d)]
           h t (Just n) = case mCompare (Top LT) (domCompare t d n) of
                             Just True  -> [f t]             --The wrong branch is evaluated

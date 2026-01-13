@@ -1,3 +1,9 @@
+{-# OPTIONS_GHC -fno-warn-orphans #-}
+
+{-
+Tracing tools for debugging
+-}
+
 module Tracing (module Tracing, trace) where
 
 import CompOrd
@@ -6,22 +12,24 @@ import Debug.Trace (trace)
 
 
 doTracing :: Bool
-doTracing = False
+doTracing = True
 
 myTrace :: String -> a -> a
 myTrace s x = if doTracing then trace s x else x
 
 
 
-traceWith :: (a -> String) -> a -> a
-traceWith f x = myTrace (f x) x
+traceWith :: String -> (a -> String) -> a -> a
+traceWith s f x = myTrace (s ++ ": " ++ f x) x
 
 traceX :: (Show a) => String -> a -> a
-traceX s x = myTrace (s ++ ": " ++ show x) x
+traceX s = traceWith s show
 
-traceList :: String -> (a -> String) -> [a] -> [a]
-traceList s f xs = myTrace (s ++ ":") $ foldr myTrace xs $ map (\(i,x) -> "["++show i++"]"++f x) $ zip ([0..] :: [Integer]) xs
+traceListWith :: String -> (a -> String) -> [a] -> [a]
+traceListWith s f xs = myTrace (s ++ ":") $ map (\(i,x) -> myTrace ("[" ++ show i ++ "]" ++ f x) x) $ zip ([0..] :: [Integer]) xs
 
+traceListX :: (Show a) => String -> [a] -> [a]
+traceListX s = traceListWith s show
 
 
 bsOrd :: (Fractional r, CompOrd r) => Rational -> Rational -> r -> Double
@@ -34,4 +42,12 @@ showCR :: (Fractional r, CompOrd r) => r -> String
 showCR x = show (bsOrd (-1000) 1000 x)
 
 traceCR :: (Fractional r, CompOrd r) => String -> r -> r
-traceCR s x = myTrace (s ++ ": " ++ showCR x) x
+traceCR s = traceWith s showCR
+
+traceListCR :: (Fractional r, CompOrd r) => String -> [r] -> [r]
+traceListCR s = traceListWith s showCR
+
+
+--To facilitate tracing structures containing functions
+instance Show (a -> b) where
+    show _ = "<FUNC>"

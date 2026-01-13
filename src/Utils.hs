@@ -46,6 +46,9 @@ fstOf4 (x,_,_,_) = x
 count :: (Eq a) => a -> [a] -> Int
 count x = length . filter (x ==)
 
+lengthGreaterThan :: Int -> [a] -> Bool
+lengthGreaterThan n = not . null . drop n
+
 interleave :: [a] -> [a] -> [a]
 interleave (x:xs) (y:ys) = x : y : interleave xs ys
 interleave xs [] = xs
@@ -68,10 +71,15 @@ joinWith _ [] ys = ys
 
 strSplit :: (Eq a) => a -> [a] -> [[a]]
 strSplit _ [] = []
-strSplit x (y:ys) | x == y    = [] : strSplit x ys
-                  | otherwise = case strSplit x ys of
-                                    []      -> [[y]]
-                                    zs:zss  -> (y : zs) : zss
+strSplit s (x:xs) | s == x    = [] : strSplit s xs
+                  | otherwise = case strSplit s xs of
+                                    []      -> [[x]]
+                                    ys:yss  -> (x : ys) : yss
+
+strSplit2 :: (Eq a) => a -> [a] -> ([a],[a])
+strSplit2 _ [] = ([], [])
+strSplit2 s (x:xs) | s == x    = ([], xs)
+                   | otherwise = let (ys, zs) = strSplit2 s xs in (x:ys, zs)
 
 --lists must be ordered. f is applied to the same values multiple times (could be optimized)
 mergeSortOn :: (Ord b) => (a -> b) -> [a] -> [a] -> [a]

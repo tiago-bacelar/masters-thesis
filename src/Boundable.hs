@@ -17,6 +17,8 @@ import Utils
 import Powers
 import CompReal (CompReal, bound)
 
+import Data.Ratio (Ratio)
+
 
 class Boundable r where
     bounds :: r -> (Integer, Integer)
@@ -24,6 +26,9 @@ class Boundable r where
     default bounds :: (CompReal r) => r -> (Integer, Integer)
     bounds = (floor >< ceiling) . flip bound 0
 
+
+instance (Integral a) => Boundable (Ratio a) where
+    bounds x = (floor x, ceiling x)
 
 instance Boundable Double where
     bounds x = (floor x, ceiling x)
