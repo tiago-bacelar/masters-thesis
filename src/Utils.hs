@@ -1,5 +1,8 @@
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+
 module Utils (module Utils) where
 
+import Numeric (readSigned, readFloat)
 import GHC.Num
 import Data.Bits
 import Data.Ratio
@@ -161,3 +164,14 @@ scanlTree f x0 = map (thdOf3 . NE.head) . scanl (aux 0) ((x0, 0 :: Integer, x0) 
 scanlTree1 :: (a -> a -> a) -> [a] -> [a]
 scanlTree1 f (x:xs) = scanlTree f x xs
 scanlTree1 _ []     = error "scanlTree1: expected non-empty list"
+
+
+--for reading/writing decimal numbers
+newtype Decimal = Decimal { toRat :: Rational } deriving (Num, Fractional, Enum)
+instance Read Decimal where
+    readsPrec _ = map (Decimal >< id) . readSigned readFloat
+instance Show Decimal where
+    showsPrec p (Decimal a) = showsPrec p (fromRational a :: Double) 
+
+readDecimal :: String -> Rational
+readDecimal = toRat . read

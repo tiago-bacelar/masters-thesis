@@ -33,13 +33,15 @@ import System.Exit (exitWith, ExitCode(..))
 --      make up some sort of workaround to avoid exhausting the precision
 --      of a Double when very zoomed in
 
+--TODO: while i<!10 do {wait 1; i:=i+1} results in an uptick at t=10. fix.
 
-data PlotConfig = PlotConfig    { outputPath    :: String
-                                , sampleNo      :: Integer
-                                , queryAccuracy :: Maybe Int
-                                , realAccuracy  :: Int
-                                , rangeT        :: Maybe (Rational, Rational)
-                                , rangeX        :: Maybe (Rational, Rational)
+
+data PlotConfig = PlotConfig    { outputPath    :: String                       -- -o
+                                , sampleNo      :: Integer                      -- -s
+                                , queryAccuracy :: Maybe Int                    -- -a
+                                , realAccuracy  :: Int                          -- -a
+                                , rangeT        :: Maybe (Rational, Rational)   -- -t
+                                , rangeX        :: Maybe (Rational, Rational)   -- -x
                                 }
 
 defPlotConfig :: PlotConfig

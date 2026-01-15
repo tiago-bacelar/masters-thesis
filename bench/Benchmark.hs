@@ -2,7 +2,6 @@
 {-# OPTIONS_GHC -fno-warn-unused-top-binds #-}
 {-# OPTIONS_GHC -fno-warn-unused-imports #-}
 
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE ImpredicativeTypes #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -19,7 +18,6 @@ import Tests
 import Group
 import PlotBench
 
-import Numeric (readSigned, readFloat)
 import Data.Ratio ((%))
 import Data.List (foldl1', intersperse)
 import GHC.Data.Maybe (firstJust)
@@ -33,8 +31,6 @@ import System.Directory (createDirectory, createDirectoryIfMissing, removeFile)
 import Criterion.Types
 import Criterion.Main.Options
 import Criterion.Main
-
-import Tracing
 
 import qualified CompReal.Instances.CDAR as CDAR
 import qualified CompReal.Instances.AERN2 as AERN2
@@ -143,21 +139,21 @@ benchmarks = [
       testParam "list_sum" [1000,2000..20000] [0,100..400]  $ \m -> foldl1' (+) [fromRational (i % 7) | i <- [1..m]]
     , testParam "tree_sum" [1000,2000..20000] [0,100..400]  $ \m -> foldTree1 (+) [fromRational (i % 7) | i <- [1..m]]
 
-    -- , testParam "idODE"                      [0..15] [0,20..200] $ linearODE 1 . toR        --30 min each
-    -- , testParam "idODE_rat"                  [0..15] [0,20..200] $ linearODERat 1 . toR
-    -- , testParam "doubleODE"                  [0..15] [0,20..200] $ linearODE 2 . toR
-    -- , testParam "doubleODE_rat"              [0..15] [0,20..200] $ linearODERat 2 . toR
-    -- , testParam "tripleODE"                  [0..15] [0,20..200] $ linearODE 3 . toR
-    -- , testParam "tripleODE_rat"              [0..15] [0,20..200] $ linearODERat 3 . toR
-    -- , testParam "squareODE1"                 [0..15] [0,20..200] $ squareODE 2 . toR
-    -- , testParam "squareODE1_rat"             [0..15] [0,20..200] $ squareODERat 2 . toR
-    -- , testParam "squareODE2"                 [0..15] [0,20..200] $ squareODE 4 . toR
-    -- , testParam "squareODE2_rat"             [0..15] [0,20..200] $ squareODERat 4 . toR
-    -- , testParam "squareODE3"                 [0..15] [0,20..200] $ squareODE 6 . toR
-    -- , testParam "squareODE3_rat"             [0..15] [0,20..200] $ squareODERat 6 . toR
+    -- , testParam "idODE"                      [0..15] [0,20..200] $ linearODE 1 . toRat        --30 min each
+    -- , testParam "idODE_rat"                  [0..15] [0,20..200] $ linearODERat 1 . toRat
+    -- , testParam "doubleODE"                  [0..15] [0,20..200] $ linearODE 2 . toRat
+    -- , testParam "doubleODE_rat"              [0..15] [0,20..200] $ linearODERat 2 . toRat
+    -- , testParam "tripleODE"                  [0..15] [0,20..200] $ linearODE 3 . toRat
+    -- , testParam "tripleODE_rat"              [0..15] [0,20..200] $ linearODERat 3 . toRat
+    -- , testParam "squareODE1"                 [0..15] [0,20..200] $ squareODE 2 . toRat
+    -- , testParam "squareODE1_rat"             [0..15] [0,20..200] $ squareODERat 2 . toRat
+    -- , testParam "squareODE2"                 [0..15] [0,20..200] $ squareODE 4 . toRat
+    -- , testParam "squareODE2_rat"             [0..15] [0,20..200] $ squareODERat 4 . toRat
+    -- , testParam "squareODE3"                 [0..15] [0,20..200] $ squareODE 6 . toRat
+    -- , testParam "squareODE3_rat"             [0..15] [0,20..200] $ squareODERat 6 . toRat
 
-    -- , testParam "ball_bounce" ([2..8]++[9,9.1..9.9]) [0,20..200] $ ballBounce . toR         --at least 13h, probably way more
-    -- , testParam "cruise_control"             [0..50] [0,20..200] $ cruiseControl . toR      --3h
+    -- , testParam "ball_bounce" ([2..8]++[9,9.1..9.9]) [0,20..200] $ ballBounce . toRat         --at least 13h, probably way more
+    -- , testParam "cruise_control"             [0..50] [0,20..200] $ cruiseControl . toRat      --3h
 
     --ODEs lineares com o param sendo o coef??
 
@@ -184,11 +180,6 @@ benchmarks = [
     --test "ball_bounce_9" [0..10] $ ballBounce 9
     ]
 
-newtype Rat = Rat { toR :: Rational } deriving (Num, Fractional, Enum)
-instance Read Rat where
-    readsPrec _ = map (Rat >< id) . readSigned readFloat
-instance Show Rat where
-    showsPrec p (Rat a) = showsPrec p (fromRational a :: Double) 
 
 type Test a = OptGroup Rational (Group String (OptGroup Int a))
 type Tests a = Group String (Test a)
@@ -197,7 +188,7 @@ splitTestName :: (String, a) -> (String, (Maybe Rational, (String, (Maybe Int, a
 splitTestName (s,a) = (gs !! 0, (readRat (gs !!? 2) (gs !!? 4), (gs !! 5, (read <$> (gs !!? 7), a))))
     where (_,_,_,gs) = s =~ "^([a-zA-Z0-9_\\-]+)(/(-?[0-9]+(\\.[0-9]+)?)|(-?[0-9]+%[0-9]+))?/([a-zA-Z0-9_\\-]+)(/([0-9]+))?$" :: (String,String,String,[String])
           xs !!? i = let m = xs !! i in if null m then Nothing else Just m
-          readRat float frac = firstJust (toR . read <$> float) (read <$> frac)
+          readRat float frac = firstJust (readDecimal <$> float) (read <$> frac)
 
 fromRuns :: [(String, a)] -> Tests a
 fromRuns = fmap (fmap (fmap (fmap unSingleton . optGroupSplit) . groupSplit) . optGroupSplit) . groupSplit . map splitTestName

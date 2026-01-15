@@ -28,6 +28,33 @@ import System.Environment (getProgName, getArgs)
 import System.Console.GetOpt
 import System.Exit (exitWith, ExitCode(..))
 
+expectPositive :: (Num a, Ord a, Show a) => a -> IO ()
+expectPositive x | x > 0     = return ()
+                 | otherwise = do
+                    hPutStrLn stderr $ "Expected positive value but got " ++ show x
+                    exitWith $ ExitFailure 1
+
+expectNonNegative :: (Num a, Ord a, Show a) => a -> IO ()
+expectNonNegative x | x > 0     = return ()
+                    | otherwise = do
+                        hPutStrLn stderr $ "Expected non-negative value but got " ++ show x
+                        exitWith $ ExitFailure 1
+
+expectAtMost :: Int -> String -> IO [String]
+expectAtMost n s | length l <= n = return l
+                 | otherwise     = do
+                    hPutStrLn stderr $ "Expected at most " ++ show n ++ "elements but got '" ++ s ++ "'"
+                    exitWith $ ExitFailure 1
+    where l = strSplit ',' s
+
+expectExactly :: Int -> String -> IO [String]
+expectExactly n s | length l == n = return l
+                  | otherwise     = do
+                        hPutStrLn stderr $ "Expected exactly " ++ show n ++ "elements but got '" ++ s ++ "'"
+                        exitWith $ ExitFailure 1
+    where l = strSplit ',' s
+
+
 --TODO: replace Show restriction with something else? (to have consistent formats between implementations)
 printState :: (Show r) => [String] -> [r] -> IO ()
 printState vars vals = sequence_ [putStrLn (var ++ ": " ++ show val) | (var, val) <- zip vars vals]
@@ -41,35 +68,25 @@ printUnroll vars t (Right s) = do
     putStrLn $ "System terminated at t=" ++ show t ++ " with following state:"
     printState vars s
 
---for quick testing with ghci
-test :: (SimNum r) => IO ([String], RunnableProgram r)
-test = do
-    input <- readFile "input.txt"
-    case parseJaguar input of
-            Failed err -> error ("Parse error: " ++ show err) --parse error
-            Ok (vars, code) -> return (vars, interpret code)
-
-play :: IO (TestType -> Int -> [[TestType]])
-play = fmap (\(vars,prog) -> runQueryJust . query prog (length vars) (Just 20) (Just 300)) test
 
 
 type AppNum r = (SimNum r, Plottable r r, Show r)
-data Mode = Plot | Query | InteractivePlot deriving (Show, Eq)
+data Mode = Plot | Query deriving (Show, Eq) --TODO: InteractivePlot
 data SomeProxy where SomeProxy :: forall r. AppNum r => Proxy r -> SomeProxy
 data Options = Options  { optFile       :: Maybe String
-                        , optNumType    :: SomeProxy
-                        , optCompPrec   :: Maybe Int
-                        , optIterations :: Maybe Integer
-                        , optPlotVars   :: S.Set String
+                        , optNumType    :: SomeProxy        -- -n
+                        , optCompAcc    :: Maybe Int        -- -c
+                        , optIterations :: Maybe Integer    -- -l
+                        , optPlotVars   :: S.Set String     -- -v (comma separated)
                         , optPlotConfig :: PlotConfig
-                        , optMode       :: Mode
+                        , optMode       :: Mode             -- -q for query mode (default is plot)
                         }
 
 startOptions :: Maybe String -> Options
 startOptions f = Options    { optFile       = f
-                            , optNumType    = SomeProxy (Proxy :: Proxy CDAR.CR)
-                            , optCompPrec   = Just 32
-                            , optIterations = Just 200
+                            , optNumType    = SomeProxy (Proxy :: Proxy CDAR.CR) --TODO: change default?
+                            , optCompAcc    = Just 32
+                            , optIterations = Nothing
                             , optPlotVars   = S.empty
                             , optPlotConfig = defPlotConfig
                             , optMode       = Plot
@@ -77,51 +94,78 @@ startOptions f = Options    { optFile       = f
 
 options :: [ OptDescr (Options -> IO Options) ]
 options =
-    [ Option "t" ["type"]
+    [ Option "n" ["numeric-type"]
         (ReqArg
             (\arg opt -> case map toLower arg of
-                            "cdar"      -> return opt { optNumType = SomeProxy (Proxy :: Proxy CDAR.CR)             }
-                            "exact-real"-> return opt { optNumType = SomeProxy (Proxy :: Proxy ExactReal.AnyCReal)  }
-                            "era"       -> return opt { optNumType = SomeProxy (Proxy :: Proxy ERA.CReal)           }
-                            "aern"      -> return opt { optNumType = SomeProxy (Proxy :: Proxy AERN2.CReal)         }
-                            "ireal"     -> return opt { optNumType = SomeProxy (Proxy :: Proxy IReal.IReal)         }
-                            "double"    -> return opt { optNumType = SomeProxy (Proxy :: Proxy Double)              }
-                            _           -> error "TODO: error msg")
+                "cdar"      -> return opt { optNumType = SomeProxy (Proxy :: Proxy CDAR.CR)             }
+                "exact-real"-> return opt { optNumType = SomeProxy (Proxy :: Proxy ExactReal.AnyCReal)  }
+                "era"       -> return opt { optNumType = SomeProxy (Proxy :: Proxy ERA.CReal)           }
+                "aern2"     -> return opt { optNumType = SomeProxy (Proxy :: Proxy AERN2.CReal)         }
+                "ireal"     -> return opt { optNumType = SomeProxy (Proxy :: Proxy IReal.IReal)         }
+                "double"    -> return opt { optNumType = SomeProxy (Proxy :: Proxy Double)              }
+                _           -> do
+                    hPutStrLn stderr $ "Numeric type not recognized: " ++ arg
+                    hPutStrLn stderr $ "Valid types are (case insensitive): cdar, exact-real, era, aern2, ireal, double"
+                    exitWith $ ExitFailure 1
+            )
             "TYPE")
-        "Number type"
+        "Number type. Default is CDAR"
     , Option "c" ["comparison-accuracy"]
         (ReqArg
-            (\arg opt -> return opt { optCompPrec = read arg })
+            (\arg opt -> let c = read arg in expectNonNegative c >> return opt { optCompAcc = Just c })
             "INT")
-        "Comparison accuracy"
-    , Option "n" ["iterations"]
+        "Comparison accuracy. Default is 32"
+    , Option "l" ["loop-iterations"]
         (ReqArg
-            (\arg opt -> return opt { optIterations = read arg })
+            (\arg opt -> let l = read arg in expectNonNegative l >> return opt { optIterations = Just l })
             "INT")
-        "Max iterations"
+        "Max iterations. Default is infinite"
+    , Option "v" ["variables"] --TODO: incompatible with modes other than Plot
+        (ReqArg
+            (\arg opt -> return opt { optPlotVars = S.fromList $ strSplit ',' arg })
+            "VAR1,VAR2...")
+        "Variables to plot. Default is all"
     , Option "o" ["output"] --TODO: incompatible with modes other than Plot
         (ReqArg
             (\arg opt -> return opt { optPlotConfig = (optPlotConfig opt) { outputPath = arg }})
             "FILE")
         "Output path"
-    , Option "v" ["variables"] --TODO: incompatible with modes other than Plot
+    , Option "s" ["samples"] --TODO: incompatible with modes other than Plot
         (ReqArg
-            (\arg opt -> return opt { optPlotVars = S.fromList $ strSplit ',' arg })
-            "FILE")
-        "Output path"
-
-    --TODO: plot config options (incompatible with modes other than Plot (and interactive plot??))
-
-    , Option "q" ["query"] --TODO: must have an input file
+            (\arg opt -> let s = read arg in expectPositive s >> return opt { optPlotConfig = (optPlotConfig opt) { sampleNo = s }})
+            "INT")
+        "Number of samples to plot. Default is 500"
+    , Option "a" ["accuracy"] --TODO: incompatible with modes other than Plot
+        (ReqArg
+            (\arg opt -> let a = read arg in expectNonNegative a >> return opt { optPlotConfig = (optPlotConfig opt) { queryAccuracy = Just a, realAccuracy = a }})
+            "INT")
+        "Accuracy of each sample to plot. Default is 32"
+    , Option "t" ["time-range"] --TODO: incompatible with modes other than Plot
+        (ReqArg
+            (\arg opt -> do
+                ts <- map readDecimal <$> expectAtMost 2 arg
+                mapM_ expectNonNegative ts
+                let range = if length ts == 1 then (0, ts !! 0) else (ts !! 0, ts !! 1)
+                return opt { optPlotConfig = (optPlotConfig opt) { rangeT = Just range }})
+            "DECIMAL | DECIMAL,DECMIAL")
+        "Range of times to plot. Default is (0,duration)"
+    , Option "x" ["value-range"] --TODO: incompatible with modes other than Plot
+        (ReqArg
+            (\arg opt -> do
+                [xl, xu] <- map readDecimal <$> expectExactly 2 arg
+                return opt { optPlotConfig = (optPlotConfig opt) { rangeX = Just (xl, xu) }})
+            "Range of values to plot")
+        "DECIMAL,DECMIAL"
+    , Option "q" ["query"]
         (NoArg
             (\opt -> return opt { optMode = Query }))
         "Query mode"
-    , Option "i" ["interactive"] --TODO: must have an input file???? (could maybe read from stdin depending on how i process the input)
+    {-
+    , Option "i" ["interactive"] --input file? (could maybe read from stdin depending on how input is processed)
         (NoArg
             (\opt -> return opt { optMode = InteractivePlot }))
         "Interactive plot"
-    {-
-    , Option "V" ["version"]
+    , Option "" ["version"]
         (NoArg
             (\_ -> do
                 hPutStrLn stderr "Version 0.01"
@@ -142,11 +186,13 @@ main = do
     args <- getArgs
 
     -- Parse options, getting a list of option actions
-    let (actions, nonOptions, errors) = getOpt RequireOrder options args
+    let (actions, nonOptions, _) = getOpt RequireOrder options args
     file <- case nonOptions of
                 []  -> return Nothing
                 [f] -> return (Just f)
-                _   -> error "TODO"
+                _   -> do
+                        hPutStrLn stderr "Only one input file supported"
+                        exitWith $ ExitFailure 1
 
     -- Here we thread startOptions through all supplied option actions
     opts <- foldl (>>=) (return $ startOptions file) actions
@@ -156,7 +202,7 @@ main = do
 mainWith :: Options -> IO ()
 mainWith (Options   { optFile       = file
                     , optNumType    = numType
-                    , optCompPrec   = compPrec
+                    , optCompAcc    = compAcc
                     , optIterations = iterations
                     , optPlotVars   = plotVars
                     , optPlotConfig = plotConfig
@@ -168,34 +214,48 @@ mainWith (Options   { optFile       = file
                         Failed err -> error ("Parse error: " ++ show err)
                         Ok (vars, code :: Program r) -> return (vars, interpret code)
 
-    let (system, discs) = run prog (length vars) compPrec iterations
+    let (system, discs) = run prog (length vars) compAcc iterations
 
     case mode of
-        Plot -> do
-                    let varIndexes = [i | (i,v) <- zip [0..] vars, S.member v plotVars]
-                    let filterIndexes :: forall a. [a] -> [a]
-                        filterIndexes = if S.null plotVars then id else (getIndexes varIndexes)
+      Plot -> do
+        let varIndexes = [i | (i,v) <- zip [0..] vars, S.member v plotVars]
+        let filterIndexes :: [a] -> [a]
+            filterIndexes = if S.null plotVars then id else (getIndexes varIndexes)
 
-                    let filteredVars = filterIndexes vars
-                    let filteredSystem = smapCH (id >< filterIndexes) $ fmap (fmap (id >< filterIndexes) . rightToMaybe) system
-                    let filteredDiscs = map (\(w,x,y,z) -> (w,x,y,filterIndexes z)) discs
+        let filteredVars = filterIndexes vars
+        let filteredSystem = smapCH (id >< filterIndexes) $ fmap (fmap (id >< filterIndexes) . rightToMaybe) system
+        let filteredDiscs = map (\(w,x,y,z) -> (w,x,y,filterIndexes z)) discs
 
-                    plotHybrid plotConfig filteredVars filteredSystem filteredDiscs
-                    case rangeT plotConfig of
-                        Just _  -> return ()
-                        Nothing -> uncurry (printUnroll vars) $ fromJust $ unrollCH $ fmap (fmap snd -|- snd) system
-        Query -> undefined
-        InteractivePlot -> undefined
+        plotHybrid plotConfig filteredVars filteredSystem filteredDiscs
+        case rangeT plotConfig of
+            Just _  -> return ()
+            Nothing -> uncurry (printUnroll vars) $ fromJust $ unrollCH $ fmap (fmap snd -|- snd) system
+      Query -> undefined
 
+
+
+
+
+--for quick testing with ghci
+test :: (SimNum r) => IO ([String], RunnableProgram r)
+test = do
+    input <- readFile "input.txt"
+    case parseJaguar input of
+            Failed err -> error ("Parse error: " ++ show err)
+            Ok (vars, code) -> return (vars, interpret code)
 
 type TestType = CDAR.CR
+
+play :: IO (TestType -> Int -> [[TestType]])
+play = fmap (\(vars,prog) -> runQueryJust . query prog (length vars) (Just 20) (Just 300)) test
+
 plot :: IO ()
 plot = mainWith Options { optFile       = Just "input.txt"
                         , optNumType    = SomeProxy (Proxy :: Proxy TestType)
-                        , optCompPrec   = Just 50
-                        , optIterations = Just 500
+                        , optCompAcc    = Just 20
+                        , optIterations = Nothing
                         , optPlotVars   = S.fromList []
-                        , optPlotConfig = defPlotConfig { realAccuracy = 6 }
+                        , optPlotConfig = defPlotConfig { realAccuracy = 10 }
                         , optMode       = Plot
                         }
 
