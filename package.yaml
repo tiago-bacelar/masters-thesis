@@ -88,6 +88,7 @@ benchmarks:
     - -threaded
     - -rtsopts
     - -with-rtsopts=-N
+    - -fno-full-laziness
     dependencies:
     - jaguar
     - criterion
