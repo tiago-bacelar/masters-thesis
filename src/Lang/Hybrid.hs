@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE TupleSections #-}
 
 module Lang.Hybrid (
     Hybrid,
@@ -19,7 +20,8 @@ module Lang.Hybrid (
     Query(..),
     runQueryJust,
     runQueryInf,
-    CompHybrid(..),
+    CompHybrid,
+    unCH,
     smapCH,
     fsmapCH,
     instantCH,
@@ -28,14 +30,16 @@ module Lang.Hybrid (
     unrollCH,
     durationCH,
     endpointCH,
-    joinCH,
-    unCH) where
+    CompHybridT,
+    runCompHybridT) where
 
 import Utils
 import CompOrd
 
-import Data.List (singleton)
+import Data.List.NonEmpty (NonEmpty(..))
+import Data.Functor.Identity (Identity(..))
 import Control.Monad (ap, join)
+import Control.Monad.Trans (MonadTrans(..))
 
 {-
 The function eval assumes t in [0, d), where d is the duration.
@@ -112,18 +116,18 @@ instance (Num t, Ord t) => Monad (Hybrid t s) where
 
 
 
-newtype Query s = Query { runQuery :: Maybe Int -> [s] } deriving (Functor)
+newtype Query s = Query { runQuery :: Maybe Int -> NonEmpty s } deriving (Functor)
 
-runQueryJust :: Query s -> Int -> [s]
+runQueryJust :: Query s -> Int -> NonEmpty s
 runQueryJust q = runQuery q . Just
 
 runQueryInf :: Query s -> s
 runQueryInf q = case runQuery q Nothing of
-                    [x] -> x
+                    (x :| []) -> x
                     _ -> error "runQueryInf: expected singleton list"
 
 instance Applicative Query where
-    pure  = Query . const . singleton
+    pure  = Query . pure . pure
     (<*>) = ap
 
 instance Monad Query where
@@ -132,59 +136,66 @@ instance Monad Query where
 
 --unline Hybrid, the function inside Hyb only needs to be
 --defined in (0,d) (or (0,inf) if duration is infinite)
-data CompHybrid t s a = Ins a | Hyb (Hybrid t (Query s) a) deriving (Functor)
+newtype CompHybridT t s m a = CompHybridT { unCHT :: m (Either a (Hybrid t (Query s) a)) }
+type CompHybrid t s a = CompHybridT t s Identity a
 
-smapCH :: (r -> s) -> CompHybrid t r a -> CompHybrid t s a
-smapCH _ (Ins x) = Ins x
-smapCH f (Hyb h) = Hyb $ smap (fmap f) h
+unCH :: CompHybrid t s a -> Either a (Hybrid t (Query s) a)
+unCH = runIdentity . unCHT
 
-fsmapCH :: (r -> s) -> CompHybrid t r r -> CompHybrid t s s
+runCompHybridT :: (Functor m) => CompHybridT t s m a -> m (CompHybrid t s a)
+runCompHybridT = fmap (CompHybridT . Identity) . unCHT
+
+
+smapCH :: (Functor m) => (r -> s) -> CompHybridT t r m a -> CompHybridT t s m a
+smapCH f = CompHybridT . fmap (id -|- smap (fmap f)) . unCHT
+
+fsmapCH :: (Functor m) => (r -> s) -> CompHybridT t r m r -> CompHybridT t s m s
 fsmapCH f = fmap f . smapCH f
 
-instantCH :: a -> CompHybrid t s a
-instantCH = Ins
+instantCH :: (Applicative m) => a -> CompHybridT t s m a
+instantCH = CompHybridT . pure . Left
 
-hybridCH :: Hybrid t s a -> CompHybrid t s a
-hybridCH = Hyb . smap pure
+hybridCH :: (Applicative m) => Hybrid t s a -> CompHybridT t s m a
+hybridCH = CompHybridT . pure . Right . smap pure
 
 evalCH :: CompHybrid t s a -> t -> Query s
-evalCH (Hyb h) = eval h
-evalCH (Ins _) = error "evalCH: Failed to evaluate instantaneous CompHybrid"
+evalCH = either err eval . unCH
+    where err _ = error "evalCH: Failed to evaluate instantaneous CompHybrid"
 
 unrollCH :: (Num t) => CompHybrid t s a -> Maybe (t, a)
-unrollCH (Ins x) = Just (0, x)
-unrollCH (Hyb h) = unroll h
+unrollCH = either (Just . (0,)) unroll . unCH
 
 durationCH :: (Num t) => CompHybrid t s a -> Maybe t
-durationCH (Ins _) = Just 0
-durationCH (Hyb h) = duration h
+durationCH = either (const $ Just 0) duration . unCH
 
 endpointCH :: CompHybrid t s a -> Maybe a
-endpointCH (Ins x) = Just x
-endpointCH (Hyb h) = endpoint h
+endpointCH = either Just endpoint . unCH
 
 joinCH :: (Num t, CompOrd t) => Hybrid t (Query s) a -> Hybrid t (Query s) b -> Hybrid t (Query s) b
 joinCH (Hybrid f Nothing) _                     = Hybrid f Nothing
 joinCH (Hybrid f (Just (d, _))) ~(Hybrid g m)   = Hybrid (join . Query . h) (fmap ((d+) >< id) m)
-    where h t Nothing  = if lesserInf t d then [f t] else [g (t - d)]
+    where h t Nothing  = if lesserInf t d then (f t) :| [] else (g (t - d)) :| []
           h t (Just n) = case mCompare (Top LT) (domCompare t d n) of
-                            Just True  -> [f t]             --The wrong branch is evaluated
-                            Just False -> [g (t - d)]       --outside its original domain.
-                            Nothing    -> [f t, g (t - d)]  --Potentially dangerous
+                            Just True  -> f t :| []             --The wrong branch is evaluated
+                            Just False -> g (t - d) :| []       --outside its original domain.
+                            Nothing    -> f t :| [g (t - d)]    --Potentially dangerous
 
-unCH :: (Num t) => CompHybrid t s a -> Hybrid t (Query s) a
-unCH (Ins x) = instant x
-unCH (Hyb h) = h
+instance (Functor m) => Functor (CompHybridT t s m) where
+    fmap f = CompHybridT . fmap (f -|- fmap f) . unCHT
 
-
-instance (Num t, CompOrd t) => Applicative (CompHybrid t s) where
-    pure  = Ins
+instance (Num t, CompOrd t, Monad m) => Applicative (CompHybridT t s m) where
+    pure  = CompHybridT . return . Left
     (<*>) = ap
 
-instance (Num t, CompOrd t) => Monad (CompHybrid t s) where
-    (Ins x)                         >>= f = f x
-    (Hyb (Hybrid e Nothing))        >>= _ = Hyb $ Hybrid e Nothing
-    (Hyb h@(Hybrid e (Just (d,x)))) >>= f
-        = Hyb $ case f x of
-                Ins y -> Hybrid e (Just (d,y))
-                Hyb i -> joinCH h i
+instance (Num t, CompOrd t, Monad m) => Monad (CompHybridT t s m) where
+    mx >>= f = CompHybridT $ do
+        ch <- unCHT mx
+        case ch of
+            Left x -> unCHT (f x)
+            Right (Hybrid e Nothing) -> return $ Right $ Hybrid e Nothing
+            Right h1@(Hybrid e (Just (d,x))) -> Right . aux <$> unCHT (f x)
+                where aux (Left y)   = Hybrid e (Just (d,y))
+                      aux (Right h2) = joinCH h1 h2
+
+instance (Num t, CompOrd t) => MonadTrans (CompHybridT t s) where
+    lift m = CompHybridT (fmap Left m)

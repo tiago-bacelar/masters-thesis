@@ -42,8 +42,8 @@ infix 4 -|-
 infixr 9 .-.
 
 
-fstOf4 :: (a, b, c, d) -> a
-fstOf4 (x,_,_,_) = x
+thdOf4 :: (a, b, c, d) -> c
+thdOf4 (_,_,x,_) = x
 
 
 count :: (Eq a) => a -> [a] -> Int

@@ -23,6 +23,7 @@ import Data.Char (toLower)
 import Data.Proxy
 import GHC.Data.Maybe (fromJust, rightToMaybe)
 import qualified Data.Set as S
+import qualified Data.List.NonEmpty as NE
 import System.IO (hPutStrLn, stderr)
 import System.Environment (getProgName, getArgs)
 import System.Console.GetOpt
@@ -35,7 +36,7 @@ expectPositive x | x > 0     = return ()
                     exitWith $ ExitFailure 1
 
 expectNonNegative :: (Num a, Ord a, Show a) => a -> IO ()
-expectNonNegative x | x > 0     = return ()
+expectNonNegative x | x >= 0    = return ()
                     | otherwise = do
                         hPutStrLn stderr $ "Expected non-negative value but got " ++ show x
                         exitWith $ ExitFailure 1
@@ -224,13 +225,13 @@ mainWith (Options   { optFile       = file
 
         let filteredVars = filterIndexes vars
         let filteredSystem = smapCH (id >< filterIndexes) $ fmap (fmap (id >< filterIndexes) . rightToMaybe) system
-        let filteredDiscs = map (\(w,x,y,z) -> (w,x,y,filterIndexes z)) discs
+        let filteredDiscs = map (\(w,x,y,z) -> (w,x,y,filterIndexes z)) . discs
 
         plotHybrid plotConfig filteredVars filteredSystem filteredDiscs
         case rangeT plotConfig of
             Just _  -> return ()
             Nothing -> uncurry (printUnroll vars) $ fromJust $ unrollCH $ fmap (fmap snd -|- snd) system
-      Query -> undefined
+      Query -> undefined --TODO
 
 
 
@@ -247,13 +248,16 @@ test = do
 type TestType = CDAR.CR
 
 play :: IO (TestType -> Int -> [[TestType]])
-play = fmap (\(vars,prog) -> runQueryJust . query prog (length vars) (Just 20) (Just 300)) test
+play = fmap (\(vars,prog) -> NE.toList .-. runQueryJust . query prog (length vars) (Just 20) Nothing) test
+
+playDiscs :: IO [(TestType, Step, Step, [Maybe (TestType, TestType)])]
+playDiscs = fmap (\(vars,prog) -> snd (run prog (length vars) (Just 20) Nothing) Nothing) test
 
 plot :: IO ()
 plot = mainWith Options { optFile       = Just "input.txt"
                         , optNumType    = SomeProxy (Proxy :: Proxy TestType)
                         , optCompAcc    = Just 20
-                        , optIterations = Nothing
+                        , optIterations = Just 300
                         , optPlotVars   = S.fromList []
                         , optPlotConfig = defPlotConfig { realAccuracy = 10 }
                         , optMode       = Plot

@@ -24,6 +24,7 @@ import Solver.Poly
 import Solver.Solver
 
 import Data.Ratio ((%))
+import qualified Data.List.NonEmpty as NE
 
 --for testing in ghci
 timeApproxs :: (CompReal r) => r -> [Int]
@@ -134,7 +135,7 @@ With a comparison and query accuracy of 8 and 9
 respectively, the program may not be accurate for t>9.9
 -}
 ballBounce :: (SimNum r) => Rational -> r
-ballBounce = \t -> (!! 0) $ (!! 0) $ (`runQueryJust` 8) $ query (interpret prog) 2 (Just 9) Nothing (fromRational t)
+ballBounce = \t -> (!! 0) $ NE.head $ (`runQueryJust` 8) $ query (interpret prog) 2 (Just 9) Nothing (fromRational t)
     where prog = Seq (Assign 0 (Num 0)) $ Seq (Assign 1 (Num 1)) $ loop
           loop = WhileDo (Term $ BConst True) (Seq arc bounce)
           arc = getFor [(0, Var $ V 1), (1, Num $ -1)] (Just $ Op Mult (Num 2) (Var $ V 1))
@@ -152,7 +153,7 @@ while true do {
 }
 -}
 cruiseControl :: (SimNum r) => Rational -> r
-cruiseControl = \t -> (!! 0) $ (!! 0) $ (`runQueryJust` 1) $ query (interpret prog) (length vars) (Just 1) Nothing (fromRational t)
+cruiseControl = \t -> (!! 0) $ NE.head $ (`runQueryJust` 1) $ query (interpret prog) (length vars) (Just 1) Nothing (fromRational t)
     where (vars,prog) = case parseJaguar code of
                             Failed err -> error ("Parse error: " ++ show err)
                             Ok p -> p

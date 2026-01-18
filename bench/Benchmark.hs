@@ -60,7 +60,7 @@ iRuns f a ns = [
     , nRuns "ExactReal" (f :: a -> ExactReal.AnyCReal) a ns
     , nRuns "IReal"     (f :: a -> IReal.IReal) a ns
     ]
-
+ 
 --a test groups together runs for every implementation and every accuracy
 test :: String -> [Int] -> (forall r. (BenchNum r) => r) -> Benchmark
 test name ns r = bgroup name $ iRuns (\() -> r) () ns
@@ -89,55 +89,49 @@ myConfig outputPath = defaultConfig {
 
 benchmarks :: [Benchmark]
 benchmarks = [
-       -- test "fromRational" [0,10..500]       $ fromRational (22 % 7)
+    --   test "fromRational" [0,20..1000]        $ fromRational (22 % 7)
 
-    -- , test "sum" [0,5..400]                 $ fromRational (22 % 7) + fromRational (22 % 7)
-    -- , test "memo_sum" [0,5..400]            $ let x = fromRational (22 % 7) in x + x
-    -- , test "list_sum" [0,5..400]            $ sum [fromRational (22 % 7) | _ <- [1..100]]
-    -- , test "list_memo_sum" [0,5..400]       $ sum $ replicate 100 $ fromRational (22 % 7)
-    -- , test "tree_sum" [0,5..400]            $ foldTree1 (+) [fromRational (22 % 7) | _ <- [1..100]]
-    -- , test "tree_memo_sum" [0,5..400]       $ foldTree1 (+) $ replicate 100 $ fromRational (22 % 7)
+    -- , test "sum" [0,20..1000]                 $ fromRational (22 % 7) + fromRational (22 % 7)
+    -- , test "memo_sum" [0,20..1000]            $ let x = fromRational (22 % 7) in x + x
+    -- , test "list_sum" [0,20..1000]            $ sum [fromRational (22 % 7) | _ <- [1..1000]]
+    -- , test "list_memo_sum" [0,20..1000]       $ sum $ replicate 1000 $ fromRational (22 % 7)
+    -- , test "tree_sum" [0,20..1000]            $ foldTree1 (+) [fromRational (22 % 7) | _ <- [1..1000]]
+    -- , test "tree_memo_sum" [0,20..1000]       $ foldTree1 (+) $ replicate 1000 $ fromRational (22 % 7)
 
-    -- , test "product" [0,5..400]             $ fromRational (22 % 7) * fromRational (22 % 7)
-    -- , test "memo_product" [0,5..400]        $ let x = fromRational (22 % 7) in x * x
-    -- , test "list_product" [0,5..400]        $ product [fromRational (22 % 7) | _ <- [1..100]]
-    -- , test "list_memo_product" [0,5..400]   $ product $ replicate 100 $ fromRational (22 % 7)
-    -- , test "tree_product" [0,5..400]        $ foldTree1 (*) [fromRational (22 % 7) | _ <- [1..100]]
-    -- , test "tree_memo_product" [0,5..400]   $ foldTree1 (*) $ replicate 100 $ fromRational (22 % 7)
+    -- , test "power" [0,20..1000]               $ fromRational (22 % 7) ^ 100 --equivalent to tree_product
+    -- , test "Power.pow" [0,20..1000]           $ pow (fromRational (22 % 7)) 100
 
-    -- , test "power" [0,5..400]               $ fromRational (22 % 7) ^ 100 --equivalent to tree_product
-    -- , test "Power.pow" [0,5..400]           $ pow (fromRational (22 % 7)) 100
+    -- , test "pi" [0,20..1000]                  $ pi
+    -- , test "e" [0,20..1000]                   $ exp 1
+    -- , test "exp_100" [0,20..1000]             $ exp 100
 
-    -- , test "pi" [0,5..400]                  $ pi
-    -- , test "e" [0,5..400]                   $ exp 1
-    -- , test "exp 100" [0,5..400]             $ exp 100
-
-    -- , test "geometricSeriesDyadRat" [0,5..400]  $ geometricSeriesDyadRat
-    -- , test "geometricSeriesDyadCR" [0,5..400]   $ geometricSeriesDyadCR
-    -- , test "geometricSeriesRat" [0,5..400]      $ geometricSeriesRat
-    -- , test "geometricSeriesCR" [0,5..400]       $ geometricSeriesCR
-    -- , test "finiteListRat" [0,5..400]           $ finiteListRat
-    -- , test "finiteListCR" [0,5..400]            $ finiteListCR
+    -- , test "geometricSeriesDyadRat" [0,20..1000]  $ geometricSeriesDyadRat
+    -- , test "geometricSeriesDyadCR" [0,20..1000]   $ geometricSeriesDyadCR
+    -- , test "geometricSeriesRat" [0,20..1000]      $ geometricSeriesRat
+    -- , test "geometricSeriesCR" [0,20..1000]       $ geometricSeriesCR
+    -- , test "finiteListRat" [0,20..1000]           $ finiteListRat
+    -- , test "finiteListCR" [0,20..1000]            $ finiteListCR
 
 
-    -- , test "list_sum_dif" [0,5..400]                    $ sum [fromRational (i % 7) | i <- [1..100]]
-    -- , test "tree_sum_dif" [0,5..400]                    $ foldTree1 (+) [fromRational (i % 7) | i <- [1..100]]
+    -- , test "list_sum_dif" [0,20..1000]                    $ sum [fromRational (i % 7) | i <- [1..100]]
+    -- , test "tree_sum_dif" [0,20..1000]                    $ foldTree1 (+) [fromRational (i % 7) | i <- [1..100]]
 
-    -- , test "list_product_dif" [0,5..400]                $ product [fromRational (i % 7) | i <- [1..100]]
-    -- , test "tree_product_dif" [0,5..400]                $ foldTree1 (*) [fromRational (i % 7) | i <- [1..100]]
+    -- , test "list_product_dif" [0,20..1000]                $ product [fromRational (i % 7) | i <- [1..100]]
+    -- , test "tree_product_dif" [0,20..1000]                $ foldTree1 (*) [fromRational (i % 7) | i <- [1..100]]
 
-    -- , test "geometricSeriesCR_list_sum" [0,5..400]      $ sum [geometricSeriesCR | _ <- [1..100]]
-    -- , test "geometricSeriesCR_list_memo_sum" [0,5..400] $ sum $ replicate 100 $ geometricSeriesCR
-    -- , test "geometricSeriesCR_tree_sum" [0,5..400]      $ foldTree1 (+) [geometricSeriesCR | _ <- [1..100]]
-    -- , test "geometricSeriesCR_tree_memo_sum" [0,5..400] $ foldTree1 (+) $ replicate 100 $ geometricSeriesCR
+    -- , test "geometricSeriesCR_list_sum" [0,20..1000]      $ sum [geometricSeriesCR | _ <- [1..100]]
+    -- , test "geometricSeriesCR_list_memo_sum" [0,20..1000] $ sum $ replicate 100 $ geometricSeriesCR
+    -- , test "geometricSeriesCR_tree_sum" [0,20..1000]      $ foldTree1 (+) [geometricSeriesCR | _ <- [1..100]]
+    -- , test "geometricSeriesCR_tree_memo_sum" [0,20..1000] $ foldTree1 (+) $ replicate 100 $ geometricSeriesCR
 
-    -- , test "geometricSeriesCR_list_product" [0,5..400]      $ product [geometricSeriesCR | _ <- [1..100]]
-    -- , test "geometricSeriesCR_list_memo_product" [0,5..400] $ product $ replicate 100 $ geometricSeriesCR
-    -- , test "geometricSeriesCR_tree_product" [0,5..400]      $ foldTree1 (*) [geometricSeriesCR | _ <- [1..100]]
-    -- , test "geometricSeriesCR_tree_memo_product" [0,5..400] $ foldTree1 (*) $ replicate 100 $ geometricSeriesCR
+    -- , test "geometricSeriesCR_list_product" [0,20..1000]      $ product [geometricSeriesCR | _ <- [1..100]]
+    -- , test "geometricSeriesCR_list_memo_product" [0,20..1000] $ product $ replicate 100 $ geometricSeriesCR
+    -- , test "geometricSeriesCR_tree_product" [0,20..1000]      $ foldTree1 (*) [geometricSeriesCR | _ <- [1..100]]
+    -- , test "geometricSeriesCR_tree_memo_product" [0,20..1000] $ foldTree1 (*) $ replicate 100 $ geometricSeriesCR
 
-      testParam "list_sum" [1000,2000..20000] [0,100..400]  $ \m -> foldl1' (+) [fromRational (i % 7) | i <- [1..m]]
-    , testParam "tree_sum" [1000,2000..20000] [0,100..400]  $ \m -> foldTree1 (+) [fromRational (i % 7) | i <- [1..m]]
+      -- testParam "list_sum" [1000,2000..40000] [0,200..1000]  $ \m -> foldl1' (+) [fromRational (i % 7) | i <- [1..m]]
+      testParam "list_sum" [1000,2000..20000] [0,10,100,1000,10000,100000,1000000] $ \m -> foldl1' (+) [fromRational (i % 7) | i <- [1..m]]
+    -- , testParam "tree_sum" [1000,2000..20000] [0,100..400]  $ \m -> foldTree1 (+) [fromRational (i % 7) | i <- [1..m]]
 
     -- , testParam "idODE"                      [0..15] [0,20..200] $ linearODE 1 . toRat        --30 min each
     -- , testParam "idODE_rat"                  [0..15] [0,20..200] $ linearODERat 1 . toRat
@@ -157,6 +151,8 @@ benchmarks = [
 
     --ODEs lineares com o param sendo o coef??
 
+    , testParam "expODE"                        [0,0.1..1.5] [0..10] $ expODE . toRat
+
 
     --TODO: all memo tests again (now with full-laziness)
     --TODO: limits, nested limits
@@ -169,15 +165,6 @@ benchmarks = [
     --      limits (careful: take into account the time taken to generate the terms)
     --      ode solver (constant, linear, polynomial, exponential/trig/recursive)
     --      jaguar (exp precision, ACC pilot)
-
-    --TODO: write script to graph benchmark times of ode as function of accuracy and time
-
-    --test "gauss_sum" [0..2]          $ gaussSum
-    --test "piLeibniz" [0..6]        $ piLeibniz
-    --test "simple_sum" [8,9]       $ piLeibniz + piLeibniz
-    --test "memo_sum" [8,9]         $ let x = piLeibniz in x + x
-    --test "doubling" [8,9]           $ 2 * piLeibniz
-    --test "ball_bounce_9" [0..10] $ ballBounce 9
     ]
 
 
@@ -186,7 +173,7 @@ type Tests a = Group String (Test a)
 
 splitTestName :: (String, a) -> (String, (Maybe Rational, (String, (Maybe Int, a))))
 splitTestName (s,a) = (gs !! 0, (readRat (gs !!? 2) (gs !!? 4), (gs !! 5, (read <$> (gs !!? 7), a))))
-    where (_,_,_,gs) = s =~ "^([a-zA-Z0-9_\\-]+)(/(-?[0-9]+(\\.[0-9]+)?)|(-?[0-9]+%[0-9]+))?/([a-zA-Z0-9_\\-]+)(/([0-9]+))?$" :: (String,String,String,[String])
+    where (_,_,_,gs) = s =~ "^([a-zA-Z0-9_\\-\\.]+)(/(-?[0-9]+(\\.[0-9]+)?)|(-?[0-9]+%[0-9]+))?/([a-zA-Z0-9_\\-\\.]+)(/([0-9]+))?$" :: (String,String,String,[String])
           xs !!? i = let m = xs !! i in if null m then Nothing else Just m
           readRat float frac = firstJust (readDecimal <$> float) (read <$> frac)
 

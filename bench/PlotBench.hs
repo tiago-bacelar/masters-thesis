@@ -46,7 +46,7 @@ plotAccuracy path title xs = do
         layout_x_axis . laxis_title .= "accuracy"
         layout_y_axis . laxis_title .= "time (ms)"
 
-        let maxTime = maximum $ map (maximum . map snd . snd) xs
+        let maxTime = maximum $ concat $ map (map snd . snd) xs
         layout_y_axis . laxis_generate .= scaledAxis def (0, maxTime)
 
         setColors $ opaque <$> [blue,green,red,orange,cyan]
@@ -60,7 +60,7 @@ plotParamMultiI path title xs = do
         layout_x_axis . laxis_title .= "parameter"
         layout_y_axis . laxis_title .= "time (ms)"
 
-        let maxTime = maximum $ map (maximum . map snd . snd) xs
+        let maxTime = maximum $ concat $ map (map snd . snd) xs
         layout_y_axis . laxis_generate .= scaledAxis def (0, maxTime)
 
         setColors $ opaque <$> [blue,green,red,orange,cyan]
@@ -74,7 +74,7 @@ plotParamMultiAcc path title xs = do
         layout_x_axis . laxis_title .= "parameter"
         layout_y_axis . laxis_title .= "time (ms)"
 
-        let maxTime = maximum $ map (maximum . map snd . snd) xs
+        let maxTime = maximum $ concat $ map (map snd . snd) xs
         layout_y_axis . laxis_generate .= scaledAxis def (0, maxTime)
 
         let minAcc = minimum $ map fst xs
