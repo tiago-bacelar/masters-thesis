@@ -1,6 +1,10 @@
 \documentclass[12pt,a4paper]{report}
 \usepackage{dissertation}
-\makeglossaries
+
+\makenoidxglossaries
+\input{glossary}
+\glsaddall
+
 \makeindex
 
 \logo{EE}{School of Engineering}{}
@@ -44,15 +48,16 @@
 \listoffigures
 
 % List of tables
-%\renewcommand*{\listtablename}{List of Tables}
-%\listoftables
-%\clearpage
+\renewcommand*{\listtablename}{List of Tables}
+\listoftables
+\clearpage
+
 
 % Acronyms
-%\printglossary[type=\acronymtype,nonumberlist, title={Acronyms}]
+\printnoidxglossary[type=\acronymtype, title={Acronyms}, sort=def, nonumberlist]
 
 % Glossary
-%\printglossary[title={Glossary}, nonumberlist]
+\printnoidxglossary[title={Glossary}, sort=def, nonumberlist]
 
 \cleardoublepage
 \pagenumbering{arabic}
@@ -84,5 +89,7 @@
 %\input{appendices/Tooling}
 
 \input{covers/BackCover}
+
+\glsaddallunused
 
 \end{document}

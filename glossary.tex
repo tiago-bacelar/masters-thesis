@@ -1,0 +1,59 @@
+%Acronyms
+
+\newacronym{era}{ERA}{Exact Real Arithmetic}
+
+\newacronym{ode}{ODE}{Ordinary Differential Equation}
+
+\newacronym{ivp}{IVP}{Initial Value Problem}
+
+
+
+%Glossary
+
+\newglossaryentry{real}
+{
+    name={real number/real},
+    description={An element of $\R$, which can be defined as the completion of $\Q$ using Cauchy limits}
+}
+
+\newglossaryentry{computable_real}
+{
+    name={computable real number/computable real},
+    description={A computational object that denotes a real number}
+}
+
+\newglossaryentry{exact_real_arithmetic}
+{
+    name={exact real arithmetic},
+    description={Arithmetic on computable reals}
+}
+
+\newglossaryentry{cr_representation}
+{
+    name={computable real representation strategy/computable real representation},
+    description={A mathematical formalization of the concept of computable real (e.g. nested intervals representation, modulus of convergence representation)}
+}
+
+\newglossaryentry{cr_implementation}
+{
+    name={computable real implementation},
+    description={A concrete implementation of a computable real representation strategy, usually offering functionality like arithmetic, comparison, etc (e.g. the packages analyzed in this thesis)}
+}
+
+\newglossaryentry{cr_approx}
+{
+    name={computable real approximation},
+    description={A real value, or range of real values, produced by a computable real number to approximate the real number it denotes. Usually restricted to $\Q$ or some subset of $\Q$}
+}
+
+\newglossaryentry{comp_real}
+{
+    name={\textit{CompReal}},
+    description={A Haskell typeclass defined for this thesis that abstractly encapsulates the concept and functionality of a computable real}
+}
+
+\newglossaryentry{comp_real_instance}
+{
+    name={\textit{CompReal} instance},
+    description={A computable real implementation that instantiates the \textit{CompReal} typeclass. All 5 analyzed packages had a \textit{CompReal} instance written for them}
+}
