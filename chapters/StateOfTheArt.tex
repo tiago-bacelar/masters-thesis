@@ -26,12 +26,12 @@ A Cauchy sequence is defined as a sequence whose terms get arbitrarily close to 
 
 This formalization, however, poses a problem: even if a sequence is known to be Cauchy, it is impossible to know which number it is converging into by looking only at a finite number of its terms. For example, the following sequence converges on the number 2:
 
-\begin{equation}
+\begin{equation*}
   \begin{cases} 
     a_i = 0 & \text{if } i < 1000000 \\
     a_i = 2 & \text{if } i \geq 1000000 \\
   \end{cases}
-\end{equation}
+\end{equation*}
 
 In the worst-case scenario, the sequence may not even be Cauchy and not converge. A direct implementation of this concept, also known as the plain or naive Cauchy representation, is therefore insufficient, since it makes no guarantees about the represented real value at any step. 
 
@@ -63,23 +63,23 @@ Another example of a domain, also of interest later in the thesis, is the orderi
 
 Domain theory is the basis of denotational semantics of programming languages, since it models the idea of computational information. A computation can be thought of as a continuous function, that is, a monotonic function such that, for any subset $X$ of the domain:
 
-\begin{equation}
+\begin{equation*}
 \bigsqcup_{\substack{x \in X}} f(x) = f(\bigsqcup_{\substack{x \in X}} x)
-\end{equation}
+\end{equation*}
 
 where $\bigsqcup$ denotes the least upper bound. Another recurring concept in domain theory is the bottom element $\bot$ of a domain $D$, which, when it exists, is defined as the least element of $D$ ($\forall x \in D, \bot \sqsubseteq x$ - that is, $\bot$ is the only minimal element of $D$) and denotes no information or a never-ending computation. In the previous examples, both domains have a bottom element.
 
 To represent real numbers, it is interesting to work specifically with the domain of closed real intervals, the reason for which will shortly become apparent. We define the domain $(I,\sqsubseteq)$ as:
 
-\begin{equation}
+\begin{equation*}
 [a,b] \sqsubseteq [c,d] \iff [a,b] \supseteq [c,d]
-\end{equation}
+\end{equation*}
 
 from which we can derive
 
-\begin{equation}
+\begin{equation*}
 \bigsqcup_{\substack{[a,b] \in X}} [a,b] = \bigcap_{\substack{[a,b] \in X}} [a,b]
-\end{equation}
+\end{equation*}
 
 This means that an interval has greater information content than another if it is contained in it. In this domain, a maximal element is an interval with zero length, that is, an interval of the form $[a,a]$, since the only interval contained in it is itself ($[a,a] \supseteq [b,c] \rightarrow [a,a] = [b,c]$, or equiavalently, $[a,a] \sqsubseteq [b,c] \rightarrow [a,a] = [b,c]$, which is the definition of a maximal element in $\sqsubseteq$). $[a,a]$, therefore, denotes exactly the real number $a$. Crucially, because computations correspond to continuous functions on the domain, any computation on a set of converging intervals will approach the result of the computation applied to the denoted real number.
 
@@ -93,9 +93,9 @@ As a small aside, it is important to keep in mind that operating on an interval 
 
 Although nested intervals allow the sequence to bound every approximation's error, note that it does not actually guarantee that any sequence converges on a single real number; it may simply converge on an interval. To ensure the former, we must introduce what is known as a modulus of convergence. The modulus of convergence is defined as follows: for a given Cauchy sequence $\{a_i\}_{i \in \N}$, the modulus of convergence is a function $f:\N \rightarrow \N$ that satisfies the following relation:
 
-\begin{equation}
+\begin{equation*}
 i \geqslant j > f(n) \implies |a_i - a_j| \leq 2^{-n}
-\end{equation}
+\end{equation*}
 
 Informally, for a certain $n$, the modulus of convergence gives us a position on the sequence such that all future terms differ less than $2^{-n}$ from each other, therefore implying that all of these terms have an accuracy of at least $n$. If such a function exists, it is possible to prove that the sequence follows \cref{eq:cauchy} and therefore converges.
 
@@ -105,9 +105,9 @@ In practice, many representations don't provide a modulus of convergence, since 
 
 Lastly, note that a Cauchy sequence $\{a_i\}_{i \in \N}$ equipped with a modulus of convergence $f:\N \rightarrow \N$ can be converted into a valid sequence of nested intervals $\{[b,c]_n\}_{i \in \N}$, since the modulated terms of the sequence effectively form an interval of length $2^{-n}$:
 
-\begin{equation}
+\begin{equation*}
 [b,c]_n = [a_{f(n)}-2^{-n-1}, a_{f(n)}+2^{-n-1}]
-\end{equation}
+\end{equation*}
 
 This makes nested intervals a sort of intermediate step between the basic Cauchy sequences with no modulus, the least restrictive representation (so nonrestrictive, in fact, that it is insufficient for practical use), and sequences with a modulus, which have the most restrictions. For example, to represent the number 2, a plain Cauchy sequence has literally no restrictions on any finite number of its elements (see the example at the end of \cref{sec:cauchy}); a sequence of nested intervals forces all its intervals to contain the number 2 (but does not restrict the length of the intervals in any way); and a modulus of convergence sets a maximum interval length that gets cut in half for each new interval.
 
@@ -120,15 +120,15 @@ Since these two terms are used interchangeably in day-to-day language, it may be
 
 Accuracy refers to how close the result of a computation or approximation is to the mathematical true value being computed, measured by the absolute or relative error of the approximation. In this thesis, accuracy is denoted by $n$ \footnote{As implied by the choice of symbol, $n$ is a natural number ($n \in \N$). Although it wouldn't be nonsensical to consider negative accuracies as well (that is, absolute errors greater than $0.5$), in practice, sequence of approximation-type representations are usually limited to natural accuracies for ease of implementation} and is defined logarithmically in terms of the absolute error $\epsilon$:
 
-\begin{equation}
+\begin{equation*}
 n = \lfloor-log_2(\epsilon)-1\rfloor
-\end{equation}
+\end{equation*}
 
 This quantity is, not incidentally, the input of the modulus of convergence of a Cauchy sequence. If the accuracy $n$ of a certain result or approximation $\hat{x}$ is known, we can construct an interval of length $2^{-n}$ of all possible values for the computation's true value $x$:
 
-\begin{equation}
+\begin{equation*}
 \hat{x}-2^{-n-1} \leq x \leq \hat{x}+2^{-n-1}
-\end{equation}
+\end{equation*}
 
 For instance, take $50/16=3.125$ as an approximation of pi. This approximation has an error of $\epsilon = |\pi-50/16| = 0.016592...$, from which we derive its accuracy of $n=\lfloor-log_2(0.016592...)-1\rfloor = 4$. This means that in a Cauchy sequence converging to pi that follows a constant modulus of convergence ($f(n)=n$), this approximation could be any of the first five terms. Of course, this example is, in a sense, "backwards"; we used the actual value of pi to calculate the error (and then accuracy) of our approximation. In reality, the reason why we generate approximations is to approach an unknown true value, and so the error has to be inferred from the nature of the operations performed to obtain the approximation. This process of error inference is an important part of numerical analysis, and extremely relevant to us here as well: we want to generate error bounds as tight as possible for the amount of computational resources expended, so as to maximize performance.
 
@@ -255,12 +255,14 @@ It should now be clear how to obtain an appropriate sequence of approximations f
 
 Finally, real numbers should support comparison. As stated before, comparison is undecidable on the computable reals, so a straight implementation of Haskell's \textit{Ord} class might never halt when comparing two reals. An in-depth exploration of why this is undesirable can be found in \cref{sec:strict_comparison}, which showcases how comparisons work in the hybrid simulator. To guarantee halting, a new class \textit{CompOrd} was created to capture the idea of comparing increasingly accurate approximations, in the domain theory sense. Its comparison function takes two values to compare and an accuracy $n$ and returns an element of the ordering domain, an extension of Haskell's \textit{Ordering} type (pictured in \cref{fig:ordering_dom}), by first \textit{approx}imating its two operands and then comparing the approximations. If the difference between the approximations is greater than $2^{-n}$, the comparison can be fully decided and returns LT or GT. Otherwise, a non-maximal element of the ordering domain is returned.
 
-An important point to make is that \textit{CompReal} and $\Q^{\N}$ are \textbf{not} isomorphic; they might be, depending on the specific \textit{CompReal}, but are not required to. Even though \textit{approx} and \textit{cons} are maps between the two types, their composition is not required to preserve the internal structure of the \textit{CompReal} ($cons \circ approx \neq id$, or in other words, \textit{approx} and \textit{cons} are not each other's inverse), despite the resulting \textit{CompReal} denoting the same real number. This change in internal structure can have serious impacts on performance, which is why these operations should be used judiciously. For this exact reason, even though \textit{limit}, \textit{fromRational} and all numeric operations could be implemented transparently (by manipulating sequences of approximations obtained with $approx$ and translating back to \textit{CompReal} using \textit{cons}, as shown in the previous examples), doing so would be terrible for performance. Instead, each instance of \textit{CompReal} implements these functionalities independently, optimized to the specific internal structure of their representation, using its library's code and functionalities whenever possible and new code written specifically for them when not. The exception is \textit{CompOrd} and its comparison function, which is implemented using \textit{approx} in all instances to assure that comparison is somewhat consistent between different libraries when using the same precision - though each instance is still expected to define its own \textit{min} and \textit{max}, optimized to its internal structure, like all the other operations.
+An important point to make is that \textit{CompReal} and $\Q^{\N}$ are \textbf{not} isomorphic; they can be, depending on the specific \textit{CompReal}, but are not required to. Even though \textit{approx} and \textit{cons} are maps between the two types, their composition is not required to preserve the internal structure of the \textit{CompReal} ($cons \circ approx \neq id$, or in other words, \textit{approx} and \textit{cons} are not each other's inverse), despite the resulting \textit{CompReal} denoting the same real number. This change in internal structure can have serious impacts on performance, which is why these operations should be used judiciously. For this exact reason, even though \textit{limit}, \textit{fromRational} and all numeric operations could be implemented transparently (by manipulating sequences of approximations obtained with $approx$ and translating back to \textit{CompReal} using \textit{cons}, as shown in the previous examples), doing so would be terrible for performance. Instead, each instance of \textit{CompReal} implements these functionalities independently, optimized to the specific internal structure of their representation, using its library's code and functionalities whenever possible and new code written specifically for them when not.
 
 \subsection{Package Survey}
+\label{sec:survey}
 %TODO: dizer como os limites sao calculados com cada package?
 
 \subsubsection{CDAR}
+%TODO: meter paper http://cs.swan.ac.uk/%7Ecsjens/pdf/centred.pdf  (Blanck 2006)
 
 \textit{CDAR} \cite{CDAR} is based on centered dyadic approximations, described in \cite{BLANCK200650}, and inspired by \textit{iRAAM} \cite{iRRAM}, an exact real arithmetic c++ library. Each approximation is stored as a center point and an error bound, both dyadic numbers with the same exponent. This is equivalent to storing the two endpoints of an interval, as described in the paper, but is slightly more compact in terms of storage and has performance benefits when working with the error bound of the approximation. The downside is that numeric operations are harder to implement, since the image of an interval is not in general centered on the image of its center point (when performing multiplications, for example).
 
@@ -274,9 +276,9 @@ A real number is represented as a list of these approximations, taking advantage
 
 \textit{ERA} \cite{ERA} is the oldest and simplest of the surveyed packages. It represents real numbers as a Cauchy sequence of dyadic numbers with a fixed modulus of convergence, stored as a function $\textit{Int} \rightarrow \textit{Integer}$, where each \textit{Integer} is the numerator of a dyadic number. Formally, the real number $r$ is represented by a function $f$ if:
 
-\begin{equation}
+\begin{equation*}
 \forall j \in \N, |r - f(j)/2^{j}| < 2^{j}
-\end{equation}
+\end{equation*}
 
 Sadly, this implementation doesn't have many utilities to work with its real numbers other than the basic arithmetic operations. It also does not memoize any of its results, making it the slowest of the surveyed packages (detailed benchmarking results are examined in \cref{chap:results}).
 
@@ -290,9 +292,9 @@ ireal \cite{IReal} expands on the ideas presented so far by merging the concepts
 
 Formally, an \textit{ireal} value represented by a function $<f,g>$ contains a real number $r$ if
 
-\begin{equation}
+\begin{equation*}
 \forall j \in \N, f(j)/2^{j} < r < g(j)/2^j
-\end{equation}
+\end{equation*}
 
 This representation is redundant when representing a single real number, since the condition imposed by the modulus already creates an interval of possible convergence points. However, this allows \textit{ireal} to directly represent intervals with real endpoints. In this setup, a single real number is simply a sequence of thin intervals, that is, the $j$-th interval's endpoints are exactly $2/2^j$ apart.
 
@@ -351,9 +353,9 @@ Modeling hybridness as a monadic effect greatly facilitates both reasoning about
 
 This general description of hybridness allows for any kind of state. However, as pointed out by the creators of Lince - an imperative hybrid programming language - in \cite{goncharov2020}, there are advantages in fixing the state type such that every operation both takes and produces the same type of state. Due to its imperative nature, Lince only works with states of $n$ real variables ($\R^n$), using differential equations as trajectory generators. As an advantage, instead of using the general hybrid monad $\monad{H}$ described in \cite{neves18}, Lince formalizes its syntax with a parametrized monad $\monad{H}_S$, where $S$ is the fixed type of the state of the program (which in Lince's case happens to be $\R^n$ for some $n \in \N$):
 
-\begin{equation}
+\begin{equation*}
 \functor{H}_S\ X = \sum_{I \in [0,\R_0^+)}{S^I} \times X + \sum_{I \in [0,\overline{\R_0^+}\rrparenthesis}{S^I}
-\end{equation}
+\end{equation*}
 
 Let's break down this definition. $\functor{H}_S X$ is defined as a coproduct. The left-hand side represents what the paper calls \textit{convergent} trajectories, which are trajectories that have a certain duration $d \in \R_0^+$ and a defined endpoint at time $t=d$. The definition separates these into a product: $\sum_{I \in [0,\R^{+})}{S^I}$ is the open trajectory up until the endpoint and $X$ is the endpoint (the duration $d$ is implicitely given as the upper bound of $I$). The right-hand side of the coproduct represents \textit{divergent} trajectories, which are trajectories that don't have an endpoint. These may come about in two situations: either the trajectory has "infinite duration", as in, it is of the form $S^{\R_0^+}$ (these are \textit{open divergent}); or it has a finite duration but no endpoint\todo{é verdade?} (\textit{closed divergent}). This second situation is perhaps the most puzzling, but consider the following example of a closed divergent trajectory:
 
@@ -362,7 +364,7 @@ Let's break down this definition. $\functor{H}_S X$ is defined as a coproduct. T
   while true do { wait x; x := x/2 }
 \end{lstlisting}
 
-Calculating the state of the system at $t=1$ would require an infinite number of iterations of the while loop. The moment $t=1$ is what we call a zeno point (since this situation is reminiscent of Zeno's paradoxes); the state of the system at this point is not defined.
+Calculating the state of the system at $t=1$ would require an infinite number of iterations of the while loop. The moment $t=1$ is what we call a zeno point (since this situation is reminiscent of Zeno's paradoxes); the state of the system at and after this point is not defined (see \cref{sec:iter_limit} for more details on zeno points and how they are handled by the hybrid simulator).
 
 Of course, if $S \neq X$ this definition of $\functor{H}_S X$ doesn't really represent a trajectory; it makes no sense for the state type of a trajectory to be different before and at the endpoint. The whole point of parametrizing the hybrid monad is separating the type of the endpoint $X$, which is used when concatenating two trajectories, and the type of the open trajectory before it, which isn't. This split allows us to define trajectory concatenation (and, using concatenation, all monadic operators) independently of $S$, such that $\monad{H}_S$ is a monad regardless of the type $S$. And in the special case $S = X$, only then does $\functor{H}_S S$ represent a hybrid trajectory.
 
@@ -372,35 +374,35 @@ The limitation of this definition is that, since interpreting $\functor{H}_S X$ 
 
 We first start by defining the concatenation of two open trajectories, $(^\frown) : \sum_{I \in [0,\R_0^+)}{S^I} \times \sum_{I \in [0,\R_0^+)}{S^I} \rightarrow \sum_{I \in [0,\R_0^+)}{S^I}$:
 
-\begin{equation}
+\begin{equation*}
   (i_{I=[0,d_1)}\ e_1) ^\frown (i_{I=[0,d_2)}\ e_2) = i_{I=[0,d_1+d_2)}\ e'
   , \text{where }
   \begin{cases}
     e'\ t = e_1\ t        \ \text{if } t   <  d_1 \\
     e'\ t = e_2\ (t - d_1)\ \text{if } t \geq d_1 \\
   \end{cases}
-\end{equation}
+\end{equation*}
 
 The definition for $\sum_{I \in [0,\overline{\R_0^+}\rrparenthesis}{S^I}$ is equivalent. The symbol $(^\frown)$ is used to represent both concatenations, depending on the type of the inputs. Note that this operator is associative: $({a^{}} ^\frown b) ^\frown c^{} = {a^{}} ^\frown ({b^{}} ^\frown c)$\todo{proof?}. Concatenation also has an identity element, the empty trajectory $\epsilon$:
 
-\begin{equation}
+\begin{equation*}
 \epsilon = i_{I=\emptyset}\ (!)
-\end{equation}
+\end{equation*}
 
 such that ${a^{}} ^\frown \epsilon = { \epsilon^{}} ^\frown a = a$\todo{proof? its pretty simple}. These properties make trajectories a monoid, which can be specified as the triple $(\functor{Trj}_S, (^\frown), \epsilon)$ where $\functor{Trj}_S = \sum_{I \in [0,\R_0^+)}{S^I}$ for open trajectories and $(\functor{Trj'}_S, (^\frown), \epsilon)$ where $\functor{Trj'}_S = \sum_{I \in [0,\overline{\R_0^+}\rrparenthesis}{S^I}$ for open, closed and infinite trajectories.
 
 We can now define the monad operators for $\monad{H}_S$: the unit function $u : X \rightarrow \functor{H}_S X$, that returns an empty convergent trajectory with the inputted endpoint:
 
-\begin{equation}
+\begin{equation*}
 %$ u\ x = i_L (\epsilon, x)$
 u = i_L \circ \langle \underline{\epsilon}, id \rangle
-\end{equation}
+\end{equation*}
 
 and the Kleisli lifting $(^\star)$ (also known as monadic bind), that transforms a function $f : X \rightarrow \functor{H}_S Y$ into a function $f^\star : \functor{H}_S X \rightarrow \functor{H}_S Y$
 
-\begin{equation}
+\begin{equation*}
 f^\star = [(\langle (^\frown) \circ (id \times \pi_L), \pi_R \circ \pi_R \rangle + (^\frown)) \circ distr \circ (id \times f), i_R]
-\end{equation}
+\end{equation*}
 
 Informally, if the inputted hybrid trajectory is divergent, it is returned as is; otherwise, $f$ is applied to its endpoint and the resulting hybrid trajectory is concatenated with the first. As expected, the result is convergent only if both trajectories are themselves convergent.
 
@@ -418,7 +420,7 @@ The following proofs start by expanding the definitions for the unit and the Kle
 
 %Left identity: bind f (u x) = f x
 %pointfree: $f^\star \circ u = f$
-\begin{equation}
+\begin{equation*}
   \begin{split}
     f^\star \circ u =&\ [(\langle (^\frown) \circ (id \times \pi_L), \pi_R \circ \pi_R \rangle + (^\frown)) \circ distr \circ (id \times f), i_R] \circ i_L \circ \langle \underline{\epsilon}, id \rangle \\
     %Cancelamento-+
@@ -440,12 +442,12 @@ The following proofs start by expanding the definitions for the unit and the Kle
     %Functor-id-+
     =&\ f
   \end{split}
-\end{equation}
+\end{equation*}
 
 
 %Right identity: bind u x = x
 %pointfree: $u^\star = id$
-\begin{equation}
+\begin{equation*}
   \begin{split}
     u^\star =&\ [(\langle (^\frown) \circ (id \times \pi_L), \pi_R \circ \pi_R \rangle + (^\frown)) \circ distr \circ (id \times (i_L \circ \langle \underline{\epsilon}, id \rangle)), i_R] \\
     %$distr \circ (f \times (i_L \circ g)) = i_L \circ (f \times g)$
@@ -465,12 +467,12 @@ The following proofs start by expanding the definitions for the unit and the Kle
     %Reflexao-+
     =&\ id
   \end{split}
-\end{equation}
+\end{equation*}
 
 
 %Associativity: bind f (bind g x) = bind (bind f . g) x
 %pointfree: $f^\star \circ g^\star = (f^\star \circ g)^\star$
-\begin{equation}
+\begin{equation*}
   \begin{split}
     f^\star \circ g^\star =&\ [(\langle (^\frown) \circ (id \times \pi_L), \pi_R \circ \pi_R \rangle + (^\frown)) \circ distr \circ (id \times f), i_R] \\
       &\ \circ [(\langle (^\frown) \circ (id \times \pi_L), \pi_R \circ \pi_R \rangle + (^\frown)) \circ distr \circ (id \times g), i_R] \\
@@ -493,8 +495,9 @@ The following proofs start by expanding the definitions for the unit and the Kle
     %definicao de (^\star)
     =&\ (f^\star \circ g)^\star
   \end{split}
-\end{equation}
+\end{equation*}
 \todo{acabar prova}
 
 
 In the paper, $\monad{H}_S$ is also shown to be an Elgot monad \cite{ELGOT1975175} by using the bind operator to define an Elgot iteration operator as a least fixed point. Elgot iteration is later used in the paper to formalize the denotational semantics of Lince's while loops. This thesis doesn't cover this detail, however, since the denotational semantics of the new hybrid language isn't really formalized. To create an operational semantics for the language (\cref{sec:semantics}), the provided concepts are enough.
+%TODO: is this true? check after writing semantics section

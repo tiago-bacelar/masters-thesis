@@ -1,26 +1,35 @@
 \chapter{Implementation of a Hybrid Simulator}
 \label{chap:implementation}
 
-TODO: preencher depois de acabar o capitulo
-%This chapter presents the implementation of this project's hybrid language, named Jaguar. It is organized into sections corresponding to each component described before: parser, interpreter, differential equation solver and visualizer. When relevant, formalizations are used to better detail the component being analyzed.
-
 \section{System Architecture}
 \label{sec:architecture}
 
-TODO
-%meter aqui o que dantes era dito na seccao do lince
+\begin{figure}
+  \centering
+  \includesvg[width=0.75\linewidth]{images/architecture.svg}
+  \caption{Diagram of Jaguar's architecture}
+  \label{fig:architecture}
+\end{figure}
+
+This chapter presents the implementation of this project's hybrid language, named Jaguar.
+
+Jaguar's architecture (\cref{fig:architecture}) has four main components: a parser, which takes in the hybrid program and produces a syntax tree; an interpreter that runs the operational semantics of the language; a solver, responsible for solving systems of differential equations and provide the solutions to the interpreter; and a visualizer, that displays the whole evolution of the system as a plot constructed from multiple queries. It is also possible to perform queries directly to the interpreter to obtain the state of the system at any given time.
+
+These components were designed to be as modular as possible and are mostly interchangeable, with future changes and improvements in each component not affecting the others. The biggest dependency between them is Jaguar's syntax tree, which is produced by the parser and consumed by the interpreter and solver. All components are also type-agnostic, supporting any type that instantiates a few typeclasses. Besides the computable real types presented in \cref{sec:survey}, Jaguar can also run using regular floating-point numbers (though, of course, the correction of the results is contingent on the program at hand not requiring more numerical precision than the floating-point number can provide), and can be made to support many more in the future simply by instantiating the necessary classes.
+
+The rest of this chapter takes a closer look at each of these components: \cref{sec:parser} is about the parser, \cref{sec:interpreter} explains the interpreter in general (with \cref{sec:undecidability} being about the specific challenge of supporting types with undecidable comparison), \cref{sec:solver} presents the workings of the solver and their formal motivation, and \cref{sec:visualizer} presents the visualizer.
+
 
 \section{Parsing a Hybrid Language}
 \label{sec:parser}
 
 To parse our hybrid language, the Happy \cite{happy} parser generator was chosen. Happy takes an annotated BNF grammar specification and produces a Haskell module containing an LR parser for the grammar. Happy is the parsing library that GHC, the Haskell compiler, uses to parse its own syntax, and its pretty comprehensive functionalities proved to be more than enough for the project's needs.
 
-A Jaguar program is composed of one or more statements. Statements must be separated by one or more semicolons, and the program may optionally end with one. Each statement may contain boolean expressions and numerical expressions, that are evaluated using the expected operator precedence rules (multiplication has higher precedence than addition, which has higher precedence than comparison, which has higher precedence than disjunction). \cref{lst:atomic_statements} showcases all atomic operations and some examples of operator precedence.
-%TODO: check if indeed more than one semicolon is allowed. if not, change this paragraph, the example and a bit of text below that
+A Jaguar program is composed of one or more statements. Statements must be separated by semicolons, and the program may optionally end with one. Each statement may contain boolean expressions and numerical expressions, which are evaluated using the expected operator precedence rules (multiplication has higher precedence than addition, which has higher precedence than comparison, which has higher precedence than disjunction). \cref{lst:atomic_statements} showcases all atomic statements (assignments and differential statements) and some examples of operator precedence.
 
 \begin{lstlisting}[caption=Jaguar program with no particular meaning showcasing atomic statements and operator precedence,label=lst:atomic_statements]
   //Assignments receive a numerical expression
-  x := 0;;;; //Multiple semicolons are allowed between statements
+  x := 0;
   v := 4 + 2 * x; //Interpreted as 4 + (2 * x)
 
   /* Differential statements receive a numerical expression
@@ -34,13 +43,13 @@ A Jaguar program is composed of one or more statements. Statements must be separ
   //Operator precedence works as expected
   if v > 5 + 2 * x || x > 10
   then v := 0
-  else v := 1
+  else v := 1;
 
   //There are also infinite differential statements
   x' = v forever //Semicolon at the end of the program is optional
 \end{lstlisting}
 
-Control statements (if-then-else and while statements) take subprograms as arguments. Subprograms follow the same rules as programs: their statements must be separated by one (or more) semicolons, with one (or more) optional semicolon at the end. If a subprogram has more than one statement it must be encased in brackets \{\}. Line breaks and indentation are always ignored.
+Control statements (if-then-else and while statements) take subprograms as arguments. Subprograms may either be a single statement or multiple statements encased in brackets. Inside the brackets, the same rules as in programs apply: statements must be separated by semicolons, with an optional semicolon at the end. Line breaks and indentation are always ignored.
 
 Jaguar also features C-style comments, as both examples demonstrate. Line comments begin with a double slash // and block comments begin with /* and end with */.
 
@@ -49,15 +58,15 @@ Jaguar also features C-style comments, as both examples demonstrate. Line commen
   v := 4 + 2 * x;
 
   if x > 10
-  then v := 0 //A semicolon here is optional
-  else { x := 10; v := 0 }; //The semicolon outside brackets is mandatory
+  then v := 0 //A semicolon here is not allowed
+  else { x := 10; v := 0; }; //The last semicolon inside the brackets is optional 
 
   if x > 10 then x := 0; //Else clauses are optional
 
   while x < 10 do { x' = v for 1 }
 \end{lstlisting}
 
-Under the hood, the semicolon is actually the sequencing operator, which takes two programs and combines them into a single program that executes its two parts in sequence. Sequencing two hybrid is programs is an associative operation, which means the associativity of the semicolon is ultimately arbitrary from a semantic perspective. However, to make use of Haskell's lazy evaluation, it is advantageous to make the semicolon right-associative. This way, querying the program for the state at time $t$ only has to interpret the program up to that point.
+Under the hood, the semicolon is actually the sequencing operator, which takes two programs and combines them into a single program that executes its two parts in sequence. Sequencing two hybrid programs is an associative operation, which means the associativity of the semicolon is ultimately arbitrary from a semantic perspective. However, to make use of Haskell's lazy evaluation, it is advantageous to make the semicolon right-associative. This way, querying the program for the state at time $t$ only has to interpret the program up to that point.
 
 The full specification of the language's syntax, in BNF notation and its precedence rules, is in the appendice/user guide \todo{ref}.
 
@@ -65,11 +74,50 @@ The full specification of the language's syntax, in BNF notation and its precede
 \section{A Hybrid Interpreter}
 \label{sec:interpreter}
 
-TODO: 
+TODO: What do I say here?
 
 \subsection{Iteration Limit}
-TODO: explicar zeno points
 
+Unlike traditional imperative programs, since hybrid programs are run with an extra parameter $t$ (the time at which to evaluate the state of the system), it is possible to write programs with an infinite duration:
+
+\begin{lstlisting}[caption=Hybrid program with infinite duration,label=lst:inf_program]
+  x' = 1 forever
+\end{lstlisting}
+
+Although it is impossible to calculate the final state of the program (and so is concatenating another program after this one, since statements after an infinite program are unreachable), the state of the system at each time $t$ can still be calculated. In this case, $x(t) = t$. It is even possible to write a program with infinite operations:
+
+\begin{lstlisting}[caption=Hybrid program with infinite operations,label=lst:inf_operations_inf_duration]
+  while true do { wait 1; x := x + 1 }
+\end{lstlisting}
+
+The while loop in this example is infinite, leading to infinite iterations of the statements in brackets, but this program can still run fine. This is because, although it is impossible to run the whole while loop, running the program with any specific $t$ will result only in a finite number of iterations of the loop. The result is the well-defined trajectory $x(t) = floor(t)$.
+
+What is problematic, however, is an infinite number of operations in a finite amount of time. This can be achieved with, for example, an infinite while loop with smaller and smaller durations for each iteration, such that the series obtained from adding their durations is convergent:
+
+\begin{lstlisting}[caption=Hybrid program with infinite operations during a finite amount of time,label=lst:inf_operations_finite_duration]
+  x := 1;
+  while true do { wait x; x := x/2 }
+\end{lstlisting}
+
+This time, all iterations of the while loop are run before $t=2$. Although it can be inferred that the value of $x$ at $t=2$ should be zero, operationally calculating the state of the system for any $t \geq 2$ would require running an infinite number of operations. We say that $t=2$ is a zeno point of the system.
+
+The same can be done with loops of zero duration, of course. For the previous two examples, removing the wait expression from the loop results in a zeno point at $t=0$.
+
+Zeno behaviour is usually disregarded in the literature, since it is difficult to analyze and its effects aren't computationally realisable anyway. Despite the existence of some formalizations \cite{algebra_hybrid} \cite{goncharov19}, treating zeno points operationally (to either calculate the value of the system at the zeno point or even just detect that there is zeno behaviour) is unfeasable. However, there is a simple alternative to zeno detection: by setting a limit to the number of iterations the program is allowed to perform, we effectively prevent zeno behaviour. If this limit is reached, the simulator will raise an error. This allows users of the hybrid simulator to find unintended zeno behaviour in their programs with no analysis overhead, just by adding a parameter to the simulation. To allow programs like \cref{lst:inf_program} to run unbothered, the user may specify they want no iteration limit at all.
+
+
+\subsection{Runtime Errors}
+
+As seen in the previous section, our language can throw errors.
+
+To handle errors without raising a native exception, the endpoint of a hybrid program may be either a valid state or an error state, containing an error message. If a program's endpoint is an error, composing it with any other program results in itself. The composition of two programs is an error if and only if either of the two programs is an error.
+
+Besides the iteration limit discussed in the previous section, there are two other circumstances where an error might be raised, discussed more in depth in \cref{sec:strict_comparison} and \cref{sec:solver}. The following is a list of all situations that cause errors:
+\begin{itemize}
+  \item An inconclusive boolean expression, caused by a strict comparison (Insufficient comparison accuracy)
+  \item Too many iterations of all while loops, summed together (Iteration limit exceeded)
+  \item A differential statement with a non-positive or inconclusive time step
+\end{itemize}
 
 
 \subsection{Language Semantics: Formalization}
@@ -79,46 +127,40 @@ TODO: formal operational semantics (esta seccao na verdade ficava melhor depois 
 
 
 
+
 The internal state of the program. Composed of current time and list of variables:
 
-$PState = \R \times \R^n$
+$S = \R \times \R^n$
 
 
 The external configuration of the program (comparison accuracy and max iteration count. if not given, Jaguar performs exact comparisons and infinite iterations):
 
-$EState = (1 + \N) \times (1 + \N) $
+$ES = (1 + \N) \times (1 + \N) $
 
 
-Some error type (String in my case):
+Some error type (ultimately arbitrary, since it doesn't interact with any other types. I chose $String \times S$ to encode an error message and the state of the program right before the error):
 
-$Err$
+$Err = String \times S$
 
+And finally, the composite monad:
 
-A hybrid query dependant on some specified query accuracy. takes the accuracy and returns the list of all possible values within the given accuracy:
+$\functor{E}_S\ X = ES \rightarrow \functor{H}_S (Err + (X \times ES))$
 
-$\functor{Q}\ X = \N \rightarrow [X]$ \todo{list notation?}
-
-
-And finally, my monad. Despite using $\functor{H}_S$, we actually don't use the monad operators defined in \cref{sec:hybrid_monad} because trajectory concatenation has to be adapted to computable reals (see \cref{sec:hybrid_undecidability} for details). Por isso se calhar nao faz muito sentido provar que $\monad{H}_S$ é um monad no capitulo anterior, agora que penso nisso.... ups
-
-$\functor{E}_S\ X = EState \rightarrow \functor{H}_{\functor{Q}\ S} (Err + (X \times EState))$
-
+$\monad{E}_S = StateT\ ES\ (ExceptT\ Err\ \monad{H}_S)$
 
 With this monad, Jaguar programs are functions of type:
 
-$PState \rightarrow \functor{E}_{PState} PState$
+$S \rightarrow \functor{E}_S\ S$
 
 and can be composed as expected with monadic bind:
 
 $\llbracket p ; q \rrbracket = \llbracket q \rrbracket^{\star} \circ \llbracket p \rrbracket $
 
-problema: $\monad{E}_S$ nao é um monad por causa daquele $\functor{Q}$. basicamente, ao concatenar um programa vazio com outro programa, introduzimos uma descontinuidade, que faz com que queries passem a retornar uma lista com dois elementos (viola as leis da left-identity e right-identity). nao sei bem o que fazer em relacao a isto... quando reunirmos falamos melhor
-
 
 \section{The Challenges of Undecidability}
 \label{sec:undecidability}
 
-Previously, we saw features ubiquitous among many hybrid simulators. However, dealing with computable real numbers results in some unique challenges, mainly when it comes to comparison. In this section, these challenges and their respective solutions are presented and used as motivation for the formalization of Jaguar's semantics in \cref{sec:semantics}.
+Previously, we saw features ubiquitous among many hybrid simulators. However, dealing with computable real numbers results in some unique challenges, mainly when it comes to comparison. This section presents these challenges and the unique solutions developed to address them.
 
 
 \subsection{Strict Comparison}
@@ -126,7 +168,7 @@ Previously, we saw features ubiquitous among many hybrid simulators. However, de
 
 Take as an example the following program, which is meant to calculate the base 2 logarithm of a small number $x < 1$, rounded down ($\lfloor log_2 x \rfloor$):
 
-\begin{lstlisting}[caption=Program to calculate the base 2 logarithm of x]
+\begin{lstlisting}[caption=Program that calculates the base 2 logarithm of x]
 x := 0.0001;  //can be any number less than 1
 y := 1;
 ans := 0;
@@ -157,13 +199,13 @@ y := 1;
 while x > 0.125 || y < 30 do { x := x / 2; y := y * 2; }
 \end{lstlisting}
 
-Although the comparison $x > 0.125$ is indeterminate at the beginning of the fourth iteration, the whole expression can be inferred to be true: since $y < 32$ is true, regardless of the value of the first term, the disjunction is true. In a sense, we can treat indeterminate values as simply another possible output from a comparison, and then work out the possible results of the disjunction. If both true and false results are possible, then the whole disjunction is indeterminate.
+Although the comparison $x > 0.125$ is indeterminate at the beginning of the fourth iteration, the whole expression can be inferred to be true: since $y < 30$ is true, regardless of the value of the first term, the disjunction is true. In a sense, we can treat indeterminate values as simply another possible output from a comparison, and then work out the possible results of the disjunction. If both true and false results are possible, then the whole disjunction is indeterminate.
 
-Essentially, what is being described is a three-valued logic as a way to capture the notion of indeterminacy. The topic is discussed in length in TODO\todo{ref}. Interestingly, this notion can also be conceptualized from a domain theory lens as the flat domain of booleans, containing three values: true, false and bottom. Such a formalization is useful because it allows us to extend what was said before about computable real numbers (\cref{sec:domain}) to the semantics of Jaguar: evaluating boolean expressions will approach the actual result of the denoted condition, and expressions evaluated with greater comparison accuracy are always consistent with those evaluated with lower accuracy.\todo{proof?}
+Essentially, what is being described is a three-valued logic as a way to capture the notion of indeterminacy. The topic is discussed in length in TODO\todo{ref}. Interestingly, this notion can also be conceptualized from a domain theory lens as the flat domain of booleans, containing three values: true, false and bottom. Such a formalization is useful because it allows us to extend what was said before about computable real numbers (\cref{sec:domain}) to the semantics of Jaguar: because operators on the domain of the booleans are continuous, evaluating boolean expressions will approach the actual result of the denoted condition, and expressions evaluated with greater comparison accuracy are always consistent with those evaluated with lower accuracy.\todo{proof?}
 
 Introducing three-valued logic allows Jaguar to decide many expressions that were undecidable before, but is far from a full symbolic evaluation of the expression. For example, in an expression like $p \vee \neg p$, where $p$ is some comparison, should $p$ be inconclusive, the expression will be evaluated as inconclusive, even though logically it must always be true (the well-known tautology/contradiction problem of three-valued logic \todo{ref}).
 
-Finally, notice that the three-valued logic is useless if the user re-enables exact comparisons (up to "infinite accuracy"), since the comparison will never halt and return inconclusive.\todo{Unless all accuracies are tried incrementally? Does this make sense?}
+Finally, notice that the three-valued logic is useless if the user re-enables exact comparisons (up to "infinite accuracy"), since the comparison will never halt and return inconclusive.
 
 \subsection{Lax Comparison}
 
@@ -183,22 +225,6 @@ For these situations, two new operators were created: determinably less than ($<
 This opens the door to all sorts of misbehavior in the program, of course: $9.99 <!\ 10$ will evaluate to false if the comparison accuracy is not high enough. Indeed, the output of this operator may be incorrect for all comparisons $r <!\ s$ where $r < s \leq r + 2^{-n+1}$. However, outside this range, it is guaranteed to be correct. So long as this critical range is avoided, the lax comparators can be used safely. If both operands are integers, this works out to $n>1$, as stated above. For other cases, it may vary. It is the responsibility of the user to make sure the variables being compared are appropriately constrained and choose the appropriate comparison accuracy for their use case.
 
 
-
-\subsection{Runtime Errors}
-\todo{meter em 3.3?}
-
-As seen in the previous sections, our language can throw errors. 
-
-To handle errors without raising a native Haskell exception, the endpoint of a hybrid program may be either a valid state or an error state, containing an error message. If a program's endpoint is an error, composing it with any other program results in itself. The composition of two programs is an error if and only if either of the two programs is an error.
-
-The following is a list of all situations that can raise an error:
-\begin{itemize}
-  \item An inconclusive boolean expression, caused by a strict comparison (Insufficient comparison accuracy)
-  \item Too many iterations of all while loops, summed together (Iteration limit exceeded)
-  \item A differential statement with a non-positive or inconclusive time step
-\end{itemize}
-
-
 \subsection{Hybrid Undecidability}
 \label{sec:hybrid_undecidability}
 
@@ -214,6 +240,7 @@ x' = 1 for 1;
 The output of this program should be a function $x(t)$ such that:
 
 \begin{equation}
+\label{eq:output_example}
   \begin{cases}
     x(t) = 0 & \text{if } 0 \leq t < 1 \\
     x(t) = t & \text{if } 1 \leq t \leq 2 \\
@@ -222,9 +249,9 @@ The output of this program should be a function $x(t)$ such that:
 
 Although this function is mathematically well-defined, in order to evaluate it to any particular value of $t$ we must perform the comparison $t < 1$ to decide between the two branches of the function. However, because comparison is undecidable on the computable reals, evaluating the function may be a never halting computation for $t=1$, and may take arbitrarily long when evaluated for values close to $1$.
 
-To solve this problem, as before, we must use a parametrized comparison, taking in the desired accuracy of our query. Note that this accuracy doesn't necessarily need to match the comparison accuracy used for in-program comparisons. The query accuracy is only used to choose between two (or more) consecutive hybrid states of the program, leaving the actual execution of the program (variable assignments, choosing between if-else branches and while-loop iterations) completely unaffected. Indeed, the query accuracy can even be chosen after the whole program has already run, and can be chosen independently for every query.
+To solve this problem, as before, we must use a parametrized comparison, taking in the desired accuracy of our query. Note that this accuracy doesn't necessarily need to match the comparison accuracy used for in-program comparisons. The query accuracy is only used to choose between two (or more) consecutive hybrid states of the program, leaving the actual execution of the program (variable assignments, choosing between if-else branches and while-loop iterations) completely unaffected. Indeed, the query accuracy can even be chosen independently for every query, without affecting each other into the past nor into the future.
 
-Taking that into account, to give the user the most flexibility and control, it was decided that a query would be a curried function $\mathbb{R} \rightarrow \mathbb{N} \rightarrow [\mathbb{R}^n]$ that takes the time $t$ and the desired query accuracy $n$ and outputs all possible hybrid states within range of that accuracy. The biggest drawback of this solution is that it may lead to some function branches being evaluated outside their original domain. In this particular example, evaluating the query $t=0.999$ with a query accuracy $n < 10$ will result in two possible outputs: $0$, the correct output; and $0.999$, which is clearly impossible to obtain from the mathematical definition, but must be considered nonetheless.
+Taking that into account, to give the user the most flexibility and control, it was decided that a query would be a curried function $\mathbb{R} \rightarrow \mathbb{N} \rightarrow [\mathbb{R}^n]$ that takes the time $t$ and the desired query accuracy $n$ and outputs all possible hybrid states within range of that accuracy. The biggest drawback of this solution is that it may lead to some function branches being evaluated outside their original domain. In this particular example (\cref{eq:output_example}), evaluating the query $t=0.999$ with a query accuracy $n < 10$ will result in two possible outputs: $0$, the correct output; and $0.999$, which is clearly impossible to obtain from the mathematical definition, but must be considered nonetheless.
 
 \section{Differential Equation Solver}
 \label{sec:solver}
@@ -236,12 +263,12 @@ As explained above, the continuous behavior of our hybrid programs is modeled us
 %https://www.maia.ub.es/~angel/taylor/taylor-1.4/taylor.pdf
 The general form of the initial value problem (IVP \todo{indice de abreviaturas?}) can be formalized as follows: given the initial value of a smooth unknown function $x: [a, b] → R^m$ at $a$ such that
 
-\begin{equation}
+\begin{equation*}
   \begin{cases} 
     x(a) = x_0 \\
     x'(t) = f(t, x(t))
   \end{cases}
-\end{equation}
+\end{equation*}
 
 with $f: [a, b]×C ⊂ R×R^m → R^m$, $m≥1$ and $C$ a closed set, find the value of $x(t)$ for any $t \in [a,b]$.
 
@@ -268,6 +295,10 @@ To implement the Taylor method, we therefore need to calculate the derivatives o
 
 \section{Visualizer}
 \label{sec:visualizer}
+
+TODO: uses Chart library
+TODO: prints differently for CompReals (put examples)
+TODO: uses Doubles for placing features on plot
 
 \subsection{Discontinuity Tracking}
 
