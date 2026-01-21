@@ -65,6 +65,7 @@ library
     , array
     , base >=4.7 && <5
     , cdar
+    , collect-errors
     , containers
     , exact-real
     , ghc
@@ -93,6 +94,7 @@ executable jaguar-exe
     , array
     , base >=4.7 && <5
     , cdar
+    , collect-errors
     , containers
     , exact-real
     , ghc
@@ -123,6 +125,7 @@ test-suite jaguar-test
     , base >=4.7 && <5
     , call-stack
     , cdar
+    , collect-errors
     , containers
     , exact-real
     , ghc
@@ -159,6 +162,7 @@ benchmark jaguar-bench
     , array
     , base >=4.7 && <5
     , cdar
+    , collect-errors
     , containers
     , criterion
     , directory

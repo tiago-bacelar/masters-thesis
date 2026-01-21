@@ -17,6 +17,8 @@ infinite that operation will never halt
 
 module SnocList (
     SnocList(..),
+    lFunc,
+    lFuncOrLast,
     singleton,
     fromList,
     toList,
@@ -58,6 +60,9 @@ instance (Show a) => Show (SnocList a) where
 
 lFunc :: ([a] -> [a]) -> SnocList a -> SnocList a
 lFunc f ~(SnocList xs y) = SnocList (f xs) y
+
+lFuncOrLast :: ([a] -> [b]) -> (a -> b) -> SnocList a -> SnocList b
+lFuncOrLast f g ~(SnocList xs y) = SnocList (f xs) (g y)
 
 singleton :: a -> SnocList a
 singleton y = SnocList [] y

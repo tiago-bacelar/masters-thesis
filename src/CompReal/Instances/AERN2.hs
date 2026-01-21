@@ -14,11 +14,14 @@ import Boundable
 import Powers
 import Limit
 
+import Data.Maybe (catMaybes)
+
 import qualified AERN2.Real as AERN2
 import qualified AERN2.MP as AERN2 (endpoints, (+-), mpBallP, getAccuracy)
 import qualified AERN2.MP.Float as AERN2 (MPFloat(..))
 
 import qualified MixedTypesNumPrelude as MTNP
+import Control.CollectErrors (CollectErrors(..))
 
 -- This is a bit scuffed, because when working with accuracy AERN2.(?) performs an optimization
 -- of skipping some elements of the list before starting a one by one search. And that skipping
@@ -69,10 +72,10 @@ instance Limit AERN2.CReal AERN2.CReal where
     errorLimit = errorLimitDef
 
 asIntervals :: AERN2.CReal -> [(AERN2.MPFloat,AERN2.MPFloat)]
-asIntervals = map (AERN2.endpoints . MTNP.unCN) . AERN2.unCSequence
+asIntervals = catMaybes . map (fmap AERN2.endpoints . getMaybeValue) . AERN2.unCSequence
 
 asIntervalsUntil :: Int -> AERN2.CReal -> SL.SnocList (AERN2.MPFloat,AERN2.MPFloat)
-asIntervalsUntil n = fmap (AERN2.endpoints . MTNP.unCN) . SL.takeUntil ((>= AERN2.bits (n+2)) . AERN2.getAccuracy) . AERN2.unCSequence
+asIntervalsUntil n = SL.lFuncOrLast (catMaybes . map (fmap AERN2.endpoints . getMaybeValue)) (AERN2.endpoints . MTNP.unCN) . SL.takeUntil ((>= AERN2.bits (n+2)) . AERN2.getAccuracy) . AERN2.unCSequence
 
 instance CompOrd AERN2.CReal where
     domCompare x y n = SL.findOrLast isTop $ SL.zipOrLastWith domCompareAux (asIntervalsUntil n x) (asIntervalsUntil n y)
