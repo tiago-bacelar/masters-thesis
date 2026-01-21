@@ -33,7 +33,8 @@ goodApprox x n = fromMaybe (error "CDAR.CR bound: expected infinite list in CDAR
 
 instance CompReal CDAR.CR where
     bound = convert .-. goodApprox
-        where convert (CDAR.Approx m e s) = (fromInteger (m-e) * d, fromInteger (m+e) * d)
+        where convert CDAR.Bottom = error "CDAR.CR bound: could not find good approximation"
+              convert (CDAR.Approx m e s) = (fromInteger (m-e) * d, fromInteger (m+e) * d)
                 where d = if s < 0 then 1 % pow2 (-s) else fromInteger (pow2 s)
 
 --CDAR doesn't export this, so we have to redefine it
