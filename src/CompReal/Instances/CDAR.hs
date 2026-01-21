@@ -16,6 +16,7 @@ import Limit
 import qualified Data.CDAR as CDAR
 
 import Data.List (find)
+import Data.Ratio ((%))
 import Data.Maybe (fromMaybe)
 import Control.Applicative (ZipList(..))
 
@@ -24,15 +25,16 @@ good _ CDAR.Bottom         = False
 good _ (CDAR.Approx _ 0 _) = True
 good n (CDAR.Approx _ e s) = - s - (lg2 e) > n
 
-goodApprox :: CDAR.CR -> Int -> CDAR.Approx
-goodApprox x n = fromMaybe (error "bound: expected infinite list in CDAR.CR")
-                    $ find (good n) $ getZipList $ CDAR.unCR x
-
 --We can't use CDAR.require because it's wrong (returns approximations with 2 more precision
 --than required), but this function does essentially the same
-instance CompReal CDAR.CR where
-    bound = split (toRational . CDAR.lowerBound) (toRational . CDAR.upperBound) .-. goodApprox
+goodApprox :: CDAR.CR -> Int -> CDAR.Approx
+goodApprox x n = fromMaybe (error "CDAR.CR bound: expected infinite list in CDAR.CR")
+                    $ find (good n) $ getZipList $ CDAR.unCR x
 
+instance CompReal CDAR.CR where
+    bound = convert .-. goodApprox
+        where convert (CDAR.Approx m e s) = (fromInteger (m-e) * d, fromInteger (m+e) * d)
+                where d = if s < 0 then 1 % pow2 (-s) else fromInteger (pow2 s)
 
 --CDAR doesn't export this, so we have to redefine it
 resources :: [Int]

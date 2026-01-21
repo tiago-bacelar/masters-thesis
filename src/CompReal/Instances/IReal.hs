@@ -25,7 +25,7 @@ import Data.Bits
 --This CompReal instance assumes IReals are numbers (all intervals are "thin", that is, have
 --a difference of 2) and as such always converge with the expected modulus
 instance CompReal IReal.IReal where
-    bound r n = let IReal.I (l,u) = IReal.appr r (n+1); d = pow2 (n+1) in (l % d, u % d)
+    bound x n = let IReal.I (l,u) = IReal.appr x (n+1); d = pow2 (n+1) in (l % d, u % d)
 
 instance Limit Rational IReal.IReal where
     limit f = IReal.ir (\i -> let (a :% b) = f i in fromInteger ((shiftL a i + b `div` 2) `div` b))
@@ -35,7 +35,7 @@ instance Limit IReal.IReal IReal.IReal where
     errorLimit = errorLimitDef
 
 instance CompOrd IReal.IReal where
-    domCompare = domCompareDef
+    domCompare = domCompareDefOpen (\x n -> let IReal.I (l,u) = IReal.appr x (n+1) in (l,u))
     compMin = min
     compMax = max
 

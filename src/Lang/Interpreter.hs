@@ -27,7 +27,6 @@ type SimNum r = (Floating r, Powers r, CompOrd r, Limit r r, Boundable r)
 --TODO: add line and source code of errors
 
 
-
 type Error s = (String, s)
 type Disc s = ([Ident], s, s)
 

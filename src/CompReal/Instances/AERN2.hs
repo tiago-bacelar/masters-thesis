@@ -16,7 +16,7 @@ import Limit
 
 import qualified AERN2.Real as AERN2
 import qualified AERN2.MP as AERN2 (endpoints, (+-), mpBallP, getAccuracy)
-import qualified AERN2.MP.Float as AERN2 (MPFloat)
+import qualified AERN2.MP.Float as AERN2 (MPFloat(..))
 
 import qualified MixedTypesNumPrelude as MTNP
 

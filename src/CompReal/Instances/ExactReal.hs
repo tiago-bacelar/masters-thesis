@@ -104,7 +104,7 @@ instance Limit AnyCReal AnyCReal where
     errorLimit = errorLimitDef
 
 instance CompOrd AnyCReal where
-    domCompare = domCompareDef
+    domCompare = domCompareDef (\x n -> let m = atPrecision x (n+1) in (m-1, m+1))
     compMin = mapCReal2 min
     compMax = mapCReal2 max
 

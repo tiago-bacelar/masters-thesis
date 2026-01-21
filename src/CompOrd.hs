@@ -12,6 +12,7 @@ module CompOrd (
     mCompare,
     CompOrd(..),
     domCompareAux,
+    domCompareAuxOpen,
     infCompareAux,
     compMinDef,
     compMaxDef,
@@ -108,6 +109,13 @@ domCompareAux (xl, xr) (yl, yr)
     | xr < yl                           = Top LT
     | xl > yr                           = Top GT
     | otherwise                         = Bottom
+
+--same as domCompareAux, but for open intervals
+domCompareAuxOpen :: (Ord a) => (a, a) -> (a, a) -> OrderingDomain
+domCompareAuxOpen (xl, xr) (yl, yr)
+    | xr <= yl  = Top LT
+    | xl >= yr  = Top GT
+    | otherwise = Bottom
 
 infCompareAux :: [OrderingDomain] -> (Maybe MidOrdering, Ordering)
 infCompareAux (Bottom : xs)     = infCompareAux xs

@@ -44,7 +44,7 @@ instance Limit ERA.CReal ERA.CReal where
     errorLimit = errorLimitDef
 
 instance CompOrd ERA.CReal where
-    domCompare = domCompareDef
+    domCompare = domCompareDef (\x n -> let m = unCR x (n+1) in (m-1, m+1))
     compMin = min
     compMax = max
 
