@@ -1,17 +1,20 @@
-\chapter{Future work}
+\chapter{Conclusion and Future Work}
 \label{chap:conclusion}
 
-With the goal of implementing a hybrid system simulator in mind, the logical next step of the project is empirically testing the surveyed packages in a benchmarking setting, focusing on correctness but also taking performance into account, to decide on the most appropriate for use. This process will necessarily go through the creation of a standard test suite of exact real computations, and the evaluations of the packages can be compared to the predictions of \cref{sec:practice}. This process is expected to take about three weeks.
+TODO: BENCH/CASE STUDY OVERVIEW
 
-After the selection of the library, the implementation of the hybrid simulator may begin. This will take the implementation of a parser, a numeric differential equation solver and an interpreter. Of these, the derivative equation solver is the most sensitive component, and will require further research to design and fine-tune. Taking this into account, the whole implementation should take between five and six weeks. 
+TODO: insights
+%despite being simple and flexible, exact real arithmetic is very performance heavy, being best employed in specific situations in small but critical calculations. This makes exact real arithmetic, and Jaguar in particular, useful only for formal methods and theoretical problems, while being too slow for "real world" applications.
+%todo
 
-This simulator can then be tested against other existing hybrid simulators such as Lince to demonstrate their differences in performance and predictive power. This benchmarking should mostly focus on accuracy and performance tests, and the trade-off between the two, though other metrics, such as memory consumption, are also relevant. The implemented simulator is expected to have a worse performance when simulating with the same precision as Lince, but be able to simulate arbitrarily precise approximations of the answer. This evaluation is expected to take two to three weeks.
-
-All these steps will be documented on a final dissertation presenting the faced challenges, engineered solutions and collected results. The writing of this dissertation will likely take over a month, and is the last step of this project.
-
-%mention how solving the differential equations symbolicly would be a great optimization (and why it wasnt done here: it would constrain the possible equations; we would lose the ooportunity to showcase limits; and maths is hard)
 
 %FUTURE WORK
-%   allow for even more user customization (e.g. define each comparison precision individually)
-%   condition-driven for statements (lince calls them events i think)
-%   numerical error handling (/0 e assim)
+There is, of course, plenty of room for improvement. An especially important component to enhance is the differential equation solver, to which the performance of the whole simulator is tied. The most direct way to optimize the solver is to symbolically solve the equations instead of using the Taylor method, completely circumventing the need for automatic differentiation and limits and massively reducing the number of arithmetic operations of each differential statement. Of course, not all differential equations are symbolically solvable, so the current approach could still be used in those cases. Some hybrid programs might also benefit from compiler-like optimizations on all arithmetic expressions (e.g. factoring out and reusing common subexpressions), since exact real arithmetic is highly sensitive to the quantity, order and associativity of operations. Adding this analysis to the parser could be an easy way to improve Jaguar's performance.
+
+Besides optimizations, the simulator could also be improved by adding other features and language constructs, such as Lince's events (which are for statements that run for as long as a condition is true) or some equivalent specific to computable real numbers. Currently, there is also no mechanism to detect and manage arithmetic errors such as division by zero. This problem is especially difficult to manage in exact real arithmetic because comparison is undecidable. Even worse, evaluating the result of a division by zero might not even terminate, as the division uses smaller and smaller approximations of the divisor, driving the value of the result infinitely high.
+
+Another important area requiring future study is memory usage, which is mostly disregarded in this thesis but would be of critical importance in an effort to scale up programs and computations. Not only would the current technologies of exact real arithmetic benefit from a memory usage analysis similar to the execution time analysis presented in \cref{sec:package_benches}; but the simulator itself should also be optimized for memory efficiency specifically, so it can handle more complicated hybrid programs without running out of memory, a sad fate my 8GB laptop often encountered during development and testing.
+
+%CONCLUSION
+TODO: In conclusion...
+%In conclusion, despite being a standalone tool, the developed simulator and framework can serve as the groundwork for more complex and specific applications in the future. 

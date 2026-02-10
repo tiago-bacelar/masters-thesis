@@ -17,7 +17,7 @@ while true do {
 
 \begin{figure}
     \centering
-    \includegraphics[width=0.75\linewidth]{images/cc_plot.png}
+    \includegraphics[width=0.75\linewidth]{images/plots/cc.png}
     \caption{Plot of the velocity over time in the cruise control program}
     \label{fig:cc_plot}
 \end{figure}
@@ -39,12 +39,12 @@ x'= x for 80;
 
 \begin{figure}
     \centering
-    \includegraphics[width=0.75\linewidth]{images/exp_plot.png}
+    \includegraphics[width=0.75\linewidth]{images/plots/exp.png}
     \caption{Plot of $x$ over time in the exponential program}
-    \label{fig:exp-plot}
+    \label{fig:plot_exp}
 \end{figure}
 
-\cref{fig:exp-plot} is a plot of the simulation of variable $x$ over time. Variable $x$ was expected to go from 1 to a very small number at time $t=80$ following a negative exponential ($e^{-t}$), and then follow a positive exponential ($e^t$) afterwards and bounce back to 1 at time $t=160$. But the Lince simulator shows the final value of $x$ as 5.653719, which is clearly an error. This error grows even larger if we replace 80 with even larger values.
+\cref{fig:plot_exp} is a plot of the simulation of variable $x$ over time. Variable $x$ was expected to go from 1 to a very small number at time $t=80$ following a negative exponential ($e^{-t}$), and then follow a positive exponential ($e^t$) afterwards and bounce back to 1 at time $t=160$. But the Lince simulator shows the final value of $x$ as 5.653719, which is clearly an error. This error grows even larger if we replace 80 with even larger values.
 
 Using an arbitrary number of digits to represent values (arbitrary precision floating point), and/or ratio representations (numerator and denominator), allows for the exact representation of all rational numbers, but still leaves open the problem of irrational numbers, which are common when simulating physical systems (when using trigonometric functions, for instance, or with the previous exponential example). In the previous example, using arbitrary precision floating point numbers would be impossible since the value of the system at $t=80$, which is needed to calculate the second exponential curve, is irrational. Unlike their rational counterparts, irrational number would take an infinite number of digits to represent using a regular digit representation. This problem therefore calls for alternative solutions.
 

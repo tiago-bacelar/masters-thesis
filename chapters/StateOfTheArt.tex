@@ -47,16 +47,16 @@ For example, take the kleeneans ($K_3 = \{T, F, U\}$), the 3 possible valuations
 
 \begin{figure}
     \centering
-    \includesvg[width=0.4\linewidth]{images/kleeneans.svg}
+    \includesvg[width=0.4\linewidth]{images/diagrams/kleeneans.svg}
     \caption{Hasse diagram of the domain of the kleeneans ($K_3$)}
     \label{fig:kleeneans_dom}
 \end{figure}
 
-Another example of a domain, also of interest later in the thesis, is the ordering domain, which extends the 3 relative positions obtained from comparing two real numbers (LT: $a < b$, EQ: $a = b$ and GT: $a > b$; equivalently, you may think of these 3 values as the sign of $b-a$) into a domain, where each element of the domain represents a possible state of knowledge about the relative position of the two reals, as shown in \cref{fig:ordering_dom}.
+Another example of a domain, also of interest later in the thesis, is the ordering domain, which extends the 3 relative positions obtained from comparing two real numbers (LT: $a < b$, EQ: $a = b$ and GT: $a > b$; equivalently, these 3 values may be thought of as the sign of $b-a$) into a domain, where each element of the domain represents a possible state of knowledge about the relative position of the two reals, as shown in \cref{fig:ordering_dom}.
 
 \begin{figure}
     \centering
-    \includesvg[width=0.5\linewidth]{images/ordering_dom.svg}
+    \includesvg[width=0.5\linewidth]{images/diagrams/ordering_dom.svg}
     \caption{Hasse diagram of the ordering domain}
     \label{fig:ordering_dom}
 \end{figure}
@@ -162,15 +162,16 @@ Another frustrating limitation is the fact that the comparison of two computable
 This section is dedicated to studying existing implementations of exact real arithmetic in the Haskell programming language. We start with some technical considerations specific to Haskell and an abstract view of the features of these implementations. Then, each package's chosen representation strategy is analyzed from a theoretical perspective, listing their capabilities and respective pros and cons. For an empirical analysis of the packages' performance consult \cref{chap:results}.
 
 \subsection{Technical Considerations}
+\label{sec:technical_considerations}
 
 Before starting, a couple of points are worth considering. Haskell, as a high-level functional programming language, provides an arbitrary precision \textit{Integer} data type that greatly simplifies number representation. Although the theory discussed thus far assumes rationals as approximations for real numbers, all analyzed Haskell packages make use of dyadic numbers: numbers of the form $a/2^p$. What is useful about them is they can be represented as two \textit{Integers} (or an \textit{Integer} and an \textit{Int}, the fixed precision\footnote{Although the exact size is implementation-dependent, with most implementations using 64 bits, an \textit{Int} is guaranteed to have at least 30 bits. This can make it dangerous when used as the exponent of extremely small dyadic numbers} counterpart to \textit{Integer}) and have simple sum and product operations, which benefit from bitshift optimizations of powers of 2 multiplication. The main disadvantage of dyadic numbers is that the representation of all other rational numbers also becomes an infinite sequence (in the same way that using a base 10 digit system makes the representation of 1/3 an infinite sequence: 0.33333...). Haskell also provides a \textit{Rational} datatype, stored as two \textit{Integers} (numerator and denominator), which allows users to exactly represent all rational numbers.
 
 Another concept to have in mind is memoization, also known as sharing or caching. Memoization is relevant when the same intermediate calculation is used more than once to produce some desired result. In these circumstances, memoizing the intermediate result avoids pointlessly repeating calculations, therefore increasing performance. In Haskell, some degree of memoization can be done automatically by taking advantage of thunks - a single lazy unit of computation. Essentially, when assigning the result of a computation to a variable, the computation isn't performed until the value is used. If the value is used multiple times, the computation is only run the first time. This allows carefully structured programs to memoize results by storing them in variables or data structures. This is useful in intermediate calculations, since the variables used in them are automatically discarded when no longer needed, avoiding unnecessary memory consumption. That said, all memoization is fundamentally a trade-off of time costs for memory costs, and both techniques presented below increase memory use.
 %todo: ref
 
-In the context of exact real arithmetic, there are two levels of memoization: when calculating the same sequence twice, or when calculating the terms of a sequence out of order. The first level is simple to implement: by storing each term of the sequence in a data structure (a list, for instance), they are cached for future use. The downside is that producing an approximation will require accessing the data structure, which in the case of lists comes with a linear cost.
+In the context of exact real arithmetic, there are two types of memoization: when calculating the same sequence twice, or when calculating the terms of a sequence out of order. The first type is simple to implement: by storing each term of the sequence in a data structure (a list, for instance), they are cached for future use. The downside is that producing an approximation will require accessing the data structure, which in the case of lists comes with a linear cost.
 
-The second level of optimization is more nuanced. It takes advantage of the observation that the $n$-th approximation of a real number is at least as accurate as any of the previous ones, and therefore, it is a valid result for all previous terms of the sequence. This is relevant when the sequence in question is the result of a long series of operations, and therefore each term has a high computational cost. Our observation allows us to return the already calculated $n$-th term when calculating a lesser term would require long computations, thus increasing performance. Note, however, that this makes the elements of the sequence dependent on whether later terms have already been calculated, which is an impure effect. This effect could in principle be modeled as a monad, but that would make using this hypothetical monadic implementation pretty cumbersome. The presented packages that perform this optimization opt for the use of unsafe Haskell functions to produce this impure effect.
+The second type of optimization is more nuanced. It takes advantage of the observation that the $n$-th approximation of a real number is at least as accurate as any of the previous ones, and therefore, it is a valid result for all previous terms of the sequence. This is relevant when the sequence in question is the result of a long series of operations, and therefore each term has a high computational cost. Our observation allows us to return the already calculated $n$-th term when calculating a lesser term would require long computations, thus increasing performance. It also reduces memory costs from type 1 memoization, since each computable real only stores the most accurate approximation calculated so far. Note, however, that this makes each approximation dependent on whether later approximations have already been calculated, which is an impure effect. This effect could in principle be modeled as a monad, but using this hypothetical monadic implementation would be pretty cumbersome. The presented packages that perform this optimization opt for the use of unsafe Haskell functions to produce this impure effect.
 
 \subsection{The \textit{CompReal} class}
 \label{sec:features}
@@ -179,7 +180,7 @@ Each of the surveyed packages implements the concepts above (approximations, com
 
 \begin{figure}
     \centering
-    \includesvg[width=0.5\linewidth]{images/CompReal.svg}
+    \includesvg[width=0.5\linewidth]{images/diagrams/CompReal.svg}
     \caption{Core functionality of \textit{CompReal} (abbreviated as CR)}
     \label{fig:comp_real}
 \end{figure}
@@ -218,7 +219,7 @@ Obviously, computable reals must also support numerical operations. In addition 
 
 \begin{figure}
     \centering
-    \includesvg[width=0.75\linewidth]{images/sum.svg}
+    \includesvg[width=0.75\linewidth]{images/diagrams/sum.svg}
     \caption{A transparent implementation of the numerical sum of two \textit{CompReals} (abbreviated as CR)}
     \label{fig:sum}
 \end{figure}
@@ -284,7 +285,7 @@ Sadly, this implementation doesn't have many utilities to work with its real num
 
 \subsubsection{ireal}
 
-ireal \cite{IReal} expands on the ideas presented so far by merging the concepts of nested intervals and modulus of convergence into a single sequence of nested open intervals with dyadic endpoints, which have a fixed modulus of convergence; all stored as a function $\textit{Int} \rightarrow (\textit{Integer},\textit{Integer})$, which is very close to the formalization of real numbers in domain theory (presented in \cref{sec:domain}). This is important for \textit{ireal}, since the creator wanted to ensure a solid theoretical ground for their implementation. Their paper explaining the implementation and showing its correctness can be found along with the source code.
+\textit{ireal} \cite{IReal} expands on the ideas presented so far by merging the concepts of nested intervals and modulus of convergence into a single sequence of nested open intervals with dyadic endpoints, which have a fixed modulus of convergence; all stored as a function $\textit{Int} \rightarrow (\textit{Integer},\textit{Integer})$, which is very close to the formalization of real numbers in domain theory (presented in \cref{sec:domain}). This is important for \textit{ireal}, since the creator wanted to ensure a solid theoretical ground for their implementation. Their paper explaining the implementation and showing its correctness can be found along with the source code.
 
 Formally, an \textit{ireal} value represented by a function $<f,g>$ contains a real number $x$ if
 
@@ -300,7 +301,7 @@ Like \textit{exact-real}, \textit{ireal} also implements out-of-order memoizatio
 
 \textit{CDAR} \cite{CDAR} is based on centered dyadic approximations as described in \cite{BLANCK200650}, and inspired by \textit{iRAAM} \cite{iRRAM}, an exact real arithmetic C++ library. Each approximation is stored as a center point and an error bound, both dyadic numbers with the same exponent. This is equivalent to storing the two endpoints of an interval, as described in the paper, but is slightly more compact in terms of storage and has performance benefits when working with the error bound of the approximation. The downside is that numeric operations are harder to implement, since the image of an interval is not in general centered on the image of its center point (when performing multiplications, for example).
 
-A real number is represented as a list of these approximations, taking advantage of Haskell's laziness. This way, it possesses the first degree of memoization discussed: in-order memoization. Operations using two real numbers are implemented as a zip of the two lists. Since the sequence of approximations doesn't follow a modulus of convergence, requesting an approximation with some given accuracy requires explicitly iterating the list until a suitable approximation is found.
+A real number is represented as a list of these approximations, taking advantage of Haskell's laziness. This way, it possesses the first type of memoization discussed: in-order memoization. Operations using two real numbers are implemented as a zip of the two lists. Since the sequence of approximations doesn't follow a modulus of convergence, requesting an approximation with some given accuracy requires explicitly iterating the list until a suitable approximation is found.
 
 \textit{CDAR} also has a precision control strategy for its approximations: every list's approximations have the same progression of precisions, starting at 80 and growing by 50\% with each index. Because when zipping lists together each index of the lists behaves independently, advancing one index in the list is effectively equivalent to restarting the calculation from scratch, but with higher a precision, which is exactly \textit{iRAAM}'s strategy.
 
