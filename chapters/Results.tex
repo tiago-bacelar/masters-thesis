@@ -103,7 +103,7 @@ $(a + b) + (c + d)$
 
 This way, the accuracy required from each number will be at most $n+\log_2 k$, and so the total time complexity is merely $\sum_{i=1}^{k} O((n + \log k) \log (n + \log k)) = O((nk+k \log k) \log(n + \log k))$ for modulus of convergence representations, which is a massive boost, as shown in \cref{fig:tree_sum}. Nested intervals representations, as expected, aren't affected. Sadly, this can only be done in specific cases like this one and doesn't generalize to non-associative operations.
 
-To reiterate, although this simple example uses addition, the insight it provides is applicable in any calculation with a high degree of nesting, and explains why nested intervals representations have the advantage in long, nested computations such as a hybrid simulation. This advantage compounds with the $fromInteger$ optimization, making modulus of convergence representations excruciatingly slow by comparison in all but the simplest hybrid programs.
+To reiterate, although this simple example uses addition, the insight it provides is applicable in any calculation with a high degree of nesting, and explains why nested intervals representations have the advantage in long, nested computations such as a hybrid simulation. This advantage compounds with the $fromInteger$ optimization, making modulus of convergence representations excruciatingly slow by comparison in all but the simplest hybrid programs, as we will see in the next section.
 
 \begin{figure}[b!]
   \centering
@@ -114,9 +114,22 @@ To reiterate, although this simple example uses addition, the insight it provide
 
 \pagebreak
 
-The last major difference in performance between these packages is explained by memoization. As explained in \cref{sec:technical_considerations}, memoization is an optimization technique that avoids performing repeated calculations by storing their value in a variable or data structure. In the context of exact real arithmetic this can be done in two different ways: type 1, in-order memoization, and type 2, out-of-order memoization. Of the analyzed packages, \textit{cdar} and \textit{aern2-real} implement type 1 while \textit{exact-real} and \textit{ireal} implement type 2.
+While the basic arithmetic operations are implemented similarly in all packages, more complicated operations such as trigonometric functions can be calculated using various methods, and different packages choose different methods, some more efficient than others. \cref{fig:cos} shows the performance of each package when calculating the cosine of numbers between $0$ to $6.3$, after which the pattern repeats since $cos(x)=cos(x + 2\pi)$.
 
-In all benchmarks shown so far, memoization hasn't had the opportunity to influence results because all calculations are only used once. We can adapt the last benchmark, the sum of a tree, to make use of this optimization by using the information that all elements of the list are the same, and therefore sums of the same number of terms should have the same result. The code is very similar to the usual implementation of exponentiation, which uses the same observation to optimize repeated multiplications:
+While these differences in performance should definitely be taken into account when choosing the most appropriate package for some specific application, they are not fundamental to each package's representation strategy. These differences come from different methods of calculating cosine, not from the underlying strategy, and it would be entirely possible to optimize the slowest packages by switching to a faster method (though it may be true that the \textit{optimal} method is somehow dependent on or influenced by the package's representation strategy such that one strategy leads to a faster optimal implementation of cosine over another).
+
+\begin{figure}[b!]
+  \centering
+  \includegraphics[width=400px]{images/benches/cos.png}
+  \caption{Benchmarks for $cos(x)$ at an accuracy of $n=1000$, scaled logarithmically in the y-axis}
+  \label{fig:cos}
+\end{figure}
+
+\pagebreak
+
+The last major difference in performance between packages is explained by memoization. As mentioned in \cref{sec:technical_considerations}, memoization is an optimization technique that avoids performing repeated calculations by storing their value in a variable or data structure. In the context of exact real arithmetic this can be done in two different ways: type 1, in-order memoization, and type 2, out-of-order memoization. Of the analyzed packages, \textit{cdar} and \textit{aern2-real} implement type 1 while \textit{exact-real} and \textit{ireal} implement type 2.
+
+In all benchmarks shown so far, memoization hasn't had the opportunity to influence results because all calculations are only used once. We can optimize one of the previous tests, the sum of a tree, to make use of memoization by using the observation that all elements of the list are the same, and therefore sums of the same number of terms should have the same result. The resulting code is very similar to the usual implementation of exponentiation, which uses the same observation to optimize repeated multiplications:
 
 \begin{lstlisting}[language=Haskell,caption=Haskell code for the sum of a list of $k$ instances of the same value]
 dp_sum x 1 = x
@@ -129,22 +142,22 @@ dp_sum x k = case k `mod` 2 of
 \begin{figure}[p]
   \centering
   \includegraphics[width=400px]{images/benches/dp_sum_k.png}
-  \caption{Benchmarks for sum of $fromRational\ \frac{22}{7}$ $k$ times at an accuracy of $n=1000$, scaled logarithmically}
+  \caption{Benchmarks for $dp\_sum\ (fromRational\ \frac{22}{7})\ k$ at an accuracy of $n=1000$, scaled logarithmically}
   \label{fig:dp_sum_k}
 \end{figure}
 
 \begin{figure}[p]
   \centering
   \includegraphics[width=400px]{images/benches/dp_sum_n.png}
-  \caption{Benchmarks for sum of $fromRational\ \frac{22}{7}$ $1000$ times, scaled logarithmically}
+  \caption{Benchmarks for $dp\_sum\ (fromRational\ \frac{22}{7})\ 1000$, scaled logarithmically}
   \label{fig:dp_sum_n}
 \end{figure}
 
-Unlike previous tests, where $k$ operations are needed to add the $k$ elements together, this test only takes between $\lfloor \log_2 k \rfloor$ and $2 \lfloor \log_2 k \rfloor$ exact real arithmetic operations\footnote{Full derivation: $dp\_sum$ performs either 1 or 2 operations if $k$ is even or odd, respectively, and then recursively calls itself with $k$ cut by half. This is equivalent to counting the number of ones and zeroes in the binary representation of $k$ (ignoring the first bit, which is always a one), each adding 2 and 1 operations, respectively. Therefore, the total number of operations must be between $\lfloor \log_2 k \rfloor$ (all bits except the first are zeroes) and $2 \lfloor \log_2 k \rfloor$ (all bits are ones)} by reusing the value $\text{x}$ multiple times per step. If the package supports memoization, the complexity of the test is logarithmic on $k$. If it doesn't, however, each $\text{x}$ is unrolled into its own calculation, which then recursively unrolls further, effectively recreating the structure of the tree this code attempted to optimize.
+Unlike previous tests, where $k$ operations are needed to add the $k$ elements together, this test only takes between $\lfloor \log_2 k \rfloor$ and $2 \lfloor \log_2 k \rfloor$ exact real arithmetic operations\footnote{$dp\_sum$ performs either 1 or 2 operations if $k$ is even or odd, respectively, and then recursively calls itself with $k$ divided by $2$. This is equivalent to counting the number of ones and zeroes in the binary representation of $k$ (ignoring the first bit, which is always a one), each adding 2 and 1 operations, respectively. Therefore, the total number of operations must be between $\lfloor \log_2 k \rfloor$ (all bits except the first are zeroes) and $2 \lfloor \log_2 k \rfloor$ (all bits are ones)} by reusing the value $\text{x}$ multiple times per step. If the package supports memoization, the complexity of the test is logarithmic on $k$. If it doesn't, however, each $\text{x}$ is unrolled into its own calculation, which then recursively unrolls further, effectively recreating the structure of the tree this code attempted to optimize.
 
-The results are shown in \cref{fig:dp_sum_k} and \cref{fig:dp_sum_n}. As we would expect, only the packages that implement memoization show improvements, while \textit{ERA}'s performance stayed the same from \cref{fig:tree_sum}. It is also interesting how \textit{exact-real}'s and \textit{ireal} follow the same pattern in \cref{fig:dp_sum_k}, since they have the same memoization type and similar implementation. If the reader is confused as to how their runtime isn't monotonic in $k$ (e.g. $k=1000$ has a greater runtime than $k=3200$), this is because the number of operations performed is not proportional to $k$, but is between $\lfloor \log_2 k \rfloor$ and $2 \lfloor \log_2 k \rfloor$. It just so happens that $k=1000$ needs more operations than $k=3200$, and, as we have seen, modulus of convergence representations are highly sensitive to the number of operations when these aren't nested properly.
+The results are shown in \cref{fig:dp_sum_k} and \cref{fig:dp_sum_n}. As we would expect, only the packages that implement memoization show improvements, while \textit{ERA}'s performance stayed the same from \cref{fig:tree_sum}. It is also interesting how \textit{exact-real} and \textit{ireal} follow the same pattern in \cref{fig:dp_sum_k}, since they have the same memoization type and similar implementation. If the reader is confused as to how their runtime isn't monotonic in $k$ (e.g. $k=1000$ has a greater runtime than $k=3200$), this is because the number of operations performed is not proportional to $\log_2 k$, but is between $\lfloor \log_2 k \rfloor$ and $2 \lfloor \log_2 k \rfloor$. It just so happens that $k=1000$ needs more operations than $k=3200$, and, as we have seen, modulus of convergence representations are highly sensitive to the number of operations when these aren't nested properly.
 
-%Speaking of memoization types, despite being named here as type 1 and type 2 for how simple they are to implement (type 1 being almost immediate and type 2 requiring unsafe Haskell functions), they are totally distinct strategies and have different strengths and weaknesses. For example, ???
+%Speaking of memoization types, despite being named here as type 1 and type 2 for how simple they are to implement (type 1 being almost immediate and type 2 requiring unsafe Haskell functions), ??? try to show a difference in their effect? (is there even a difference?)
 
 
 \section{Hybrid Simulator Benchmarks}
