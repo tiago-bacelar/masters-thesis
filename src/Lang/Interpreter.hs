@@ -13,7 +13,7 @@ import Solver.Poly
 import Solver.Solver
 import Lang.Hybrid
 import Lang.Parser
-import Lang.Expr hiding (E)
+import Lang.Expr hiding (E, Comparator(..))
 
 import Data.Maybe (fromMaybe)
 import GHC.Data.Maybe (rightToMaybe)
@@ -75,61 +75,67 @@ regStep stp = DifList aux
                             | otherwise     = const []
 
 
-newtype E t s a = E { runE :: EState s -> CompHybridT t s (Writer (DifList (Disc s))) (Either (Error s) (a, EState s)) } deriving (Functor)
+newtype J t s a = J { runE :: EState s -> CompHybridT t s (Writer (DifList (Disc s))) (Either (Error s) (a, EState s)) } deriving (Functor)
 
-instance (Num t, CompOrd t) => Applicative (E t s) where
-    pure x = E $ \eState -> pure $ Right (x, eState)
+instance (Num t, CompOrd t) => Applicative (J t s) where
+    pure x = J $ \eState -> pure $ Right (x, eState)
     (<*>)  = ap
 
-instance (Num t, CompOrd t) => Monad (E t s) where
-    e >>= f = E $ \eState -> do
+instance (Num t, CompOrd t) => Monad (J t s) where
+    e >>= f = J $ \eState -> do
         endp <- runE e eState
         case endp of
             Left err -> return (Left err)
             Right (x, eState2) -> runE (f x) eState2
 
 --duration of hybrid must be greater than 0
-fromHybrid :: Hybrid t s a -> E t s a
-fromHybrid h = E $ \eState -> hybridCH $ (Right . (,eState)) <$> h
+fromHybrid :: Hybrid t s a -> J t s a
+fromHybrid h = J $ \eState -> hybridCH $ (Right . (,eState)) <$> h
 
-failE :: Error s -> E t s a
-failE err = E $ const $ instantCH $ Left err
+failE :: Error s -> J t s a
+failE err = J $ const $ instantCH $ Left err
 
-getEState :: E t s (EState s)
-getEState = E $ \eState -> instantCH $ Right (eState, eState)
+getEState :: J t s (EState s)
+getEState = J $ \eState -> instantCH $ Right (eState, eState)
 
 --unused
---setEState :: EState s -> E t s ()
---setEState eState = E $ const (instantCH $ Right ((), eState), mempty)
+--setEState :: EState s -> J t s ()
+--setEState eState = J $ const (instantCH $ Right ((), eState), mempty)
 
-updateEState :: (EState s -> EState s) -> E t s ()
-updateEState f = E $ \eState -> instantCH $ Right ((), f eState)
+updateEState :: (EState s -> EState s) -> J t s ()
+updateEState f = J $ \eState -> instantCH $ Right ((), f eState)
 
-regStepE :: (Num t, CompOrd t) => Step -> E t s ()
-regStepE stp = E $ \eState -> lift (writer (Right ((), eState), regStep stp))
+regStepE :: (Num t, CompOrd t) => Step -> J t s ()
+regStepE stp = J $ \eState -> lift (writer (Right ((), eState), regStep stp))
 
-appendDisc :: (Num t, CompOrd t) => Disc s -> E t s ()
-appendDisc d = E $ \eState -> lift (writer (Right ((), eState), singl d))
+appendDisc :: (Num t, CompOrd t) => Disc s -> J t s ()
+appendDisc d = J $ \eState -> lift (writer (Right ((), eState), singl d))
 
 
-validateT :: (Num t, CompOrd t) => t -> s -> E t s ()
+validateT :: (Num t, CompOrd t) => t -> s -> J t s ()
 validateT d s = do
     eState <- getEState
-    case fmap (d >! 0) (cmp eState) of
-        Just False  -> failE ("Time step is not verifiably positive (insufficient comparison accuracy)", s)
-        _           -> return ()
+    case cmp eState of
+        Nothing -> return ()
+        Just n ->
+            case domCompare d 0 n of
+                Top GT      -> return ()
+                Top LT      -> failE ("Time step is negative", s)
+                Top EQ      -> failE ("Time step is zero", s)
+                Middle LEQ  -> failE ("Time step is non-positive", s)
+                _           -> failE ("Time step is not verifiably positive (insufficient comparison accuracy)", s)
 
-decItersE :: (Num t, CompOrd t) => s -> E t s ()
+decItersE :: (Num t, CompOrd t) => s -> J t s ()
 decItersE s = do
     eState <- getEState
     case fmap (<= 0) (iters eState) of
         Just True   -> failE ("Iteration limit exceeded", s)
         _           -> updateEState decIters
 
-addDiscE :: Ident -> (s, s) -> E t s ()
+addDiscE :: Ident -> (s, s) -> J t s ()
 addDiscE v (s,s') = updateEState (addDisc v (s,s'))
 
-skipDiscE :: (Num t, CompOrd t) => Step -> E t s ()
+skipDiscE :: (Num t, CompOrd t) => Step -> J t s ()
 skipDiscE stp = do
     eState <- getEState
     case curDisc eState of
@@ -140,7 +146,7 @@ skipDiscE stp = do
 
 type Step = Integer
 data PState r = PState { time :: r, step :: Step, variables :: [r] }
-type RunnableProgram r = PState r -> E r (PState r) (PState r)
+type RunnableProgram r = PState r -> J r (PState r) (PState r)
 
 assign :: Ident -> r -> PState r -> PState r
 assign var val s = s { variables = replaceIndex var val $ variables s }
@@ -164,7 +170,7 @@ evalFor is ps s = \dt -> s { time = time s + dt, variables = updateVars (variabl
           --updates the (whole) list of vars by changing only the ones with a differential expression
           updateVars old = zipWith fromMaybe old . maybeIndexes . zip is
 
-evalCond :: (Floating r, Powers r, CompOrd r) => BExpr -> PState r -> E r (PState r) Bool
+evalCond :: (Floating r, Powers r, CompOrd r) => BExpr -> PState r -> J r (PState r) Bool
 evalCond bExpr s = do
     eState <- getEState
     case cmp eState of

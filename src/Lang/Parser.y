@@ -235,7 +235,7 @@ lexer cont s =
         '}':cs           -> cont TokenCB cs . moveColumn 1
         c:cs | isSpace c -> lexer cont cs . moveColumn 1
              | isDigit c -> let (x, rest, n) = lexFloat s in cont x rest . moveColumn n
-             | isAlpha c -> let (word, rest) = span isAlpha s in lexAlpha cont word rest . moveColumn (length word)
+             | isAlpha c -> let (word, rest) = span isAlphaNum s in lexAlpha cont word rest . moveColumn (length word)
              | otherwise -> \(line, col, _) -> Failed ("Unknown symbol " ++ show c ++ " at line " ++ show line ++ " column " ++ show col)
 
 lexFloat :: String -> (Token, String, Int)

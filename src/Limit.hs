@@ -52,8 +52,8 @@ errorLimitAux p xs = SL.foldr aux (const . singleton . fst) (SL.fromList xs) 0
 --whose error is not significant (as in, doesn't change when the two are added together)
 instance Limit Rational Double where
     listLimit = errorLimit . (`zip` map ((1%) . pow2) [1..])
-    errorLimit = fromRational . fst . SL.findOrLast p . SL.fromList
-        where p (x, e) = fromRational (x + e) == (fromRational x :: Double)
+    errorLimit = fst . SL.findOrLast p . SL.fromList . map (fromRational >< fromRational)
+        where p (x, e) = x + e == x
 
 instance Limit Double Double where
     listLimit = errorLimit . (`zip` map (fromRational . (1%) . pow2) [1..])
