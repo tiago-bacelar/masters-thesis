@@ -1,13 +1,15 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE ScopedTypeVariables #-}
+-- {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE RankNTypes #-}
+-- {-# LANGUAGE TypeApplications #-}
+-- {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE DataKinds #-}
 
 module CompReal.Instances.ExactReal (AnyCReal) where
 
+import Utils
 import CompOrd
 import CompReal
 import Boundable
@@ -15,14 +17,15 @@ import Powers
 import Limit
 
 import qualified Data.CReal as ExactReal
-import qualified Data.CReal.Internal as ExactReal (crMemoize)
+import qualified Data.CReal.Internal as ExactReal (crMemoize, showAtPrecision)
 
-import GHC.Real (Ratio(..))
-import GHC.TypeLits
-import Data.Proxy
+import GHC.Real (Ratio(..), (%))
+--import GHC.TypeLits
+--import Data.Proxy
 import Data.Bits
 
-
+{-
+--Sadly, using existential qualification makes exact-real's memoization not work
 newtype AnyCReal = AnyCReal { anyCReal :: forall n. KnownNat n => ExactReal.CReal n }
 
 getCReal :: (forall n. KnownNat n => ExactReal.CReal n -> a) -> AnyCReal -> Int -> a
@@ -31,17 +34,30 @@ getCReal f x n = case someNatVal $ fromIntegral n of
                                                           y = (anyCReal x) @_n
                                                       in f y
                     Nothing -> error $ "Invalid accuracy " ++ show n
+-}
 
---since ExactReal.atPrecision works the same regardless of type-level precision, we can just pick any (I
---chose zero for no particular reason) and then call ExactReal.atPrecision with the desired precision
+--As a workaround, we can use any specific default accuracy (I chose zero), since we don't
+--actually use this default. approx is implemented with atPrecision, which is n-agnostic
+newtype AnyCReal = AnyCReal { crealZero :: ExactReal.CReal 0 }
+
+
 atPrecision :: AnyCReal -> Int -> Integer
-atPrecision x i = getCReal (flip ExactReal.atPrecision i) x 0
+-- atPrecision x i = getCReal (flip ExactReal.atPrecision i) x 0
+atPrecision x = ExactReal.atPrecision (crealZero x)
 
+{-
 mapCReal :: (forall n. KnownNat n => ExactReal.CReal n -> ExactReal.CReal n) -> AnyCReal -> AnyCReal
 mapCReal f x = AnyCReal $ f $ anyCReal x
 
 mapCReal2 :: (forall n. KnownNat n => ExactReal.CReal n -> ExactReal.CReal n -> ExactReal.CReal n) -> AnyCReal -> AnyCReal -> AnyCReal
 mapCReal2 f x y = AnyCReal $ f (anyCReal x) (anyCReal y)
+-}
+mapCReal :: (ExactReal.CReal 0 -> ExactReal.CReal 0) -> AnyCReal -> AnyCReal
+mapCReal f x = AnyCReal $ f $ crealZero x
+
+mapCReal2 :: (ExactReal.CReal 0 -> ExactReal.CReal 0 -> ExactReal.CReal 0) -> AnyCReal -> AnyCReal -> AnyCReal
+mapCReal2 f x y = AnyCReal $ f (crealZero x) (crealZero y)
+
 
 {-
 Same thing as ERA. If instead of the current definition we were to write:
@@ -51,7 +67,8 @@ then some approximations (my tests revealed sqrt 2, but there are probably other
 It also wouldn't be possible to sensibly implement rational limits
 -}
 instance CompReal AnyCReal where
-    approx x n = getCReal toRational x (n+1)
+    -- approx x n = getCReal toRational x (n+1)
+    approx x n = atPrecision x (n+1) % pow2 (n+1)
 
 instance Num AnyCReal where
     (+) = mapCReal2 (+)
@@ -117,4 +134,5 @@ instance Boundable AnyCReal
 
 
 instance Show AnyCReal where
-    show x = getCReal show x 80
+    --show x = getCReal show x 80
+    show = ExactReal.showAtPrecision 80 . crealZero

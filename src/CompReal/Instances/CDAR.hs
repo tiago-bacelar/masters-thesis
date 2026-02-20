@@ -82,21 +82,21 @@ instance CompOrd CDAR.CR where
     compMin (CDAR.CR x) (CDAR.CR y) = CDAR.CR $ minA <$> x <*> y
     compMax (CDAR.CR x) (CDAR.CR y) = CDAR.CR $ maxA <$> x <*> y
 
-powA :: CDAR.Approx -> Int -> CDAR.Approx
-powA CDAR.Bottom _ = CDAR.Bottom
-powA (CDAR.Approx m e s) n
-    | even n && am <= e = CDAR.Approx ame ame (n*s-1)
-    | even n && m < 0   = CDAR.Approx (a+b) (b-a) (n*s-1)
-    | otherwise         = CDAR.Approx (a+b) (a-b) (n*s-1)
-    where am = abs m
-          ame = (am + e)^(n :: Int)
-          a = (m + e)^(n :: Int)
-          b = (m - e)^(n :: Int)
 
-instance Powers CDAR.CR where
-    pow _ 0 = 1
-    pow x 1 = x
-    pow x n = CDAR.CR $ (\a l -> CDAR.ok (-100) $ CDAR.limitAndBound l (powA a n)) <$> CDAR.unCR x <*> ZipList resources
+-- powA :: CDAR.Approx -> Int -> CDAR.Approx
+-- powA CDAR.Bottom _ = CDAR.Bottom
+-- powA (CDAR.Approx m e s) n
+--     | even n && am <= e = CDAR.Approx ame ame (n*s-1)
+--     | even n && m < 0   = CDAR.Approx (a+b) (b-a) (n*s-1)
+--     | otherwise         = CDAR.Approx (a+b) (a-b) (n*s-1)
+--     where am = abs m
+--           ame = (am + e)^(n :: Int)
+--           a = (m + e)^(n :: Int)
+--           b = (m - e)^(n :: Int)
+
+instance Powers CDAR.CR
+    --the default implementation using x^n is much faster
+    --pow x n = CDAR.CR $ (\a l -> CDAR.ok (-100) $ CDAR.limitAndBound l (powA a n)) <$> CDAR.unCR x <*> ZipList resources
 
 instance Boundable CDAR.CR
 

@@ -40,7 +40,7 @@ instance Limit Rational ERA.CReal where
     limit f = ERA.CR (\i -> let (a :% b) = f i in ERA.round_uk (shiftL a i % b))
 
 instance Limit ERA.CReal ERA.CReal where
-    limit f = ERA.CR (\i -> ERA.round_uk (unCR (f i) (i+1) % 2))
+    limit f = ERA.CR (\i -> (unCR (f i) (i+1) + 1) `div` 2)
     errorLimit = errorLimitDef
 
 instance CompOrd ERA.CReal where

@@ -12,6 +12,7 @@ import qualified CompReal.Instances.ERA as ERA
 
 Since the submodules already reexport their respective types,
 there is no reason to ever import this module
+Why did I write this module anyways?
 
 -}
 
