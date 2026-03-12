@@ -13,16 +13,16 @@ import Data.Ratio
 
 class (Floating r, CompOrd r, Limit Rational r, Limit r r) => CompReal r where
     --receives the desired accuracy and returns an approximation of x
-    --formally, |approx x n - x| <= 2^(-n-1)
+    --formally, |approx x n - x| <= 2^(-n)
     approx :: r -> Int -> Rational
     approx x n = (/2) $ uncurry (+) $ bound x n
 
     --receives the desired accuracy and returns the bound of possible values of x
-    --formally, l <= x <= u and u - l <= 2^(-n) where (l,u) = bound x n
+    --formally, l <= x <= u and u - l <= 2^(1-n) where (l,u) = bound x n
     bound :: r -> Int -> (Rational, Rational)
     bound x n = (m - e, m + e)
         where m = approx x n
-              e = 1 % pow2 (n+1)
+              e = 1 % pow2 n
 
     {-# MINIMAL (approx | bound) #-}
 
@@ -43,8 +43,9 @@ errorLimit = Limit.errorLimit
 --a default implementation of listLimit using limit and a CompReal restriction
 errorLimitDef :: (CompReal r) => [(r, r)] -> r
 errorLimitDef = listLimit . Limit.errorLimitAux p
-    where p n = (<= (1 % pow2 (n+1))) . snd . flip bound (n+1)
-
+    where p n = (<= (1 % pow2 n)) . snd . flip bound n --any accuracy can be used here. a greater
+                                                       --accuracy means some earlier terms may be
+                                                       --accepted but each term takes longer to test
 
 --A default implementation of domCompare for CompReals
 --Both definitions below are correct. The second definition is more efficient when the

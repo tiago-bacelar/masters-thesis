@@ -59,16 +59,9 @@ mapCReal2 :: (ExactReal.CReal 0 -> ExactReal.CReal 0 -> ExactReal.CReal 0) -> An
 mapCReal2 f x y = AnyCReal $ f (crealZero x) (crealZero y)
 
 
-{-
-Same thing as ERA. If instead of the current definition we were to write:
-approx x n = getCReal toRational x n
-
-then some approximations (my tests revealed sqrt 2, but there are probably others) would be wrong
-It also wouldn't be possible to sensibly implement rational limits
--}
 instance CompReal AnyCReal where
-    -- approx x n = getCReal toRational x (n+1)
-    approx x n = atPrecision x (n+1) % pow2 (n+1)
+    -- approx x n = getCReal toRational x n
+    approx x n = atPrecision x n % pow2 n
 
 instance Num AnyCReal where
     (+) = mapCReal2 (+)
@@ -108,20 +101,19 @@ roundD :: Integer -> Integer -> Integer
 roundD n d = case divMod n d of
               (q, r) -> case compare (unsafeShiftL r 1) d of
                 LT -> q
-                EQ -> if testBit q 0 then q + 1 else q
-                GT -> q + 1
+                _  -> q + 1
 
 --So, because exact-real has a dumb implementation of limits, we have to do it ourselves
 --really tho. it uses equality to test if the value of the limit was reached. like, bruhh
 instance Limit Rational AnyCReal where
-    limit f = AnyCReal $ ExactReal.crMemoize (\i -> let (a :% b) = f i in roundD (shiftL a i) b)
+    limit f = AnyCReal $ ExactReal.crMemoize (\i -> let (a :% b) = f (i+1) in roundD (shiftL a i) b)
 
 instance Limit AnyCReal AnyCReal where
-    limit f = AnyCReal $ ExactReal.crMemoize (\i -> let x = f i in (atPrecision x (i+1) + 1) `div` 2)
+    limit f = AnyCReal $ ExactReal.crMemoize (\i -> let x = f (i+1) in (atPrecision x (i+1) + 1) `div` 2)
     errorLimit = errorLimitDef
 
 instance CompOrd AnyCReal where
-    domCompare = domCompareDef (\x n -> let m = atPrecision x (n+1) in (m-1, m+1))
+    domCompare = domCompareDef (\x n -> let m = atPrecision x n in (m-1, m+1))
     compMin = mapCReal2 min
     compMax = mapCReal2 max
 

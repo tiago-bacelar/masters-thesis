@@ -22,29 +22,18 @@ import Data.Bits
 unCR :: ERA.CReal -> Int -> Integer
 unCR (ERA.CR x') = x'
 
-{-
-When looking at the source code for ERA, it is somewhat implied that each term is
-the best approximation of its precision, which would mean that term i would have
-an error of no more than 2^(-i-1). If that were true, we could write:
-approx x n = unCR x n % pow2 n
-
-However... when testing, I noticed that unCR pi 9 equals 1609, even though 1608/512 is
-closer to the actual value of pi. So either the implementation of pi in the package is wrong,
-or my assumptions about the error bound of CReal are wrong... Either way, writing approx
-as below seems to fix the problem
--}
 instance CompReal ERA.CReal where
-    approx x n = unCR x (n+1) % pow2 (n+1)
+    approx x n = unCR x n % pow2 n
 
 instance Limit Rational ERA.CReal where
-    limit f = ERA.CR (\i -> let (a :% b) = f i in ERA.round_uk (shiftL a i % b))
+    limit f = ERA.CR (\i -> let (a :% b) = f (i+1) in ERA.round_uk (shiftL a i % b))
 
 instance Limit ERA.CReal ERA.CReal where
-    limit f = ERA.CR (\i -> (unCR (f i) (i+1) + 1) `div` 2)
+    limit f = ERA.CR (\i -> (unCR (f (i+1)) (i+1) + 1) `div` 2)
     errorLimit = errorLimitDef
 
 instance CompOrd ERA.CReal where
-    domCompare = domCompareDef (\x n -> let m = unCR x (n+1) in (m-1, m+1))
+    domCompare = domCompareDef (\x n -> let m = unCR x n in (m-1, m+1))
     compMin = min
     compMax = max
 

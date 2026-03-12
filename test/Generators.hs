@@ -41,21 +41,21 @@ instance (Monad m, Serial Identity a) => Serial m (Distinct2 a) where
 --given the limit of a sequence, returns a normalized sequence where term n is an accuracy n approximation
 --if the sequence is finite, the limit is appended to the sequence as its last element
 normalize :: Rational -> [Rational] -> [Rational]
-normalize l = aux (1%2)
+normalize l = aux 1
     where aux e (x:xs) | l - x <= e = x : aux (e/2) (x:xs)
                        | otherwise  = aux e xs
           aux _ [] = [l]
 
 --the sum 1/2 + 1/4 + 1/8 + .... = 1
 geometricSeriesDyad :: [Rational]
-geometricSeriesDyad = scanl1 (+) $ iterate (/2) (1%2)
+geometricSeriesDyad = scanl (+) 0 $ iterate (/2) (1%2)
 
 --the sum 1/3 + 1/9 + 1/27 + ... = 1/2
 geometricSeries :: [Rational]
-geometricSeries = normalize (1%2) $ scanl1 (+) $ iterate (/3) (1%3)
+geometricSeries = normalize (1%2) $ scanl (+) 0 $ iterate (/3) (1%3)
 
 finiteList :: [Rational]
-finiteList = [-0.2, 0.045, 1%6, 2%7]
+finiteList = [-0.7, -0.2, 0.045, 1%6, 2%7]
 
 
 --1

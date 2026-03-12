@@ -10,6 +10,7 @@ between queries at different times and query accuracy), many of these tests
 require -fno-full-laziness to generate correct benchmarking results
 -}
 
+import Utils
 import Limit
 import Powers
 import Boundable
@@ -51,49 +52,76 @@ factorial50 = product $ map fromInteger [1..50]
 --given the limit of a sequence, returns a normalized sequence where term n is an accuracy n approximation
 --if the sequence is finite, the limit is appended to the sequence as its last element
 normalize :: Rational -> [Rational] -> [Rational]
-normalize l = aux (1%2)
+normalize l = aux 1
     where aux e (x:xs) | l - x <= e = x : aux (e/2) (x:xs)
                        | otherwise  = aux e xs
           aux _ [] = [l]
 
+
 --the sum 1/2 + 1/4 + 1/8 + .... = 1
 geometricSeriesDyad :: [Rational]
-geometricSeriesDyad = scanl1 (+) $ iterate (/2) (1%2)
+geometricSeriesDyad = scanl (+) 0 $ iterate (/2) (1%2)
 
 --the sum 1/3 + 1/9 + 1/27 + ... = 1/2
 geometricSeries :: [Rational]
-geometricSeries = normalize (1%2) $ scanl1 (+) $ iterate (/3) (1%3)
+geometricSeries = normalize (1%2) $ scanl (+) 0 $ iterate (/3) (1%3)
 
 finiteList :: [Rational]
-finiteList = [-0.2, 0.045, 1%6, 2%7]
+finiteList = [-0.7, -0.2, 0.045, 1%6, 2%7]
 
 
---1
+
+
+constLimitRat :: (Limit Rational r) => Rational -> r
+constLimitRat = limit . const
+
+constLimitCR :: (Limit r r) => r -> r
+constLimitCR = limit . const
+
+dyadLimitRat :: (Limit Rational r) => r
+dyadLimitRat = limit $ \n -> 1 % pow2 n
+
+dyadLimitCR :: forall r. (Fractional r, Limit r r) => r
+dyadLimitCR = limit $ \n -> fromRational (1 % pow2 n) :: r
+
 geometricSeriesDyadRat :: (Limit Rational r) => r
-geometricSeriesDyadRat = listLimit geometricSeriesDyad
+geometricSeriesDyadRat = listLimit $ scanl (+) 0 $ iterate (/2) (1%2 :: Rational)
 
---1
+geometricSeriesDyadRatMemo :: (Limit Rational r) => r
+geometricSeriesDyadRatMemo = listLimit geometricSeriesDyad
+
 geometricSeriesDyadCR :: forall r. (Fractional r, Limit r r) => r
-geometricSeriesDyadCR = _listLimit $ fromRational <$> geometricSeriesDyad
+geometricSeriesDyadCR = _listLimit $ fromRational <$> scanl (+) 0 (iterate (/2) (1%2))
     where _listLimit = listLimit :: [r] -> r
 
---0.5
-geometricSeriesRat :: (Limit Rational r) => r
-geometricSeriesRat = listLimit geometricSeries
-
---0.5
-geometricSeriesCR :: forall r. (Fractional r, Limit r r) => r
-geometricSeriesCR = _listLimit $ fromRational <$> geometricSeries
+geometricSeriesDyadCRMemo :: forall r. (Fractional r, Limit r r) => r
+geometricSeriesDyadCRMemo = _listLimit $ fromRational <$> geometricSeriesDyad
     where _listLimit = listLimit :: [r] -> r
 
---2/7
+geometricSeriesRatMemo :: (Limit Rational r) => r
+geometricSeriesRatMemo = listLimit geometricSeries
+
+geometricSeriesCRMemo :: forall r. (Fractional r, Limit r r) => r
+geometricSeriesCRMemo = _listLimit $ fromRational <$> geometricSeries
+    where _listLimit = listLimit :: [r] -> r
+
 finiteListRat :: (Limit Rational r) => r
 finiteListRat = listLimit finiteList
 
---2/7
 finiteListCR :: forall r. (Fractional r, Limit r r) => r
 finiteListCR = _listLimit $ fromRational <$> finiteList
     where _listLimit = listLimit :: [r] -> r
+
+
+
+dp_sum :: (Num r) => r -> Int -> r
+dp_sum x 1 = x
+dp_sum x k = case k `mod` 2 of
+                0 -> y
+                _ -> x + y
+    where y = dp_sum (x + x) (k `div` 2)
+
+
 
 
 {-

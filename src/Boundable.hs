@@ -10,7 +10,8 @@ number (e.g. approx_floor_of_log2 x = integerLogBase 2 (upperBound x) - 1)
 These bounds aren't required to have any specific width. Zero width is allowed,
 and so are widths larger than one. But do keep in mind that if the width gets
 too big, the approximations generated using the bounds might become too inaccurate,
-which could impact algorithm performance
+which could impact algorithm performance. the default instance for CompReal generates
+bounds of width <=1
 -}
 
 import Utils
@@ -24,7 +25,7 @@ class Boundable r where
     bounds :: r -> (Integer, Integer)
 
     default bounds :: (CompReal r) => r -> (Integer, Integer)
-    bounds = (floor >< ceiling) . flip bound 0
+    bounds = (floor >< ceiling) . flip bound 1
 
 
 instance (Integral a) => Boundable (Ratio a) where

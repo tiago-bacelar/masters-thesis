@@ -27,22 +27,22 @@ import Control.CollectErrors (CollectErrors(..))
 -- of skipping some elements of the list before starting a one by one search. And that skipping
 -- assumes that the values in the list follow cseqPrecisions, which is a standart list of
 -- precisions (it starts at 10 and then grows exponentially). Therefore, depending on how limits
--- are impemented, extracting approximations may force many more terms of the limited list than
+-- are implemented, extracting approximations may force many more terms of the limited list than
 -- necessary, tanking performance when the list is slow to compute
 instance CompReal AERN2.CReal where
-    bound x n = toRational >< toRational $ AERN2.endpoints $ MTNP.unCN $ x AERN2.? AERN2.bits (n+1)
+    bound x n = toRational >< toRational $ AERN2.endpoints $ MTNP.unCN $ x AERN2.? AERN2.bits n
 
 instance Limit Rational AERN2.CReal where
     -- This implementation was copied from AERN2.limit and adapted for lists and rationals
     listLimit xs = AERN2.CSequence $ map aux xs'
-        where xs' = getIndexes (map (fromInteger . MTNP.integer) AERN2.cseqPrecisions) $ zip [1..] $ SL.repeatLast $ SL.fromList xs
+        where xs' = getIndexes (map (fromInteger . MTNP.integer) AERN2.cseqPrecisions) $ zip [0..] $ SL.repeatLast $ SL.fromList xs
               aux (p,x) = (MTNP.cn $ AERN2.mpBallP (max 2 p) x) AERN2.+- ((0.5 :: AERN2.MPFloat) ^ (MTNP.integer p))
 
     {-
     Instead of using cseqPrecisions (which slows everything down when the input list is slow
     to compute), we could also use all elements of xs
     -}
-    -- listLimit xs = AERN2.CSequence $ map aux $ zip [1..] (SL.repeatLast $ SL.fromList xs)
+    -- listLimit xs = AERN2.CSequence $ map aux $ zip [0..] (SL.repeatLast $ SL.fromList xs)
     --     where aux (p,x) = (MTNP.cn $ AERN2.mpBallP (max 2 p) x) AERN2.+- ((0.5 :: AERN2.MPFloat) ^ (MTNP.integer p))
 
     {-
@@ -62,10 +62,10 @@ instance Limit Rational AERN2.CReal where
 --It's always cool when your arbitrary precision library runs out of precision
 --And it's such an artificial limitation, too. It's literally a hardcoded constant, after which AERN2 simply refuses to compute
 instance Limit AERN2.CReal AERN2.CReal where
-    limit f = AERN2.limit (f . (max 0) . pred)
+    limit = AERN2.limit
 
     listLimit xs = AERN2.CSequence $ SL.foldr aux1 aux2 xs'
-        where xs' = SL.getIndexesOrLast (map (fromInteger . MTNP.integer) AERN2.cseqPrecisions) $ SL.fromList $ zip [1..] xs
+        where xs' = SL.getIndexesOrLast (map (fromInteger . MTNP.integer) AERN2.cseqPrecisions) $ SL.fromList $ zip [0..] xs
               aux1 (p, x) = ((x AERN2.? p) AERN2.+- ((0.5 :: AERN2.MPFloat) ^ (MTNP.integer p)) :)
               aux2 (p, x) = MTNP.drop (AERN2.cseqIndexForPrecision p) (AERN2.unCSequence x)
 
@@ -75,7 +75,7 @@ asIntervals :: AERN2.CReal -> [(AERN2.MPFloat,AERN2.MPFloat)]
 asIntervals = catMaybes . map (fmap AERN2.endpoints . getMaybeValue) . AERN2.unCSequence
 
 asIntervalsUntil :: Int -> AERN2.CReal -> SL.SnocList (AERN2.MPFloat,AERN2.MPFloat)
-asIntervalsUntil n = SL.lFuncOrLast (catMaybes . map (fmap AERN2.endpoints . getMaybeValue)) (AERN2.endpoints . MTNP.unCN) . SL.takeUntil ((>= AERN2.bits (n+2)) . AERN2.getAccuracy) . AERN2.unCSequence
+asIntervalsUntil n = SL.lFuncOrLast (catMaybes . map (fmap AERN2.endpoints . getMaybeValue)) (AERN2.endpoints . MTNP.unCN) . SL.takeUntil ((>= AERN2.bits n) . AERN2.getAccuracy) . AERN2.unCSequence
 
 instance CompOrd AERN2.CReal where
     domCompare x y n = SL.findOrLast isTop $ SL.zipOrLastWith domCompareAux (asIntervalsUntil n x) (asIntervalsUntil n y)

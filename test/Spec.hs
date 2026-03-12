@@ -66,7 +66,7 @@ compRealTests _ = testGroup "CompReal instance"
         \(CRS x) (Acc n) -> uncurry (<=) $ bound (x :: r) n
 
     , SC.testProperty "bound width" $
-        \(CRS x) (Acc n) -> uncurry (flip (-)) (bound (x :: r) n) @?<= 1%pow2 n
+        \(CRS x) (Acc n) -> uncurry (flip (-)) (bound (x :: r) n) @?<= 2 % pow2 n
 
     ,  SC.testProperty "approx ∈ bound" $
         \(CRS x) (Acc n) -> approx (x :: r) n @?∈ bound x n
@@ -123,7 +123,7 @@ rationalLimitTests _ = testGroup "Limit Rational r instance"
     , SC.testProperty "geometric series (r=1/3)" $
         (geometricSeriesRat :: r) @?~ 0.5
 
-    , SC.testProperty "finite list [-0.2, 0.045, 1/6, 2/7]" $
+    , SC.testProperty "finite list [-0.7, -0.2, 0.045, 1/6, 2/7]" $
         (finiteListRat :: r) @?~ 2%7
     ]
 
@@ -135,7 +135,7 @@ limitTests _ = testGroup "Limit r r instance"
     , SC.testProperty "geometric series (r=1/3)" $
         (geometricSeriesCR :: r) @?~ 1.5
 
-    , SC.testProperty "finite list [0.8, 1.045, 7/6, 9/7]" $
+    , SC.testProperty "finite list [0.3, 0.8, 1.045, 7/6, 9/7]" $
         (finiteListCR :: r) @?~ 9%7
     ]
 
@@ -150,10 +150,10 @@ compOrdTests _ = testGroup "CompOrd instance"
         \(CRS x) (CRS y) (Acc n) -> domCompare (x :: r) (y :: r) n `consistent` invert (domCompare y x n)
 
     , SC.testProperty "domCompare respects accuracy (not bottom)" $
-        \(Rat a) (Rat b) (Acc n) -> abs (a - b) >= 2 % pow2 n ==> not $ isBottom $ domCompare (fromRational a :: r) (fromRational b :: r) n
+        \(Rat a) (Rat b) (Acc n) -> abs (a - b) >= 4 % pow2 n ==> not $ isBottom $ domCompare (fromRational a :: r) (fromRational b :: r) n
 
     , SC.testProperty "domCompare respects accuracy (top)" $
-        \(Rat a) (Rat b) (Acc n) -> abs (a - b) > 2 % pow2 n ==> isTop $ domCompare (fromRational a :: r) (fromRational b :: r) n
+        \(Rat a) (Rat b) (Acc n) -> abs (a - b) > 4 % pow2 n ==> isTop $ domCompare (fromRational a :: r) (fromRational b :: r) n
     
     , SC.testProperty "infCompare is consistent" $
         \(Distinct2 (CRS x, CRS y)) -> let (mm,o) = infCompare (x :: r) (y :: r)

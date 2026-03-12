@@ -23,7 +23,7 @@ import Control.Applicative (ZipList(..))
 good :: Int -> CDAR.Approx -> Bool
 good _ CDAR.Bottom         = False
 good _ (CDAR.Approx _ 0 _) = True
-good n (CDAR.Approx _ e s) = - s - (lg2 e) > n
+good n (CDAR.Approx _ e s) = 1 - s - (lg2 e) > n --TODO: check and fix the comment below
 
 --We can't use CDAR.require because it's wrong (returns approximations with 2 more precision
 --than required), but this function does essentially the same
@@ -56,7 +56,7 @@ instance Limit Rational CDAR.CR where
     --listLimit xs = CDAR.CR $ ZipList [CDAR.Approx (round $ x * toRational (pow2 p)) 1 (-p) | (p,x) <- zip [0..] (SL.repeatLast $ SL.fromList xs)]
 
 instance Limit CDAR.CR CDAR.CR where
-    limit f = CDAR.limCR (f . (max 0) . pred) --internally uses resources too
+    limit = CDAR.limCR --internally uses resources too
     
     listLimit xs = CDAR.CR $ ZipList $ SL.foldr aux1 aux2 $ SL.zip3 (SL.iterate succ 0) (SL.fromList resources) elems
         where elems = SL.getIndexesOrLast resources (SL.fromList xs)
