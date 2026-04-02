@@ -13,7 +13,10 @@ There is, of course, plenty of room for improvement. An especially important com
 
 Besides optimizations, the simulator could also be improved by adding other features and language constructs, such as Lince's events (which are for statements that run for as long as a condition is true) or some equivalent specific to computable real numbers. Currently, there is also no mechanism to detect and manage arithmetic errors such as division by zero. This problem is especially difficult to manage in exact real arithmetic because comparison is undecidable. Even worse, evaluating the result of a division by zero might not even terminate, as the division uses smaller and smaller approximations of the divisor, driving the value of the result infinitely high.
 
-Another important area requiring future study is memory usage, which is mostly disregarded in this thesis but would be of critical importance in an effort to scale up programs and computations. Not only would the current technologies of exact real arithmetic benefit from a memory usage analysis similar to the execution time analysis presented in \cref{sec:package_benches}; but the simulator itself should also be optimized for memory efficiency specifically, so it can handle more complicated hybrid programs without running out of memory, a sad fate my 8GB laptop often encountered during development and testing.
+Another important area requiring future study is memory usage, which is mostly disregarded in this dissertation but would be of critical importance in an effort to scale up programs and computations. Not only would the current technologies of exact real arithmetic benefit from a memory usage analysis similar to the execution time analysis presented in \cref{sec:package_benches}; but the simulator itself should also be optimized for memory efficiency specifically, so it can handle more complicated hybrid programs without running out of memory, a sad fate my 8GB laptop often encountered during development and testing.
+
+%more future work: analyze other types of real number representation such as continued fractions and dedekind cuts, both theoretically and in practice with benchmarks (wasnt done here since no libraries used this approach)
+%more future work: add new libraries/develop a library specifically for Jaguar
 
 %CONCLUSION
 TODO: In conclusion...

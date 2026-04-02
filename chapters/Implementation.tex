@@ -11,7 +11,7 @@
   \label{fig:architecture}
 \end{figure}
 
-This chapter presents the implementation of this project's hybrid language, named Jaguar.
+This chapter presents the implementation of this project's hybrid language, named Jaguar \cite{Jaguar}.
 
 Jaguar's architecture (\cref{fig:architecture}) has four main components: a parser, which takes in the hybrid program and produces a syntax tree; an interpreter that runs the operational semantics of the language; a solver, responsible for solving systems of differential equations and provide the solutions to the interpreter; and a visualizer, that displays the whole evolution of the system as a plot constructed from multiple queries. It is also possible to perform queries directly to the interpreter to obtain the state of the system at any given time.
 
@@ -23,7 +23,7 @@ The rest of this chapter takes a closer look at each of these components: \cref{
 \section{Parsing a Hybrid Language}
 \label{sec:parser}
 
-To parse our hybrid language, the Happy \cite{happy} parser generator was chosen. Happy takes an annotated BNF grammar specification and produces a Haskell module containing an LR parser for the grammar. Happy is the parsing library that GHC, the Haskell compiler, uses to parse its own syntax, and its pretty comprehensive functionalities proved to be more than enough for the project's needs.
+To parse our hybrid language, the Happy \cite{happy} parser generator was chosen. Happy takes an annotated BNF grammar specification and produces a Haskell module containing an LR parser for the grammar. Happy is also the parsing library that the Glasgow Haskell Compiler (GHC), the \textit{de facto} standard compiler for Haskell, uses to parse its own syntax. Happy's pretty comprehensive functionalities proved to be more than enough for the project's needs.
 
 A Jaguar program is composed of one or more statements. Statements must be separated by semicolons, and the program may optionally end with one. Each statement may contain boolean expressions and numerical expressions, which are evaluated using the expected operator precedence rules (multiplication has higher precedence than addition, which has higher precedence than comparison, which has higher precedence than disjunction). \cref{lst:atomic_statements} showcases all atomic statements (assignments and differential statements) and some examples of operator precedence.
 
@@ -90,15 +90,15 @@ ans := 0;
 while x < y do { ans := ans - 1; y := y / 2 }
 \end{lstlisting}
 
-This algorithm is mathematically correct: it always takes a finite number of steps for any input $x$, and always reaches the correct answer. However, notice what happens if we try to run the program with the input $x=0.5$: the second iteration of the while loop will try to make the comparison $0.5 < 0.5$. Mathematically, it should evaluate to false, but as explained in \cref{sec:theory}, comparing two equal computable real numbers will never terminate. As a result, our program will never halt, even though it is mathematically sound!
+This algorithm is mathematically correct: it always takes a finite number of steps for any input $x$, and always reaches the correct answer. However, notice what happens if we try to run the program with the input $x=0.5$: the second iteration of the while loop will try to make the comparison $0.5 < 0.5$. Mathematically, it should evaluate to false, but as explained in \cref{sec:theory}, comparing two equal computable real numbers will never terminate. As a result, our program will never terminate, even though it is mathematically sound!
 
-The fundamental limitation here is the undecidability of comparison in the computable reals: whenever our hybrid simulator tries to fully evaluate a comparison, it may never halt, giving no further feedback to the user. From a design standpoint, this places on the user the responsibility of ensuring that no comparison ever compares two equal numbers. Which, while in some cases is simply impractical, in others it is downright impossible.
+The fundamental limitation here is the undecidability of comparison in the computable reals: whenever our hybrid simulator tries to fully evaluate a comparison, it may never terminate, giving no further feedback to the user. From a design standpoint, this places on the user the responsibility of ensuring that no comparison ever compares two equal numbers. Which, while in some cases is simply impractical, in others it is downright impossible.
 
-Ideally, such comparisons would produce an error instead of running indefinitely. We can do that by evaluating the comparison only up to a certain accuracy. Formally, when evaluating $r<s$ to accuracy $n$, we first approximate $r$ and $s$ to intervals of rational numbers $a \leq r \leq b$ and $c \leq s \leq d$ such that $b-a,d-c \leq 2^{-n}$. If $b<c$, then we can be sure that $r<s$ and the original comparison is true. If $d \leq a$, then we are sure $r \geq s$ and the comparison is false. In all other situations, we can't resolve the comparison; the given accuracy isn't enough. All that can be inferred is that $|r-s| \leq 2^{-n+1}$. In these cases an error is raised, giving valuable feedback to the user. 
+Ideally, such comparisons would produce an error instead of running indefinitely. We can do that by evaluating the comparison only up to a certain accuracy. Formally, when evaluating $r<s$ to accuracy $n$, we first approximate $r$ and $s$ to intervals of rational numbers $a \leq r \leq b$ and $c \leq s \leq d$ such that $b-a,d-c \leq 2^{1-n}$. If $b<c$, then we can be sure that $r<s$ and the original comparison is true. If $d \leq a$, then we are sure $r \geq s$ and the comparison is false. In all other situations, we can't resolve the comparison; the given accuracy isn't enough. All that can be inferred is that $|r-s| \leq 2^{2-n}$. In these cases an error is raised, giving valuable feedback to the user. 
 
-Analogous reasoning can be used for $>$, $\leq$ and $\geq$. However, operators for equality and inequality ($=$ and $\neq$) aren't included. The reason for this is simple: two equal numbers can't be guaranteed to be found equal, since this would require both numbers to be approximated to an interval of zero length (and while this isn't impossible - remember the restriction on intervals is $a \leq r \leq b$ such that $b-a \leq 2^{-n}$, so zero length is technically possible - it isn't guaranteed either, and depends entirely on the particular representation details of the two numbers). As a result, these hypothetical operators would always yield the same output: false in the case of $=$ and true in the case of $\neq$; or be unable to produce any output at all and raise an error.
+Analogous reasoning can be used for $>$, $\leq$ and $\geq$. However, operators for equality and inequality ($=$ and $\neq$) aren't included. The reason for this is simple: two equal numbers can't be guaranteed to be found equal, since this would require both numbers to be approximated to an interval of zero width \footnote{This is technically possible, but only in a nested intervals strategy and only if both numbers contain zero-width intervals in their representation. In all other cases (by far the majority), there is only an output if the reals are not equal.}. As a result, these hypothetical operators would basically always yield the same output: false in the case of $=$ and true in the case of $\neq$; or be unable to produce any output at all and raise an error.
 
-Of course, if the comparison accuracy is not high enough, close comparisons ($|r-s| \leq 2^{-n+1}$ at most, depending on the approximations) can also result in an error; but these false positives are inevitable if we wish to guarantee our program eventually halts. It is up to the user to interpret the error, figure out the cause and decide how to solve it; either by raising the comparison accuracy, or by rewriting the program to avoid the faulty comparison, or even re-enabling exact comparisons (by "raising the comparison accuracy to infinity") if they are confident the program will halt.
+Of course, if the comparison accuracy is not high enough, close comparisons ($|r-s| \leq 2^{2-n}$ at most, depending on the approximations) can also result in an error; but these false positives are inevitable if we wish to guarantee our program eventually terminates. It is up to the user to interpret the error, figure out the cause and decide how to solve it; either by raising the comparison accuracy, or by rewriting the program to avoid the faulty comparison, or even re-enabling exact comparisons (by "raising the comparison accuracy to infinity") if they are confident the program will terminate.
 
 The comparison accuracy $n$ could be specified for each comparison individually, but to avoid cluttering the syntax it was decided instead that all comparisons in a program would have the same accuracy, which can be supplied as an external configuration when running the program.
 
@@ -120,7 +120,7 @@ Essentially, what is being described is Kleene's logic, a three-valued logic as 
 
 Introducing three-valued logic allows Jaguar to decide many expressions that were undecidable before, but is far from a full symbolic evaluation of the expression. For example, in an expression like $p \vee \neg p$, where $p$ is some comparison, should $p$ be inconclusive, the expression will be evaluated as inconclusive, even though logically it must always be true (the well-known tautology/contradiction problem of three-valued logic).
 
-Finally, notice that the three-valued logic is useless if the user re-enables exact comparisons (up to "infinite accuracy"), since the comparison will never halt and return inconclusive.
+Finally, notice that the three-valued logic is useless if the user re-enables exact comparisons (up to "infinite accuracy"), since the comparison will never terminate with an inconclusive result.
 
 \subsection{Lax Comparison}
 
@@ -133,11 +133,11 @@ while i < 10 do { i := i + 1; }
 
 The program is meant to exit the loop at 10 iterations, but the comparison $i < 10$ will raise an error when $i = 10$. A simple workaround is to replace the value 10 with a number we know $i$ will never be too close to and that still produces the same results when evaluating the comparison. In this case, $9.5$ works. But this puts the chore of finding such a number on the user, and the resulting code is much less readable (and much, much uglier).
 
-But in this particular case, this replacement shouldn't be  necessary. Because we know $i$ is restricted to the integers, we can guarantee that an indeterminate comparison means that $i=10$ for any accuracy $n>1$, since the comparison is only indeterminate when $|i-10| \leq 2^{-n+1}$. Our restriction of $i$ gives us enough information to make these deductions, effectively bypassing the error.
+But in this particular case, this replacement shouldn't be necessary. Since we know $i$ is restricted to the integers, we can guarantee that an indeterminate comparison means that $i=10$ for any accuracy $n>2$, since the comparison is only indeterminate when $|i-10| \leq 2^{2-n}$. Our restriction of $i$ gives us enough information to make these deductions, effectively bypassing the error.
 
 For these situations, two new operators were created: determinably less than ($<!$) and determinably greater than ($>!$). Unlike the strict comparison operators (the ones introduced in \cref{sec:strict_comparison} that can return true, false or indeterminate), these new lax comparators only return true or false: true if the comparison is determinably true, and false in all other cases. They are lax in the sense that they always produce an answer, even when there isn't enough information.
 
-This opens the door to all sorts of misbehavior in the program, of course: $9.99 <!\ 10$ will evaluate to false if the comparison accuracy is not high enough. Indeed, the output of this operator may be incorrect for all comparisons $r <!\ s$ where $r < s \leq r + 2^{-n+1}$. However, so long as this critical range is avoided, the lax comparators are guaranteed to return a correct result. If both operands are integers, this works out to $n>1$, as stated above. For other cases, it may vary. It is the responsibility of the user to make sure the variables being compared are appropriately constrained and choose the appropriate comparison accuracy for their use case.
+This opens the door to all sorts of misbehavior in the program, of course: $9.99 <!\ 10$ will evaluate to false if the comparison accuracy is not high enough. Indeed, the output of this operator may be incorrect for all comparisons $r <!\ s$ where $r < s \leq r + 2^{2-n}$. However, so long as this critical range is avoided, the lax comparators are guaranteed to return a correct result. If both operands are integers, this works out to $n>2$, as stated above. For other cases, it may vary. It is the responsibility of the user to make sure the variables being compared are appropriately constrained and choose the appropriate comparison accuracy for their use case.
 
 
 \subsection{Hybrid Undecidability}
@@ -166,7 +166,7 @@ Although this function is mathematically well-defined, in order to evaluate it t
 
 To solve this problem, as before, we must use a parametrized comparison, taking in the desired accuracy of our query. Note that this accuracy doesn't necessarily need to match the comparison accuracy used for in-program comparisons. The query accuracy is only used to choose between two (or more) consecutive branches of the program, leaving the actual execution of the program (variable assignments, choosing between if-else branches and while-loop iterations) completely unaffected. Indeed, the query accuracy can even be chosen independently for every query, without affecting each other into the past nor into the future.
 
-Taking that into account, to give the user the most flexibility and control, it was decided that a query would be a curried function $\mathbb{R} \rightarrow \mathbb{N} \rightarrow [\mathbb{R}^n]$ that takes the time $t$ and the desired query accuracy $n$ and outputs all possible hybrid states within range of that accuracy. The biggest drawback of this solution is that it may lead to some function branches being evaluated outside their original domain. In this particular example (\cref{eq:output_example}), evaluating the query $t=0.999$ with a query accuracy $n < 10$ will result in two possible outputs: $0$, the correct output; and $0.999$, which is clearly impossible to obtain from the mathematical definition, but must be considered nonetheless.
+Taking that into account, to give the user the most flexibility and control, it was decided that a query would be a curried function $\mathbb{R} \rightarrow \mathbb{N} \rightarrow [\mathbb{R}^n]$ that takes the time $t$ and the desired query accuracy $n$ and outputs all possible hybrid states within range of that accuracy. The biggest drawback of this solution is that it may lead to some function branches being evaluated outside their original domain. In this particular example (\cref{eq:output_example}), evaluating the query $t=0.999$ with a query accuracy $n \leq 10$ will result in two possible outputs: $0$, the correct output; and $0.999$, which is clearly impossible to obtain from the mathematical definition, but must be considered nonetheless.
 
 
 \section{A Hybrid Interpreter}
@@ -209,7 +209,7 @@ Zeno behavior is usually disregarded in the literature, since it is difficult to
 
 As seen in the previous sections, our language can throw errors.
 
-To handle errors without raising a native exception, the endpoint of a hybrid program may be either a valid state or an error state, containing an error message. If a program's endpoint is an error, composing it with any other program results in itself. The composition of two programs is an error if and only if either of the two programs is an error.
+To handle errors without raising a native exception, the endpoint of a hybrid program may be either a valid state or an error state, containing an error message. If a program's endpoint is an error, the endpoint of its composition with any other program results in that same error. Conversely, the composition of two programs outputs an error if and only if any of the two programs outputs an error.
 
 The following is a list of all situations that cause errors:
 \begin{itemize}
@@ -276,7 +276,7 @@ A denotational definition for while loops is slightly more complex since it requ
   \llbracket \text{while}\ b\ \text{do}\ p \rrbracket (\sigma) = \llbracket \text{while}\ b\ \text{do}\ p \rrbracket^{\star} (\llbracket p \rrbracket^{\star} (\kappa \sigma)) \triangleleft b \sigma \triangleright \eta (\sigma)
 \end{equation*}
 
-where $\kappa : S \rightarrow \monad{J} S$ returns an error if the iteration limit is reached and otherwise decreases it by one and returns the state unchanged. This is essentially how the loops are implemented operationally. 
+where $\kappa : S \rightarrow \monad{J} S$ returns an error if the iteration limit is reached and otherwise decreases it by one and returns the state unchanged. This is essentially how the loops are implemented in Haskell. 
 
 The advantage of defining the behavior of the language in such a monadic, composable way is that the implementation in Haskell is extremely close to the denotational semantics presented in \cref{eq:semantics}. The actual implementation is just slightly more complicated, mostly because it also has to keep track of discontinuities (which weren't covered here to keep the focus on the behavior of the language; see \cref{sec:discontinuities} for details).
 
@@ -284,7 +284,7 @@ The advantage of defining the behavior of the language in such a monadic, compos
 \label{sec:solver}
 
 %introduction (IVP, numeric vs symbolic)
-As explained above, the continuous behavior of our hybrid programs is modeled using systems of ordinary differential equations (ODEs). This section exposes how to use a differential equation to evolve a set of initial conditions - the well-known initial value problem - when working specifically with computable real numbers.
+As explained above, the continuous behavior of our hybrid programs is modeled using systems of ordinary differential equations (ODEs). This section exposes how to use a differential equation to evolve a set of initial conditions -- the well-known initial value problem -- when working specifically with computable real numbers.
 
 %adapted from
 %https://www.maia.ub.es/~angel/taylor/taylor-1.4/taylor.pdf
@@ -327,7 +327,7 @@ $\vec{x}\ '''(0) = (\vec{f}\ '(\vec{x}(0)) \vec{x}\ '(0))' = \vec{f}\ ''(\vec{x}
 
 There is also the issue of finding the derivatives of $\vec{f}$. Remember that in the context of the hybrid simulator, $\vec{f}$ is not an arbitrary function, but an expression that contains the variables of the system and combines them using a fixed set of elementary functions and operators. Therefore, finding its derivatives could be done symbolically from that expression; but this approach has the same problem as the derivation of the derivatives of $\vec{x}$ above: as the order of the derivative gets higher, the complexity of the expression grows quickly.
 
-To solve both problems at once, we can use automatic differentiation\cite{Rall1981}. Automatic differentiation is a group of techniques used to calculate the derivative of functions expressed as programs by systematically applying the chain rule to each elementary operation in the program. Forward automatic differentiation (FAD), in particular, computes the value and derivative of a function simultaneously, propagating them forward through the composition of elementary operations.
+To solve both problems at once, we can use automatic differentiation \cite{Rall1981}. Automatic differentiation is a group of techniques used to calculate the derivative of functions expressed as programs by systematically applying the chain rule to each elementary operation in the program. Forward automatic differentiation (FAD), in particular, computes the value and derivative of a function simultaneously, propagating them forward through the composition of elementary operations.
 
 One method for implementing FAD is representing the value of expressions and all of their derivatives as (possibly infinite) lists. A constant expression is represented as a singleton list ($\textsf{2} \sim [2]$) and an independent variable $\textsf{t}$ with value $t$ is represented as a two element list $\textsf{t} \sim [t, 1]$. Expressions may then be built by operating on these base representations. For example, to obtain the list representing the expression $\textsf{a(t)} = \textsf{t + 2}$ we sum the list representations of $\textsf{t}$ and $\textsf{2}$ (since $(u+v)' = v' + v'$) to obtain $\textsf{a(t)} \sim [t + 2, 1]$; this represents the fact that $a(t) = t + 2$, $a'(t) = 1$ and higher derivatives are zero. Though do note that, in general, operations on these representations are more complex than a simple zip of the operands, since the derivative of an expression may depend on both the value and the derivative of the subexpressions that make it up (e.g. $(uv)' = u'v + uv'$).
 
@@ -339,18 +339,18 @@ Using these representations, obtaining all derivatives of the solution to an ODE
 
 The resulting list contains all derivatives of $x$ at $t=0$. From there it is possible to build a Taylor series that equals $x$. The process is essentially the same for systems of ODEs.
 
-To turn the Taylor series into a computable real number we take the partial sums of the series (which are Taylor polynomial approximations of $x$) and calculate their limit. However, recall from \cref{sec:features} that limits require known error bounds for each approximation. There is actually a formula for the error $E_k$ of a Taylor polynomial\cite{apostol1991calculus}: if $A,B$ are known such that $\forall t \in [a,a + h], A \leq x^{(k+1)}(t) \leq B$, then
+To turn the Taylor series into a computable real number we take the partial sums of the series (which are Taylor polynomial approximations of $x$) and calculate their limit. However, recall from \cref{sec:features} that limits require known error bounds for each approximation. There is actually a formula for the error $E_k$ of a Taylor polynomial \cite{apostol1991calculus}: if $A,B$ are known such that $\forall t \in [a,a + h], A \leq x^{(k+1)}(t) \leq B$, then
 
 \begin{equation*}
    A\frac{h^{k+1}}{(k+1)!} \leq E_k(a+h) \leq B\frac{h^{k+1}}{(k+1)!}
 \end{equation*}
 
-Using the error bound, it is possible to calculate the appropriate step size $h$ and necessary order $k$ to achieve the desired error. However, although $A$ and $B$ can be found using of interval arithmetic by calculating $x^{(k+1)}([a, a+h])$, implementing interval arithmetic for arbitrary functions is not trivial. This error bound is also pretty loose, which would need to be balanced by using small step sizes.
+Using the error bound, it is possible to calculate the appropriate step size $h$ and necessary order $k$ to achieve the desired error. However, although $A$ and $B$ can be found using interval arithmetic by calculating $x^{(k+1)}([a, a+h])$, implementing interval arithmetic for arbitrary functions is not trivial. This error bound is also pretty loose, which would need to be balanced by using small step sizes.
 %I wanted to cite these but can't find a bibtex for it
 %https://fse.studenttheses.ub.rug.nl/25354/1/bMATH_2021_LeviN.pdf
 %https://www.maia.ub.es/~angel/taylor/taylor-1.4/taylor.pdf
 
-Jaguar instead uses another approach, taking advantage of polynomial ODEs. A polynomial ODE is an ODE where the derivative of the unknown function is given by a polynomial. Of interest, these ODEs have a stricter, \textit{a priori} error bound for Taylor polynomial approximations of their solution based only on their coefficients and initial values\cite{WARNE20061695}:
+Jaguar instead uses another approach, taking advantage of polynomial ODEs. A polynomial ODE is an ODE where the derivative of the unknown function is given by a polynomial. Of interest, these ODEs have a stricter, \textit{a priori} error bound for Taylor polynomial approximations of their solution based only on their coefficients and initial values \cite{WARNE20061695}:
 
 \begin{equation}
 \label{eq:poly_ode_error}
@@ -401,13 +401,13 @@ So what should $g_{h,i}(n)$ be? For the fixed steps $h=1/2M$, using the formula 
 
 \begin{equation*}
   \begin{split}
-    & |(E_{g_h(n)})_i| \leq 2^{-n-1} \\
-    \Leftarrow\ & \frac{|c_i|}{2^{g_{h,i}(n)}} \leq 2^{-n-1} \\
-    \Leftrightarrow\ & |c_i| \leq 2^{g_{h,i}(n)-n-1} \\
-    \Leftrightarrow\ & max(|(x_0)_i|, 1) \leq 2^{g_{h,i}(n)-n-1} \\
-    \Leftrightarrow\ & log_2(max(|(x_0)_i|, 1)) \leq g_{h,i}(n)-n-1 \\
-    \Leftrightarrow\ & g_{h,i}(n) \geq log_2(max(|(x_0)_i|, 1))+n+1 \\
-    \Leftarrow\ & g_{h,i}(n) = \lceil log_2(max(|(x_0)_i|, 1)) \rceil +n+1
+    & |(E_{g_h(n)})_i| \leq 2^{-n} \\
+    \Leftarrow\ & \frac{|c_i|}{2^{g_{h,i}(n)}} \leq 2^{-n} \\
+    \Leftrightarrow\ & |c_i| \leq 2^{g_{h,i}(n)-n} \\
+    \Leftrightarrow\ & max(|(x_0)_i|, 1) \leq 2^{g_{h,i}(n)-n} \\
+    \Leftrightarrow\ & log_2(max(|(x_0)_i|, 1)) \leq g_{h,i}(n)-n \\
+    \Leftrightarrow\ & g_{h,i}(n) \geq log_2(max(|(x_0)_i|, 1))+n \\
+    \Leftarrow\ & g_{h,i}(n) = \lceil log_2(max(|(x_0)_i|, 1)) \rceil +n
   \end{split}
 \end{equation*}
 
@@ -415,42 +415,42 @@ And for the last step, with an arbitrary $h$ ($r = |Mh|$ for convenience), solvi
 
 \begin{equation*}
   \begin{split}
-    & |(E_{g_{h,i}(n)})_i| \leq 2^{-n-1} \\
-    \Leftarrow\ & \frac{|c_i| r^{g_{h,i}(n)+1}}{1-r} \leq 2^{-n-1} \\
-    \Leftrightarrow\ & 2^{log_2(r)g_{h,i}(n)+1} \leq \frac{(1-r) 2^{-n-1}}{|c_i|} \\
-    \Leftrightarrow\ & log_2(r)g_{h,i}(n)+1 \leq log_2 \left( \frac{(1-r)}{|c_i|} \right) -n-1 \\
-    \Leftrightarrow\ & g_{h,i}(n)+1 \geq \frac{log_2 \left( \frac{1-r}{|c_i|} \right) -n-1}{log_2(r)} \\
-    \Leftrightarrow\ & g_{h,i}(n)+1 \geq \frac{log_2 \left( \frac{|c_i|}{1-r} \right) +n+1}{log_2(1/r)} \\
-    \Leftrightarrow\ & g_{h,i}(n) \geq \frac{log_2 \left( \frac{max(|(x_0)_i|,1)}{1-r} \right) +n+1}{log_2(1/r)} - 1 \\
-    \Leftarrow\ & g_{h,i}(n) = \left\lceil \frac{log_2 \left( \frac{max(|(x_0)_i|,1)}{1-r} \right) +n+1}{log_2(1/r)} \right\rceil - 1
+    & |(E_{g_{h,i}(n)})_i| \leq 2^{-n} \\
+    \Leftarrow\ & \frac{|c_i| r^{g_{h,i}(n)+1}}{1-r} \leq 2^{-n} \\
+    \Leftrightarrow\ & 2^{log_2(r)g_{h,i}(n)+1} \leq \frac{(1-r) 2^{-n}}{|c_i|} \\
+    \Leftrightarrow\ & log_2(r)g_{h,i}(n)+1 \leq log_2 \left( \frac{(1-r)}{|c_i|} \right) -n \\
+    \Leftrightarrow\ & g_{h,i}(n)+1 \geq \frac{log_2 \left( \frac{1-r}{|c_i|} \right) -n}{log_2(r)} \\
+    \Leftrightarrow\ & g_{h,i}(n)+1 \geq \frac{log_2 \left( \frac{|c_i|}{1-r} \right) +n}{log_2(1/r)} \\
+    \Leftrightarrow\ & g_{h,i}(n) \geq \frac{log_2 \left( \frac{max(|(x_0)_i|,1)}{1-r} \right) +n}{log_2(1/r)} - 1 \\
+    \Leftarrow\ & g_{h,i}(n) = \left\lceil \frac{log_2 \left( \frac{max(|(x_0)_i|,1)}{1-r} \right) +n}{log_2(1/r)} \right\rceil - 1
   \end{split}
 \end{equation*}
 
-If the Taylor series is finite (when the solution to the differential equation is a polynomial), the whole stepping process can be skipped since the series is an exact formula for the function and can be calculated for arbitrarily big steps without the need for limits, which can be heavy on performance, especially when nested. However, since it is computationally impossible to learn if the series is finite by iterating it (because iterating an infinite list will never terminate), Jaguar only checks if its length is at most five. This will include most simple physical systems, which are defined with non-recursive low-order derivatives (e.g. velocity and acceleration independent of position). If so, the exact solution is taken, achieving a performance close to symbolic solving; otherwise, the stepping strategy is employed. This and other aspects of the solver have plenty of room for improvement in the future, and any optimizations in this component will translate directly to a faster performance of the language overall.
+If the Taylor series is finite (when the solution to the differential equation is a polynomial), the whole stepping process can be skipped since the series is an exact formula for the function and can be calculated for arbitrarily big steps without the need for limits, which can be heavy on performance, especially when nested. However, since it is computationally impossible to learn if the series is finite by iterating it (because iterating an infinite list will never terminate), Jaguar only checks if its length is at most five. This will include most simple physical systems, which are defined with non-recursive low-order derivatives (e.g. velocity and acceleration independent of position). If so, the exact solution is taken; otherwise, the stepping strategy is employed. This and other aspects of the solver have plenty of room for improvement in the future, and any optimizations in this component will translate directly to a faster performance of the language overall.
 
 
 \section{Visualizer}
 \label{sec:visualizer}
 
-The visualizer takes in the hybrid evolution produced by the interpreter and plots the value of each variable versus time by evaluating the evolution at multiple sample points. To generate the plot, the Chart\cite{Chart} library was used.
+The visualizer takes in the hybrid evolution produced by the interpreter and plots the value of each variable versus time by evaluating the evolution at multiple sample points. To generate the plot, the Chart \cite{Chart} library was used.
 
 To place a computable real on the plot, it is first approximated with some accuracy (which can be provided as a parameter by the user), generating a range of values around the approximation that bounds the actual value of the real. The approximations are then joined together with a line and the ranges are joined as the shaded areas (\cref{fig:plot_example}). \cref{fig:plot_example2} is a plot of the same program with a higher accuracy, making the shaded area so small it is no longer visible. The code that generated both of them can be found in \todo{cref to appendix}.
 
 \begin{figure}
   \centering
   \includegraphics[width=0.75\linewidth]{images/plots/example.png}
-  \caption{Plot of a Jaguar program with an accuracy of 3}
+  \caption{Plot of a Jaguar program with an accuracy of 4}
   \label{fig:plot_example}
 \end{figure}
 
 \begin{figure}
   \centering
   \includegraphics[width=0.75\linewidth]{images/plots/example2.png}
-  \caption{Plot of a Jaguar program with an accuracy of 8}
+  \caption{Plot of a Jaguar program with an accuracy of 9}
   \label{fig:plot_example2}
 \end{figure}
 
-Because time is also a computable real, it too must be approximated before being placed on the plot. This can sometimes generate weird artifacts, such as in \cref{fig:plot_example} where the line loops around at the bouncing points ($t=2$ and $t=3.8$ are the most visible). This happens because the time of the sample before the bounce was approximated to a higher value than the time of the sample after the bounce, making the line go backwards to connect the two. Also note how the line goes below the x-axis, due to the undecidability of hybrid branches talked about in \cref{sec:hybrid_undecidability}. These artifacts disappear when accuracy is increased (\cref{fig:plot_example2}).
+Since time is also a computable real, it too must be approximated before being placed on the plot. This can sometimes generate weird artifacts, such as in \cref{fig:plot_example} where the line loops around at the bouncing points ($t=2$ and $t=3.8$ are the most visible). This happens because the time of the sample before the bounce was approximated to a higher value than the time of the sample after the bounce, making the line go backwards to connect the two. Also note how the line goes below the x-axis, due to the undecidability of hybrid branches talked about in \cref{sec:hybrid_undecidability}. These artifacts disappear when accuracy is increased (\cref{fig:plot_example2}).
 
 
 
@@ -458,10 +458,10 @@ Because time is also a computable real, it too must be approximated before being
 \subsection{Discontinuity Tracking}
 \label{sec:discontinuities}
 
-It was already explained in \cref{sec:undecidability} how discontinuities (which may arise at the point of concatenation of two hybrid programs) are handled locally, when making individual queries. However, to facilitate a big picture analysis of a program, Jaguar also includes tools for tracking discontinuity points throughout the whole trajectory (shown in the plots as the empty and full points). This is as simple as keeping track of every point at which an assignment is made\footnote{The solutions to the differential equations are assumed to be continuous. Since the solver relies on Taylor series, the generated solitions will always be continuous evolutions anyway. No effort was made to detect or simulate mathematical discontinuities}. Not every assignment effectively generates a discontinuity, since it may not change the state, but checking if the state changed requires comparisons (which, as seen before, leads to undecidability troubles), so all assignments are tracked. The resulting list of discontinuities is returned alongside the hybrid evolution as the output of a Jaguar program.
+It was already explained in \cref{sec:undecidability} how discontinuities (which may arise at the point of concatenation of two hybrid programs) are handled locally, when making individual queries. However, to facilitate a big picture analysis of a program, Jaguar also includes tools for tracking discontinuity points throughout the whole trajectory (shown in the plots as the empty and full points). This is as simple as keeping track of every point at which one or more assignments are made\footnote{The solutions to the differential equations are assumed to be continuous. Since the solver relies on Taylor series, the generated solitions will always be continuous evolutions anyway. No effort was made to detect or simulate mathematical discontinuities.}. Not every assignment effectively generates a discontinuity, since it may not change the state, but checking if the state changed requires comparisons (which, as seen before, leads to undecidability troubles), so all assignments are tracked. The resulting list of discontinuities is returned alongside the hybrid evolution as the output of a Jaguar program.
 
 Each discontinuity is located between two differential trajectories. To match each discontinuity to its neighboring hybrid branches without directly comparing the time of each (which, again, is undecidable), each discontinuity and differential trajectory also include order information in the form of a step counter. Basically, alongside the state of the system, Jaguar keeps a counter that starts at zero and increases with both differential statements and assignments. This way, each differential trajectory is associated with a unique step number.
 
 %todo: example program, image of plot (with the step counter added on top) and list of discontinuities
 
-A discontinuity is described by all that information put together: a real number corresponding to the time of the discontinuity; the hybrid state and step number "before" the discontinuity (as in, the state the system would have at the moment of discontinuity if the program ended without the assignment statement(s) that caused the discontinuity); and the hybrid state and step number at the moment of the discontinuity. Discontinuities are returned as a lazy list, taking advantage of the right associativity of Jaguar's parsing.
+A discontinuity is described by all that information put together: a real number corresponding to the time of the discontinuity; the hybrid state and step number "before" the discontinuity (as in, the state the system would have at the moment of discontinuity if the program ended without the assignment(s) that caused the discontinuity); and the hybrid state and step number at the moment of the discontinuity. Discontinuities are returned as a lazy list, taking advantage of the right associativity of Jaguar's parsing.

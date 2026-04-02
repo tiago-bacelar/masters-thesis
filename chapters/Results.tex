@@ -3,17 +3,16 @@
 
 This chapter is dedicated to the benchmarking results of both the exact real arithmetic packages and the hybrid simulator. To understand the obtained results, it is important to build up from the basics, first analyzing the performance of the basic operations and how they interact, so that by the time the benchmarks of the simulator are presented they are totally expected. The chapter is divided into \cref{sec:package_benches}, focusing on the basic operations of the five packages, and \cref{sec:simulator_benches}, which analyzes benchmarks for the differential equation solver and the hybrid simulator as a whole.
 
-Since there are five libraries being contrasted with one another, a big part of this analysis will be to try to explain where their differences in performance come from, be it from fundamental differences in their respective strategies or from some specific implementation detail. From these comparisons there will emerge a clear best choice for using with the hybrid simulator.
+Since there are five libraries being compared with one another, a big part of this analysis will be to try to explain where their differences in performance come from, be it from fundamental differences in their respective strategies or from some specific implementation detail. From these comparisons there will emerge a clear best choice for using with the hybrid simulator.
 
-All results were obtained by performing multiple runs of the code samples (at least 10 runs for the slowest tests) on the same Asus laptop\todo{specs?} with the help of benchmarking library criterion\cite{criterion}. The presented results are the arithmetic averages of the multiple runs.
-
+All code was compiled with the Glasgow Haskell Compiler (GHC) 9.10.3 using Stack 3.3.1 and executed on Ubuntu 22.04 running on an AMD Ryzen 5 UM425UA\todo{confirmar} laptop with 8GB RAM. The results were obtained by performing multiple runs of the code samples (at least 10 runs for the slowest tests) with the help of benchmarking library criterion \cite{criterion}. The presented results are the arithmetic averages of the multiple runs. The full code can be found on github \cite{Jaguar} and run with stack, but the source code for each test was also included in the appendix for ease of reference. %todo: cref
 
 \section{Exact Real Arithmetic Benchmarks}
 \label{sec:package_benches}
 
 To measure the performance of an operation on computable reals is effectively to measure the performance of approximating the result of that operation to some accuracy $n$. This means that, right from the start, there is an extra axis to our analysis: the performance of an operation usually depends on the requested accuracy, which is why the presented benchmarks are graphs of execution time (in milliseconds) over accuracy. Logarithmic axis are used to make asymptotic complexity more visible. Although constant factors (which in logarithmic axis appear as translations) are somewhat important, for large computations the asymptotic behavior (the shape and slope of the curves) as the accuracy increases is the most helpful predictor of performance, so that is where this analysis focuses the most. 
 
-The simplest operation we can start by analyzing is $fromRational$ (\cref{fig:fromRational}), which, recall from \cref{sec:features}, promotes a rational to a computable real. Since the analyzed packages work with dyadic approximations, approximating the result of $fromRational$ entails generating a dyadic number that approximates the wanted rational within a certain accuracy. As the accuracy grows, the size of the numerator and denominator grow by the same amount, which explains the (approximately) linear cost of the operation after $n \approx 10^3$, where constant costs are overcome. Looking a bit closer at the results, there also seems to be a logarithmic factor at play ($O(n \log{n})$), probably related to Integer operations, in all packages except \textit{exact-real}. This difference is likely due to implementation specific optimizations, such as the use of bitshifting operations instead of exponentiation.
+The simplest operation we can start by analyzing is $fromRational$ (\cref{fig:fromRational}), which, recall from \cref{sec:features}, promotes a rational to a computable real. Since the analyzed packages work with dyadic approximations, approximating the result of $fromRational$ entails generating a dyadic number that approximates the wanted rational within a certain accuracy. As the accuracy grows, the size of the numerator and denominator grow by the same amount, which explains the (approximately) linear cost of the operation after $n \approx 10^3$, where constant costs are overcome. Looking a bit closer at the results, there also seems to be a logarithmic factor at play ($O(n \log{n})$ or $O(n \log^2{n})$), probably related to Integer operations, in all packages except \textit{exact-real}. This difference is likely due to implementation specific optimizations, such as the use of bitshifting operations instead of exponentiations and multiplications, which introduce a logarithmic factor.
 
 \begin{figure}[b!]
   \centering
@@ -22,7 +21,7 @@ The simplest operation we can start by analyzing is $fromRational$ (\cref{fig:fr
   \label{fig:fromRational}
 \end{figure}
 
-There is also $fromInteger$ (\cref{fig:fromInteger}), which works the same but limited to integer inputs. Since most rationals can't be represented exactly by a dyadic, while integers can, nested intervals representations (\textit{CDAR} and \textit{aern2-real}) can optimize $fromInteger$ by storing a single interval with zero length, which is a valid approximation for any accuracy. This can also be done in $fromRational$ with rationals whose denominator is a power of 2 (\cref{fig:fromRational_dyad}), which \textit{aern2-real} also seems to do but \textit{CDAR} doesn't, presumably to avoid extra logic and checks that could slow $fromRational$ down (notice how \textit{CDAR}'s non-dyadic $fromRational$ is faster than \textit{aern2-real}'s by a constant factor).
+There is also $fromInteger$ (\cref{fig:fromInteger}), which works the same way but limited to integer inputs. Since most rationals can't be represented exactly by a dyadic, while integers can, nested intervals representations (\textit{CDAR} and \textit{aern2-real}) can optimize $fromInteger$ by storing a single interval with zero width, which is a valid approximation for any accuracy. This can also be done in $fromRational$ with rationals whose denominator is a power of 2 (\cref{fig:fromRational_dyad}), which \textit{aern2-real} also seems to do but \textit{CDAR} doesn't, presumably to avoid extra logic and checks that could slow $fromRational$ down (notice how \textit{CDAR}'s non-dyadic $fromRational$ is faster than \textit{aern2-real}'s by a constant factor).
 
 \begin{figure}[p]
   \centering
@@ -42,7 +41,7 @@ There is also $fromInteger$ (\cref{fig:fromInteger}), which works the same but l
 
 \pagebreak
 
-As expected, $cons$ (\cref{fig:cons}) has a very similar performance to non-dyadic $fromRational$, since they are essentially the same operation. However, something to keep in mind with $cons$ is that, since it receives a function or list, the performance of the resulting computable real is tied to the performance of the function it was constructed from. If instead of a constant function we pass $cons$ the partial sums of a series (\cref{fig:cons_series}) for example, the times rise significantly and are pretty much the same between the packages, since the bottleneck is now calculating and iterating the list.
+As expected, the constructor $cons$ (\cref{fig:cons}) has a very similar performance to non-dyadic $fromRational$, since they are essentially the same operation. However, something to keep in mind with $cons$ is that, since it receives a function or list, the performance of the resulting computable real is tied to the performance of the function it was constructed from. If instead of a constant function we pass $cons$ the partial sums of a series (\cref{fig:cons_series}) for example, the times rise significantly and are pretty much the same between the packages, since the bottleneck is now calculating and iterating the list.
 
 \begin{figure}[b!]
   \centering
@@ -78,8 +77,10 @@ In \cref{sec:survey} it was explained how addition works on modulus of convergen
 $((a + b) + c) + d$
 
 then this approach has the unfortunate consequence of escalating the accuracy requested from each term. In this example, the term $d$ will be evaluated at $n+2$ accuracy, the term $c$ at $n+4$ and terms $a$ and $b$ at $n+6$. The deeper a number is in the nesting of operations, the greater accuracy is required from it. And because more accurate approximations have bigger precision in modulus of convergence representations ($O(p) \approx O(n)$), adding and dividing them is also slower. The time complexity of division is $O(p \log{p}) \approx O(n \log{n})$, so the total time complexity of the sum of the list equals $\sum_{i=1}^{k} O((n+2i) \log{(n+2i)}) = O((k^2+nk) \log{(n+k)})$, which seems to match the quadratic growth of the three modulus of convergence packages in \cref{fig:list_sum_k} and \cref{fig:list_sum_n} pretty closely. \textit{ireal} does have a small spike at $k=10000$ for reasons that elude me, but otherwise follows the pattern.
+%todo: replace O(p) = O(n) with p <= n ????
 
 Nested intervals representations don't have this problem since their operations are a zip. It is a bit trickier to calculate an asymptotic complexity for them, since they have much more freedom in the precision and accuracy of their intervals and how intervals are searched, but if we use the same assumptions as before ($O(p) \approx O(n)$ for the terms), we can intuitively say complexity should be around $O(kn \log{n})$. Looking at \cref{fig:list_sum_k}, both appear to be linear in $k$ as predicted, despite \textit{cdar} gaining a greater constant factor at $k=320$.
+%todo: same here
 
 \begin{figure}[p]
   \centering
@@ -153,7 +154,7 @@ dp_sum x k = case k `mod` 2 of
   \label{fig:dp_sum_n}
 \end{figure}
 
-Unlike previous tests, where $k$ operations are needed to add the $k$ elements together, this test only takes between $\lfloor \log_2 k \rfloor$ and $2 \lfloor \log_2 k \rfloor$ exact real arithmetic operations\footnote{$dp\_sum$ performs either 1 or 2 operations if $k$ is even or odd, respectively, and then recursively calls itself with $k$ divided by $2$. This is equivalent to counting the number of ones and zeroes in the binary representation of $k$ (ignoring the first bit, which is always a one), each adding 2 and 1 operations, respectively. Therefore, the total number of operations must be between $\lfloor \log_2 k \rfloor$ (all bits except the first are zeroes) and $2 \lfloor \log_2 k \rfloor$ (all bits are ones)} by reusing the value $\text{x}$ multiple times per step. If the package supports memoization, the complexity of the test is logarithmic on $k$. If it doesn't, however, each $\text{x}$ is unrolled into its own calculation, which then recursively unrolls further, effectively recreating the structure of the tree this code attempted to optimize.
+Unlike previous tests, where $k$ operations are needed to add the $k$ elements together, this test only takes between $\lfloor \log_2 k \rfloor$ and $2 \lfloor \log_2 k \rfloor$ exact real arithmetic operations\footnote{$dp\_sum$ performs either 1 or 2 operations if $k$ is even or odd, respectively, and then recursively calls itself with $k$ divided by $2$. This is equivalent to counting the number of ones and zeroes in the binary representation of $k$ (ignoring the first bit, which is always a one), each adding 2 and 1 operations, respectively. Therefore, the total number of operations must be between $\lfloor \log_2 k \rfloor$ (all bits except the first are zeroes) and $2 \lfloor \log_2 k \rfloor$ (all bits are ones).} by reusing the value $\text{x}$ multiple times per step. If the package supports memoization, the complexity of the test is logarithmic on $k$. If it doesn't, however, each $\text{x}$ is unrolled into its own calculation, which then recursively unrolls further, effectively recreating the structure of the tree this code attempted to optimize.
 
 The results are shown in \cref{fig:dp_sum_k} and \cref{fig:dp_sum_n}. As we would expect, only the packages that implement memoization show improvements, while \textit{ERA}'s performance stayed the same from \cref{fig:tree_sum}. It is also interesting how \textit{exact-real} and \textit{ireal} follow the same pattern in \cref{fig:dp_sum_k}, since they have the same memoization type and similar implementation. If the reader is confused as to how their runtime isn't monotonic in $k$ (e.g. $k=1000$ has a greater runtime than $k=3200$), this is because the number of operations performed is not proportional to $\log_2 k$, but is between $\lfloor \log_2 k \rfloor$ and $2 \lfloor \log_2 k \rfloor$. It just so happens that $k=1000$ needs more operations than $k=3200$, and, as we have seen, modulus of convergence representations are highly sensitive to the number of operations when these aren't nested properly.
 
@@ -162,3 +163,17 @@ The results are shown in \cref{fig:dp_sum_k} and \cref{fig:dp_sum_n}. As we woul
 
 \section{Hybrid Simulator Benchmarks}
 \label{sec:simulator_benches}
+
+After studying the fundamentals, we can now understand the performance of the hybrid simulator. Obviously, the performance will vary greatly depending on the hybrid program -- more complex programs perform more complex operations and a greater number of them, which leads to slower runtimes. The complexity introduced by conditional structures and variable assignments is immediately visible: the more complicated the expression (and the more nesting it introduces, in the case of modulus of convergence representations), the more it contributes to the total runtime. The following program recreates the sum of a list analyzed previously as a hybrid program using assignments, and the runtimes (\cref{fig:hybrid_list_sum}) match the ones obtained in \cref{fig:list_sum_k}.
+
+\begin{lstlisting}[caption=Hybrid program that for each $t$ calculates the sum of $\lfloor t \rfloor + 1$ elements]
+  x := 22/7;
+  while true do {
+    wait 1;
+    x := x + 22/7
+  }
+\end{lstlisting}
+
+//TODO: analyze
+
+Differential statements, on the other hand, can be much more complex than what they let on. 
