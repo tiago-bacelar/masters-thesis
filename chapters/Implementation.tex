@@ -17,7 +17,7 @@ Jaguar's architecture (\cref{fig:architecture}) has four main components: a pars
 
 These components were designed to be as modular as possible and are mostly interchangeable, with future changes and improvements in each component not affecting the others. The biggest dependency between them is Jaguar's syntax tree, which is produced by the parser and consumed by the interpreter and solver. All components are also type-agnostic, supporting any type that instantiates a few typeclasses. Besides the computable real types presented in \cref{sec:survey}, Jaguar can also run using regular floating-point numbers (though, of course, the correction of the results is contingent on the program at hand not requiring more numerical precision than the floating-point number can provide), and can be made to support many more in the future simply by instantiating the necessary classes.
 
-The rest of this chapter takes a closer look at each of these components: \cref{sec:parser} is about the parser, \cref{sec:interpreter} explains some general features of the interpreter and the denotational semantics of the language (with \cref{sec:undecidability} being about the specific challenge of supporting types with undecidable comparison), \cref{sec:solver} presents the workings of the solver and their mathematical motivation, and \cref{sec:visualizer} describes the visualizer.
+The rest of this chapter takes a closer look at each of these components: \cref{sec:parser} is about the parser, \cref{sec:interpreter} explains some general features of the interpreter and the denotational semantics of the language (with \cref{sec:semidecidability} being about the specific challenge of supporting types with semidecidable comparison), \cref{sec:solver} presents the workings of the solver and their mathematical motivation, and \cref{sec:visualizer} describes the visualizer.
 
 
 \section{Parsing a Hybrid Language}
@@ -72,8 +72,8 @@ The full specification of the language's syntax, in BNF notation and its precede
 
 
 
-\section{The Challenges of Undecidability}
-\label{sec:undecidability}
+\section{The Challenges of Semidecidability}
+\label{sec:semidecidability}
 
 Up until now, the features discussed were common among other hybrid simulators. However, dealing with computable real numbers results in some unique challenges, mainly when it comes to comparison. This section presents these challenges and the unique solutions developed to address them.
 
@@ -92,7 +92,7 @@ while x < y do { ans := ans - 1; y := y / 2 }
 
 This algorithm is mathematically correct: it always takes a finite number of steps for any input $x$, and always reaches the correct answer. However, notice what happens if we try to run the program with the input $x=0.5$: the second iteration of the while loop will try to make the comparison $0.5 < 0.5$. Mathematically, it should evaluate to false, but as explained in \cref{sec:theory}, comparing two equal computable real numbers will never terminate. As a result, our program will never terminate, even though it is mathematically sound!
 
-The fundamental limitation here is the undecidability of comparison in the computable reals: whenever our hybrid simulator tries to fully evaluate a comparison, it may never terminate, giving no further feedback to the user. From a design standpoint, this places on the user the responsibility of ensuring that no comparison ever compares two equal numbers. Which, while in some cases is simply impractical, in others it is downright impossible.
+The fundamental limitation here is the semidecidability of comparison in the computable reals: whenever our hybrid simulator tries to fully evaluate a comparison, it may never terminate, giving no further feedback to the user. From a design standpoint, this places on the user the responsibility of ensuring that no comparison ever compares two equal numbers. Which, while in some cases is simply impractical, in others it is downright impossible.
 
 Ideally, such comparisons would produce an error instead of running indefinitely. We can do that by evaluating the comparison only up to a certain accuracy. Formally, when evaluating $r<s$ to accuracy $n$, we first approximate $r$ and $s$ to intervals of rational numbers $a \leq r \leq b$ and $c \leq s \leq d$ such that $b-a,d-c \leq 2^{1-n}$. If $b<c$, then we can be sure that $r<s$ and the original comparison is true. If $d \leq a$, then we are sure $r \geq s$ and the comparison is false. In all other situations, we can't resolve the comparison; the given accuracy isn't enough. All that can be inferred is that $|r-s| \leq 2^{2-n}$. In these cases an error is raised, giving valuable feedback to the user. 
 
@@ -118,13 +118,13 @@ Although the comparison $x > 0.125$ is indeterminate at the beginning of the fou
 
 Essentially, what is being described is Kleene's logic, a three-valued logic as a way to capture epistemological knowledge. Unlike other three-valued logics, where the middle value denotes that a proposition is fundamentally unprovable or unknowable, in Kleene's logic the middle value works essentially as a placeholder. True or false are still the only "real" values a proposition may have, with the middle value reflecting only a current lack of information about its real value \cite{Malinowski14}. Interestingly, this notion can also be conceptualized from a domain theory lens as the flat domain of the booleans, containing three values: true, false and bottom (\cref{fig:kleeneans_dom}). Such a formalization is useful because it allows us to extend what was said before about computable real numbers in \cref{sec:domain} to the semantics of Jaguar: because operators on the domain of the booleans are continuous, evaluating boolean expressions will approach the actual result of the denoted condition, and expressions evaluated with greater comparison accuracy are always consistent with those evaluated with lower accuracy.
 
-Introducing three-valued logic allows Jaguar to decide many expressions that were undecidable before, but is far from a full symbolic evaluation of the expression. For example, in an expression like $p \vee \neg p$, where $p$ is some comparison, should $p$ be inconclusive, the expression will be evaluated as inconclusive, even though logically it must always be true (the well-known tautology/contradiction problem of three-valued logic).
+Introducing three-valued logic allows Jaguar to decide many expressions that were semidecidable before, but is far from a full symbolic evaluation of the expression. For example, in an expression like $p \vee \neg p$, where $p$ is some comparison, should $p$ be inconclusive, the expression will be evaluated as inconclusive, even though logically it must always be true (the well-known tautology/contradiction problem of three-valued logic).
 
 Finally, notice that the three-valued logic is useless if the user re-enables exact comparisons (up to "infinite accuracy"), since the comparison will never terminate with an inconclusive result.
 
 \subsection{Lax Comparison}
 
-The solution described above for the undecidable comparison problem is as good as it gets: it detects faulty behavior and also allows the user to manage false positives. However, there are still problems which it isn't suitable to solve. Take as an example the following program, a simple while loop with an integer counter:
+The solution described above for the semidecidable comparison problem is as good as it gets: it detects faulty behavior and also allows the user to manage false positives. However, there are still problems which it isn't suitable to solve. Take as an example the following program, a simple while loop with an integer counter:
 
 \begin{lstlisting}[caption=Simple "for" loop with an integer counter variable]
 i := 0;
@@ -140,10 +140,10 @@ For these situations, two new operators were created: determinably less than ($<
 This opens the door to all sorts of misbehavior in the program, of course: $9.99 <!\ 10$ will evaluate to false if the comparison accuracy is not high enough. Indeed, the output of this operator may be incorrect for all comparisons $r <!\ s$ where $r < s \leq r + 2^{2-n}$. However, so long as this critical range is avoided, the lax comparators are guaranteed to return a correct result. If both operands are integers, this works out to $n>2$, as stated above. For other cases, it may vary. It is the responsibility of the user to make sure the variables being compared are appropriately constrained and choose the appropriate comparison accuracy for their use case.
 
 
-\subsection{Hybrid Undecidability}
-\label{sec:hybrid_undecidability}
+\subsection{Hybrid Semidecidability}
+\label{sec:hybrid_semidecidability}
 
-Another unique problem to the crossing of hybrid systems and arbitrary-precision real numbers is the issue of undecidability on the concatenation point of two hybrid programs. Take the following program:
+Another unique problem to the crossing of hybrid systems and arbitrary-precision real numbers is the issue of semidecidability on the concatenation point of two hybrid programs. Take the following program:
 
 \begin{lstlisting}
 x:=0;
@@ -162,7 +162,7 @@ The output of this program should be a function $x(t)$ such that:
   \end{cases}
 \end{equation}
 
-Although this function is mathematically well-defined, in order to evaluate it to any particular value of $t$ we must perform the comparison $t < 1$ to decide between the two branches of the function. However, because comparison is undecidable on the computable reals, evaluating the function may be a never halting computation for $t=1$, and may take arbitrarily long when evaluated for values close to $1$.
+Although this function is mathematically well-defined, in order to evaluate it to any particular value of $t$ we must perform the comparison $t < 1$ to decide between the two branches of the function. However, because comparison is semidecidable on the computable reals, evaluating the function may be a never halting computation for $t=1$, and may take arbitrarily long when evaluated for values close to $1$.
 
 To solve this problem, as before, we must use a parametrized comparison, taking in the desired accuracy of our query. Note that this accuracy doesn't necessarily need to match the comparison accuracy used for in-program comparisons. The query accuracy is only used to choose between two (or more) consecutive branches of the program, leaving the actual execution of the program (variable assignments, choosing between if-else branches and while-loop iterations) completely unaffected. Indeed, the query accuracy can even be chosen independently for every query, without affecting each other into the past nor into the future.
 
@@ -172,7 +172,7 @@ Taking that into account, to give the user the most flexibility and control, it 
 \section{A Hybrid Interpreter}
 \label{sec:interpreter}
 
-With the undecidability issues out of the way, let us turn our attention to the more straightforward problems of implementing a hybrid simulator. These will serve as motivation for Jaguar's denotational semantics, presented in \cref{sec:semantics}.
+With the semidecidability issues out of the way, let us turn our attention to the more straightforward problems of implementing a hybrid simulator. These will serve as motivation for Jaguar's denotational semantics, presented in \cref{sec:semantics}.
 
 \subsection{Iteration Limit}
 \label{sec:iteration_limit}
@@ -391,15 +391,16 @@ Finally, to calculate the solution $\vec{x}(t)$ at some $t$, since the step size
   |(E_k(h))_i| \leq \frac{|c_i|}{2^k}
 \end{equation*}
 
-From this formula it is evident that the accuracy of the approximation increases by $1$ for every increase in $k$, which is perfect for our use case of calculating limits as defined in \cref{sec:features}. Recall that the $limit$ function takes in a list of approximations with increasing accuracies; in order to provide said list, let us define a function $g_{h,i} : \N \rightarrow \N$ that takes in an accuracy $n$ and calculates the smallest $k$ for which the $k$-th order Taylor polynomial approximation has an accuracy of at least $n$ (i.e. $E_{g_{h,i}(n)} \leq 2^{-n-1}$). Then, the list $(l_n)_{n \in \N}$ such that $limit\ l_n = x_i(h)$ is given by:
+From this formula it is evident that the accuracy of the approximation increases by $1$ for every increase in $k$, which is perfect for our use case of calculating limits as defined in \cref{sec:features}. Recall that the $limit$ function takes in a list of approximations with increasing accuracies; in order to provide said list, let us define a function $g_{h,i} : \N \rightarrow \N$ that takes in an accuracy $n$ and calculates the smallest $k$ for which the $k$-th order Taylor polynomial approximation has an accuracy of at least $n$ (i.e. $E_{g_{h,i}(n)} \leq 2^{-n}$). Then, the list $(l_n)_{n \in \N}$ such that $limit\ l_n = x_i(h)$ is given by:
 
 \begin{equation*}
   l_n = \sum_{j=0}^{g_{h,i}(n)} \frac{x_i^{(j)}(0)}{j!}h^j
 \end{equation*}
 
-So what should $g_{h,i}(n)$ be? For the fixed steps $h=1/2M$, using the formula of the error and solving for $(x_0)_i$ yields
+So what should $g_{h,i}(n)$ be? For the fixed steps $h=1/2M$, substituting the formula of the error results in
 
-\begin{equation*}
+\begin{equation}
+\label{eq:solver_step_dt}
   \begin{split}
     & |(E_{g_h(n)})_i| \leq 2^{-n} \\
     \Leftarrow\ & \frac{|c_i|}{2^{g_{h,i}(n)}} \leq 2^{-n} \\
@@ -409,11 +410,12 @@ So what should $g_{h,i}(n)$ be? For the fixed steps $h=1/2M$, using the formula 
     \Leftrightarrow\ & g_{h,i}(n) \geq log_2(max(|(x_0)_i|, 1))+n \\
     \Leftarrow\ & g_{h,i}(n) = \lceil log_2(max(|(x_0)_i|, 1)) \rceil +n
   \end{split}
-\end{equation*}
+\end{equation}
 
-And for the last step, with an arbitrary $h$ ($r = |Mh|$ for convenience), solving for $(x_0)_i$ yields
+And for the last step, with an arbitrary $h$ ($r = |Mh|$ for convenience), solving for $g_{h,i}(n)$ yields
 
-\begin{equation*}
+\begin{equation}
+\label{eq:solver_step_delta}
   \begin{split}
     & |(E_{g_{h,i}(n)})_i| \leq 2^{-n} \\
     \Leftarrow\ & \frac{|c_i| r^{g_{h,i}(n)+1}}{1-r} \leq 2^{-n} \\
@@ -424,7 +426,7 @@ And for the last step, with an arbitrary $h$ ($r = |Mh|$ for convenience), solvi
     \Leftrightarrow\ & g_{h,i}(n) \geq \frac{log_2 \left( \frac{max(|(x_0)_i|,1)}{1-r} \right) +n}{log_2(1/r)} - 1 \\
     \Leftarrow\ & g_{h,i}(n) = \left\lceil \frac{log_2 \left( \frac{max(|(x_0)_i|,1)}{1-r} \right) +n}{log_2(1/r)} \right\rceil - 1
   \end{split}
-\end{equation*}
+\end{equation}
 
 If the Taylor series is finite (when the solution to the differential equation is a polynomial), the whole stepping process can be skipped since the series is an exact formula for the function and can be calculated for arbitrarily big steps without the need for limits, which can be heavy on performance, especially when nested. However, since it is computationally impossible to learn if the series is finite by iterating it (because iterating an infinite list will never terminate), Jaguar only checks if its length is at most five. This will include most simple physical systems, which are defined with non-recursive low-order derivatives (e.g. velocity and acceleration independent of position). If so, the exact solution is taken; otherwise, the stepping strategy is employed. This and other aspects of the solver have plenty of room for improvement in the future, and any optimizations in this component will translate directly to a faster performance of the language overall.
 
@@ -450,7 +452,7 @@ To place a computable real on the plot, it is first approximated with some accur
   \label{fig:plot_example2}
 \end{figure}
 
-Since time is also a computable real, it too must be approximated before being placed on the plot. This can sometimes generate weird artifacts, such as in \cref{fig:plot_example} where the line loops around at the bouncing points ($t=2$ and $t=3.8$ are the most visible). This happens because the time of the sample before the bounce was approximated to a higher value than the time of the sample after the bounce, making the line go backwards to connect the two. Also note how the line goes below the x-axis, due to the undecidability of hybrid branches talked about in \cref{sec:hybrid_undecidability}. These artifacts disappear when accuracy is increased (\cref{fig:plot_example2}).
+Since time is also a computable real, it too must be approximated before being placed on the plot. This can sometimes generate weird artifacts, such as in \cref{fig:plot_example} where the line loops around at the bouncing points ($t=2$ and $t=3.8$ are the most visible). This happens because the time of the sample before the bounce was approximated to a higher value than the time of the sample after the bounce, making the line go backwards to connect the two. Also note how the line goes below the x-axis, due to the semidecidability of hybrid branches talked about in \cref{sec:hybrid_semidecidability}. These artifacts disappear when accuracy is increased (\cref{fig:plot_example2}).
 
 
 
@@ -458,9 +460,9 @@ Since time is also a computable real, it too must be approximated before being p
 \subsection{Discontinuity Tracking}
 \label{sec:discontinuities}
 
-It was already explained in \cref{sec:undecidability} how discontinuities (which may arise at the point of concatenation of two hybrid programs) are handled locally, when making individual queries. However, to facilitate a big picture analysis of a program, Jaguar also includes tools for tracking discontinuity points throughout the whole trajectory (shown in the plots as the empty and full points). This is as simple as keeping track of every point at which one or more assignments are made\footnote{The solutions to the differential equations are assumed to be continuous. Since the solver relies on Taylor series, the generated solitions will always be continuous evolutions anyway. No effort was made to detect or simulate mathematical discontinuities.}. Not every assignment effectively generates a discontinuity, since it may not change the state, but checking if the state changed requires comparisons (which, as seen before, leads to undecidability troubles), so all assignments are tracked. The resulting list of discontinuities is returned alongside the hybrid evolution as the output of a Jaguar program.
+It was already explained in \cref{sec:semidecidability} how discontinuities (which may arise at the point of concatenation of two hybrid programs) are handled locally, when making individual queries. However, to facilitate a big picture analysis of a program, Jaguar also includes tools for tracking discontinuity points throughout the whole trajectory (shown in the plots as the empty and full points). This is as simple as keeping track of every point at which one or more assignments are made\footnote{The solutions to the differential equations are assumed to be continuous. Since the solver relies on Taylor series, the generated solutions will always be continuous evolutions anyway. No effort was made to detect or simulate mathematical discontinuities.}. Not every assignment effectively generates a discontinuity, since it may not change the state, but checking if the state changed requires comparisons (which, as seen before, leads to semidecidability troubles), so all assignments are tracked. The resulting list of discontinuities is returned alongside the hybrid evolution as the output of a Jaguar program.
 
-Each discontinuity is located between two differential trajectories. To match each discontinuity to its neighboring hybrid branches without directly comparing the time of each (which, again, is undecidable), each discontinuity and differential trajectory also include order information in the form of a step counter. Basically, alongside the state of the system, Jaguar keeps a counter that starts at zero and increases with both differential statements and assignments. This way, each differential trajectory is associated with a unique step number.
+Each discontinuity is located between two differential trajectories. To match each discontinuity to its neighboring hybrid branches without directly comparing the time of each (which, again, is semidecidable), each discontinuity and differential trajectory also include order information in the form of a step counter. Basically, alongside the state of the system, Jaguar keeps a counter that starts at zero and increases with both differential statements and assignments. This way, each differential trajectory is associated with a unique step number.
 
 %todo: example program, image of plot (with the step counter added on top) and list of discontinuities
 

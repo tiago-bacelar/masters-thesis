@@ -1,7 +1,7 @@
 \chapter{Results}
 \label{chap:results}
 
-This chapter is dedicated to the benchmarking results of both the exact real arithmetic packages and the hybrid simulator. To understand the obtained results, it is important to build up from the basics, first analyzing the performance of the basic operations and how they interact, so that by the time the benchmarks of the simulator are presented they are totally expected. The chapter is divided into \cref{sec:package_benches}, focusing on the basic operations of the five packages, and \cref{sec:simulator_benches}, which analyzes benchmarks for the differential equation solver and the hybrid simulator as a whole.
+This chapter is dedicated to the benchmarking results of both the exact real arithmetic packages and the hybrid simulator. To understand the obtained results, it is important to build up from the basics, first analyzing the performance of the basic operations and how they interact, before looking at the benchmarks of the simulator. The chapter is divided into \cref{sec:package_benches}, focusing on the basic operations of the five packages; \cref{sec:simulator_benches}, which analyzes benchmarks for the differential equation solver and the hybrid simulator as a whole; and \cref{sec:case_study}, where a practical case study is formulated and analyzed.
 
 Since there are five libraries being compared with one another, a big part of this analysis will be to try to explain where their differences in performance come from, be it from fundamental differences in their respective strategies or from some specific implementation detail. From these comparisons there will emerge a clear best choice for using with the hybrid simulator.
 
@@ -14,7 +14,7 @@ To measure the performance of an operation on computable reals is effectively to
 
 The simplest operation we can start by analyzing is $fromRational$ (\cref{fig:fromRational}), which, recall from \cref{sec:features}, promotes a rational to a computable real. Since the analyzed packages work with dyadic approximations, approximating the result of $fromRational$ entails generating a dyadic number that approximates the wanted rational within a certain accuracy. As the accuracy grows, the size of the numerator and denominator grow by the same amount, which explains the (approximately) linear cost of the operation after $n \approx 10^3$, where constant costs are overcome. Looking a bit closer at the results, there also seems to be a logarithmic factor at play ($O(n \log{n})$ or $O(n \log^2{n})$), probably related to Integer operations, in all packages except \textit{exact-real}. This difference is likely due to implementation specific optimizations, such as the use of bitshifting operations instead of exponentiations and multiplications, which introduce a logarithmic factor.
 
-\begin{figure}[b!]
+\begin{figure}[p]
   \centering
   \includegraphics[width=400px]{images/benches/fromRational.png}
   \caption{Benchmarks for $fromRational\ \frac{22}{7}$, scaled logarithmically}
@@ -30,7 +30,7 @@ There is also $fromInteger$ (\cref{fig:fromInteger}), which works the same way b
   \label{fig:fromInteger}
 \end{figure}
 
-\begin{figure}[p]
+\begin{figure}[h!]
   \centering
   \includegraphics[width=400px]{images/benches/fromRational_dyad.png}
   \caption{Benchmarks for $fromRational\ \frac{9}{64}$, scaled logarithmically}
@@ -43,14 +43,14 @@ There is also $fromInteger$ (\cref{fig:fromInteger}), which works the same way b
 
 As expected, the constructor $cons$ (\cref{fig:cons}) has a very similar performance to non-dyadic $fromRational$, since they are essentially the same operation. However, something to keep in mind with $cons$ is that, since it receives a function or list, the performance of the resulting computable real is tied to the performance of the function it was constructed from. If instead of a constant function we pass $cons$ the partial sums of a series (\cref{fig:cons_series}) for example, the times rise significantly and are pretty much the same between the packages, since the bottleneck is now calculating and iterating the list.
 
-\begin{figure}[b!]
+\begin{figure}[p]
   \centering
   \includegraphics[width=400px]{images/benches/cons.png}
   \caption{Benchmarks for $cons\ (const\ \frac{22}{7})$, scaled logarithmically}
   \label{fig:cons}
 \end{figure}
 
-\begin{figure}[p!]
+\begin{figure}[p]
   \centering
   \includegraphics[width=400px]{images/benches/cons_series.png}
   \caption{Benchmarks for $cons$ of a series, scaled logarithmically}
@@ -59,7 +59,7 @@ As expected, the constructor $cons$ (\cref{fig:cons}) has a very similar perform
 
 The same is true for $limit$, which works very similarly to $cons$. \cref{fig:limit_series} shows the limit of the same series as \cref{fig:cons_series} where each element is first calculated as a rational and them converted to a computable real with $fromRational$, and they correspond perfectly. However, the performance of $limit$ has yet another factor: the performance of each individual real in the list. Even if the list itself is fast to calculate, if each element of the list is a slow computable real, so will be the resulting limit.
 
-\begin{figure}[p!]
+\begin{figure}[h!]
   \centering
   \includegraphics[width=400px]{images/benches/limit_series.png}
   \caption{Benchmarks for $limit$ of a series, scaled logarithmically}
@@ -76,20 +76,18 @@ In \cref{sec:survey} it was explained how addition works on modulus of convergen
 
 $((a + b) + c) + d$
 
-then this approach has the unfortunate consequence of escalating the accuracy requested from each term. In this example, the term $d$ will be evaluated at $n+2$ accuracy, the term $c$ at $n+4$ and terms $a$ and $b$ at $n+6$. The deeper a number is in the nesting of operations, the greater accuracy is required from it. And because more accurate approximations have bigger precision in modulus of convergence representations ($O(p) \approx O(n)$), adding and dividing them is also slower. The time complexity of division is $O(p \log{p}) \approx O(n \log{n})$, so the total time complexity of the sum of the list equals $\sum_{i=1}^{k} O((n+2i) \log{(n+2i)}) = O((k^2+nk) \log{(n+k)})$, which seems to match the quadratic growth of the three modulus of convergence packages in \cref{fig:list_sum_k} and \cref{fig:list_sum_n} pretty closely. \textit{ireal} does have a small spike at $k=10000$ for reasons that elude me, but otherwise follows the pattern.
-%todo: replace O(p) = O(n) with p <= n ????
+then this approach has the unfortunate consequence of escalating the accuracy requested from each term. In this example, the term $d$ will be evaluated at $n+2$ accuracy, the term $c$ at $n+4$ and terms $a$ and $b$ at $n+6$. The deeper a number is in the nesting of operations, the more accuracy it requires. And because more accurate approximations have bigger precision in modulus of convergence representations ($p \approx n$, therefore $O(p) = O(n)$), adding and dividing them is also slower. The time complexity of division depends on the complexity of the used multiplication algorithm, which will be denoted as a function $M(p)$. So the total time complexity of the sum of the list equals $\sum_{i=1}^{k} O(M(n+2i)) = O(kM(n+k))$, which for the fastest multiplication algorithm $M(p)=p\log{p}$ results in $O((k^2+nk)\log{(n+k)})$. This seems to match the quadratic growth of the three modulus of convergence packages in \cref{fig:list_sum_k} and \cref{fig:list_sum_n}. \textit{ireal} does have a small spike at $k=10000$ for reasons that elude me, but otherwise follows the pattern.
 
-Nested intervals representations don't have this problem since their operations are a zip. It is a bit trickier to calculate an asymptotic complexity for them, since they have much more freedom in the precision and accuracy of their intervals and how intervals are searched, but if we use the same assumptions as before ($O(p) \approx O(n)$ for the terms), we can intuitively say complexity should be around $O(kn \log{n})$. Looking at \cref{fig:list_sum_k}, both appear to be linear in $k$ as predicted, despite \textit{cdar} gaining a greater constant factor at $k=320$.
-%todo: same here
+Nested intervals representations don't have this problem because their operations are a zip. It is trickier to calculate an asymptotic complexity for them, since they have much more freedom in the precision and accuracy of their intervals and how intervals are searched, but using same assumptions as before ($O(p) = O(n)$), we can intuitively say that complexity should be around $O(kM(n))$. Looking at \cref{fig:list_sum_k}, both appear to be linear in $k$ as predicted, despite \textit{cdar} gaining a greater constant factor at $k=320$.
 
-\begin{figure}[p]
+\begin{figure}[h!]
   \centering
   \includegraphics[width=400px]{images/benches/list_sum_k.png}
   \caption{Benchmarks for sum of a list of $k$ elements at an accuracy of $n=1000$, scaled logarithmically}
   \label{fig:list_sum_k}
 \end{figure}
 
-\begin{figure}[p]
+\begin{figure}[h!]
   \centering
   \includegraphics[width=400px]{images/benches/list_sum_n.png}
   \caption{Benchmarks for sum of a list of $k=1000$ elements, scaled logarithmically}
@@ -102,11 +100,11 @@ Smart readers may have already realized that, since addition is associative, the
 
 $(a + b) + (c + d)$
 
-This way, the accuracy required from each number will be at most $n+\log_2 k$, and so the total time complexity is merely $\sum_{i=1}^{k} O((n + \log k) \log (n + \log k)) = O((nk+k \log k) \log(n + \log k))$ for modulus of convergence representations, which is a massive boost, as shown in \cref{fig:tree_sum}. Nested intervals representations, as expected, aren't affected. Sadly, this can only be done in specific cases like this one and doesn't generalize to non-associative operations.
+This way, the accuracy required from each number will be at most $n+\log_2 k$, and so the total time complexity is merely $\sum_{i=1}^{k} O(M(n + \log k))$ for modulus of convergence representations, which is a massive boost, as shown in \cref{fig:tree_sum}. Nested intervals representations, as expected, aren't affected. Sadly, this can only be done in specific cases like this one and doesn't generalize to non-associative operations.
 
 To reiterate, although this simple example uses addition, the insight it provides is applicable in any calculation with a high degree of nesting, and explains why nested intervals representations have the advantage in long, nested computations such as a hybrid simulation. This advantage compounds with the $fromInteger$ optimization, making modulus of convergence representations excruciatingly slow by comparison in all but the simplest hybrid programs, as we will see in the next section.
 
-\begin{figure}[b!]
+\begin{figure}[h!]
   \centering
   \includegraphics[width=400px]{images/benches/tree_sum.png}
   \caption{Benchmarks for sum of a tree of $k$ elements at an accuracy of $n=1000$, scaled logarithmically}
@@ -115,11 +113,11 @@ To reiterate, although this simple example uses addition, the insight it provide
 
 \pagebreak
 
-While the basic arithmetic operations are implemented similarly in all packages, more complicated operations such as trigonometric functions can be calculated using various methods, and different packages choose different methods, some more efficient than others. \cref{fig:cos} shows the performance of each package when calculating the cosine of numbers between $0$ to $6.3$, after which the pattern repeats since $cos(x)=cos(x + 2\pi)$.
+While the basic arithmetic operations are implemented similarly in all packages, more complicated operations such as trigonometric functions can be calculated using various methods, and different packages choose different methods, some more efficient than others. \cref{fig:cos} shows the performance of each package when calculating the cosine of numbers between $0$ to $6.3$, after which the pattern repeats since cosine is periodic.
 
 While these differences in performance should definitely be taken into account when choosing the most appropriate package for some specific application, they are not fundamental to each package's representation strategy. These differences come from different methods of calculating cosine, not from the underlying strategy, and it would be entirely possible to optimize the slowest packages by switching to a faster method (though it may be true that the \textit{optimal} method is somehow dependent on or influenced by the package's representation strategy such that one strategy leads to a faster optimal implementation of cosine over another).
 
-\begin{figure}[b!]
+\begin{figure}[h!]
   \centering
   \includegraphics[width=400px]{images/benches/cos.png}
   \caption{Benchmarks for $cos(x)$ at an accuracy of $n=1000$, scaled logarithmically in the y-axis}
@@ -132,7 +130,7 @@ The last major difference in performance between packages is explained by memoiz
 
 In all benchmarks shown so far, memoization hasn't had the opportunity to influence results because all calculations are only used once. We can optimize one of the previous tests, the sum of a tree, to make use of memoization by using the observation that all elements of the list are the same, and therefore sums of the same number of terms should have the same result. The resulting code is very similar to the usual implementation of exponentiation, which uses the same observation to optimize repeated multiplications:
 
-\begin{lstlisting}[language=Haskell,caption=Haskell code for the sum of a list of $k$ instances of the same value]
+\begin{lstlisting}[language=Haskell,label=eq:dp_sum,caption=Haskell code for the sum of a list of $k$ instances of the same value]
 dp_sum x 1 = x
 dp_sum x k = case k `mod` 2 of
                 0 -> y
@@ -156,24 +154,100 @@ dp_sum x k = case k `mod` 2 of
 
 Unlike previous tests, where $k$ operations are needed to add the $k$ elements together, this test only takes between $\lfloor \log_2 k \rfloor$ and $2 \lfloor \log_2 k \rfloor$ exact real arithmetic operations\footnote{$dp\_sum$ performs either 1 or 2 operations if $k$ is even or odd, respectively, and then recursively calls itself with $k$ divided by $2$. This is equivalent to counting the number of ones and zeroes in the binary representation of $k$ (ignoring the first bit, which is always a one), each adding 2 and 1 operations, respectively. Therefore, the total number of operations must be between $\lfloor \log_2 k \rfloor$ (all bits except the first are zeroes) and $2 \lfloor \log_2 k \rfloor$ (all bits are ones).} by reusing the value $\text{x}$ multiple times per step. If the package supports memoization, the complexity of the test is logarithmic on $k$. If it doesn't, however, each $\text{x}$ is unrolled into its own calculation, which then recursively unrolls further, effectively recreating the structure of the tree this code attempted to optimize.
 
-The results are shown in \cref{fig:dp_sum_k} and \cref{fig:dp_sum_n}. As we would expect, only the packages that implement memoization show improvements, while \textit{ERA}'s performance stayed the same from \cref{fig:tree_sum}. It is also interesting how \textit{exact-real} and \textit{ireal} follow the same pattern in \cref{fig:dp_sum_k}, since they have the same memoization type and similar implementation. If the reader is confused as to how their runtime isn't monotonic in $k$ (e.g. $k=1000$ has a greater runtime than $k=3200$), this is because the number of operations performed is not proportional to $\log_2 k$, but is between $\lfloor \log_2 k \rfloor$ and $2 \lfloor \log_2 k \rfloor$. It just so happens that $k=1000$ needs more operations than $k=3200$, and, as we have seen, modulus of convergence representations are highly sensitive to the number of operations when these aren't nested properly.
+The results are shown in \cref{fig:dp_sum_k} and \cref{fig:dp_sum_n}. As we would expect, only the packages that implement memoization show improvements, while \textit{ERA}'s performance stayed the same from \cref{fig:tree_sum}. It is also interesting how \textit{exact-real} and \textit{ireal} follow the same pattern in \cref{fig:dp_sum_k}, since they have the same memoization type and similar implementation. If the reader is confused as to how their runtime isn't monotonic in $k$ (e.g. $k=1000$ has a greater runtime than $k=3200$), this is because the number of operations performed is not proportional to $\log_2 k$, but oscillates between $\lfloor \log_2 k \rfloor$ and $2 \lfloor \log_2 k \rfloor$. It just so happens that $k=1000$ needs more operations than $k=3200$, and, as we have seen, modulus of convergence representations are highly sensitive to the number of operations when these aren't nested properly.
 
-%Speaking of memoization types, despite being named here as type 1 and type 2 for how simple they are to implement (type 1 being almost immediate and type 2 requiring unsafe Haskell functions), ??? try to show a difference in their effect? (is there even a difference?)
+%try to show a difference in performance between type 1 and type 2 ? (is there even a difference?)
 
+\pagebreak
 
 \section{Hybrid Simulator Benchmarks}
 \label{sec:simulator_benches}
 
-After studying the fundamentals, we can now understand the performance of the hybrid simulator. Obviously, the performance will vary greatly depending on the hybrid program -- more complex programs perform more complex operations and a greater number of them, which leads to slower runtimes. The complexity introduced by conditional structures and variable assignments is immediately visible: the more complicated the expression (and the more nesting it introduces, in the case of modulus of convergence representations), the more it contributes to the total runtime. The following program recreates the sum of a list analyzed previously as a hybrid program using assignments, and the runtimes (\cref{fig:hybrid_list_sum}) match the ones obtained in \cref{fig:list_sum_k}.
+After analyzing the fundamentals, we can now look at the hybrid simulator. Obviously, the performance of the simulator will vary greatly depending on the hybrid program -- more complex programs perform more complex operations and a greater number of them, which leads to slower runtimes.
 
-\begin{lstlisting}[caption=Hybrid program that for each $t$ calculates the sum of $\lfloor t \rfloor + 1$ elements]
-  x := 22/7;
+There are two sources of complexity in hybrid programs: instantaneous changes (variable assignments and conditional structures) and continuous changes (differential statements). The complexity introduced by instantaneous statements is immediately visible: the more complicated the expression (and the more nesting it introduces, in the case of modulus of convergence representations), the more it contributes to the total runtime. To illustrate this with a simple example, the following program recreates the sum of a list analyzed previously as a hybrid program. The runtimes are presented in \cref{fig:hybrid_list_sum}.
+
+\begin{lstlisting}[caption=Hybrid program that at time $t$ calculates the sum of $\lfloor t \rfloor + 1$ elements]
+  x := 0;
   while true do {
+    x := x + 22/7;
     wait 1;
-    x := x + 22/7
   }
 \end{lstlisting}
 
-//TODO: analyze
+\begin{figure}[p]
+  \centering
+  \includegraphics[width=400px]{images/benches/hybrid_list_sum.png}
+  \caption{Benchmarks for a hybrid program that calculates sum of $\lfloor t \rfloor + 1$ elements, evaluated at $n=1000$, scaled logarithmically}
+  \label{fig:hybrid_list_sum}
+\end{figure}
 
-Differential statements, on the other hand, can be much more complex than what they let on. 
+For this specific hybrid program, the parameters of the simulation (comparison accuracy and iteration limit) don't really matter, since there are no comparisons and no risk of zeno behavior. However, the query accuracy does matter. Since each wait has a duration of 1, the query accuracy can be safely set to 2, which guarantees an error of $2^{1-n}=2^{1-2}=0.5$, smaller than each step. Therefore, queries always result in at most two possible branches: the branch before a wait statement and the one during the wait. Since the wait statement doesn't change the state, either branch contains the correct answer.
+
+Even from this simple example it is obvious how slow modulus of convergence representations really are. This hybrid program is noticeably slower than the equivalent benchmark in \cref{fig:list_sum_k}. This can be explained by simulator overhead: besides calculating the variables, Jaguar also needs to keep track of the simulated time. Indeed, even if no other operations are performed, simply adding together the times of the wait statements is already enough to produce a quadratic time complexity for modulus of convergence representations. The following program does just that, and the resulting runtimes are shown in \cref{fig:hybrid_wait_loop}.
+
+\begin{lstlisting}[caption={Hybrid program that does nothing, one time unit at a time}]
+  x := 0;
+  while true do wait 1;
+\end{lstlisting}
+
+\begin{figure}[p]
+  \centering
+  \includegraphics[width=400px]{images/benches/hybrid_wait_loop.png}
+  \caption{Benchmarks for loop of wait statements, evaluated at $n=1000$, scaled logarithmically}
+  \label{fig:hybrid_wait_loop}
+\end{figure}
+
+
+\pagebreak
+
+Differential statements are a bit harder to analyze. Recall from \cref{sec:solver} how Jaguar calculates differential statements: if the Taylor series/polynomial of the solution to the differential equation is finite and has 5 or fewer terms, the solution is given exactly by that polynomial, and so querying the state of the hybrid system only requires evaluating the polynomial. Therefore, if there are multiple such differential statements in a program, each one essentially acts like an assignment, setting each variable to the corresponding polynomial evaluated with the duration of the differential equation.
+
+If, on the other hand, the Taylor series is infinite, or has more than 5 terms, Jaguar uses the \textit{limit} of the partial sums of the series to calculate the solution. For a single variable and a fixed step size of $h$, this operation is roughly equivalent to the following Haskell code:
+
+\begin{lstlisting}[language=Haskell,caption=Simplification of the differential equation solver for solutions with an infinite Taylor series,label=eq:solver]
+  solve :: (CompReal r) => [r] -> Int -> r -> r
+  solve as k0 h = limit ((drop k0 $ scanl1 (+) $ zipWith (*) as $ map (h^) [0..]) !!)
+\end{lstlisting}
+
+In the code above, $as$ are the Taylor coefficients (which depend only on the differential equation) and $k_0$ is the initial degree of the Taylor series used in the limit (derived in \cref{eq:solver_step_dt}; depends on the initial value). To understand the cost of this operation, let us first consider the time complexity of calculating a single monomial of the Taylor series. Calculating a monomial (an expression of the form $a_k * h^k$) takes one multiplication and an exponentiation by $k$, which can be performed as roughly $log_2{k}$ multiplications; however, as we saw with \cref{eq:dp_sum}, that optimization relies on memoization, so we should expect \textit{ERA} to be much slower than the other libraries.
+
+The monomials are then summed together to obtain the list of reals for the limit. At this point, an attentive reader might naturally assume that modulus of convergence representations are also at a disadvantage, since a large number of additions is performed sequentially. But actually, instead of using $scanl1$, the solver performs these additions as a tree. As a result, this summation (and the solver as a whole) has similar asymptotic complexity for nested intervals and modulus of convergence representations.
+
+%todo: run ERA for n=10000 (will take around 3/4 hours)
+\begin{figure}[h!]
+  \centering
+  \includegraphics[width=400px]{images/benches/expODE_n.png}
+  \caption{Benchmarks for ODE solver ($x'(t) = x(t)$) at $t=0.4$, scaled logarithmically}
+  \label{fig:expODE_n}
+\end{figure}
+
+\cref{fig:expODE_n} shows the times of solving the differential equation $x'(t) = x(t)$ with initial value $x(0)=1$ at $t=0.4$. This requires a single variable step, which is slightly more complex than the fixed step simplification in \cref{eq:solver}, but the core idea is the same. As expected, all libraries except \textit{ERA} have similar performances close to $O(n^2)$, though an exact complexity is hard to calculate from the code.
+
+
+%K time steps
+To evaluate the differential equation at a further time $t$ (or perform multiple differential operations), the result of the $limit$ is taken as the new initial value and passed into another $limit$. For the previous example ($x'(t) = x(t)$), fixed steps have a length of $0.5$, so calculating the solution for $t=1.2$, for instance, requires two fixed steps and one variable step of length $0.2$. Since longer variable steps are slower than shorter ones, the overall runtime as $t$ increases is a somewhat periodic series of bumps, slowly trending upwards as the number of fixed steps grows. \cref{fig:expODE_t} shows the results of such a test; benchmarks for \textit{ERA} were not included because they were taking too long to generate, and the ones that didn't (for lower $t$'s) were warping the y-axis too much. It is not entirely clear to me why \textit{exact-real} has such a different performance from \textit{ireal} in this test, though after some profiling it seems to be related to the specifics of how they each memoize results (\textit{exact-real} spends a lot more time packing/unpacking the memoized values).
+
+\begin{figure}[h!]
+  \centering
+  \includegraphics[width=400px]{images/benches/expODE_t.png}
+  \caption{Benchmarks for ODE solver ($x'(t) = x(t)$) for $n=1000$, scaled logarithmically in the y-axis}
+  \label{fig:expODE_t}
+\end{figure}
+
+\pagebreak
+
+\section{Case Study}
+
+This section serves as a showcase of the hybrid simulator for a concrete problem: TODO
+%given a unit circle centered on the origin and some initial position inside the circle, calculate the path of a light ray as it bounces back and forth according to the law of reflection. 
+
+TODO: present problem
+
+TODO: derive hybrid program (code + parameters)
+
+TODO: show result of some queries and compare with floating point (showing the error grow over time?)
+
+TODO: benchmark over time and over accuracy
+
+
