@@ -68,7 +68,7 @@ Jaguar also features C-style comments, as both examples demonstrate. Line commen
 
 Under the hood, the semicolon is actually the sequencing operator, which takes two programs and combines them into a single program that executes its two parts in sequence. Sequencing two hybrid programs is an associative operation, which means the associativity of the semicolon is ultimately arbitrary from a semantic perspective. However, to make use of Haskell's lazy evaluation, it is advantageous to make the semicolon right-associative. This way, querying the program for the state at time $t$ only has to interpret the program up to that point.
 
-The full specification of the language's syntax, in BNF notation and its precedence rules, can be found in the appendice/user guide \todo{ref}.
+The full specification of the language's syntax, in BNF notation and its precedence rules, can be found in \cref{app:jaguar_syntax}.
 
 
 
@@ -436,23 +436,23 @@ If the Taylor series is finite (when the solution to the differential equation i
 
 The visualizer takes in the hybrid evolution produced by the interpreter and plots the value of each variable versus time by evaluating the evolution at multiple sample points. To generate the plot, the Chart \cite{Chart} library was used.
 
-To place a computable real on the plot, it is first approximated with some accuracy (which can be provided as a parameter by the user), generating a range of values around the approximation that bounds the actual value of the real. The approximations are then joined together with a line and the ranges are joined as the shaded areas (\cref{fig:plot_example}). \cref{fig:plot_example2} is a plot of the same program with a higher accuracy, making the shaded area so small it is no longer visible. The code that generated both of them can be found in \todo{cref to appendix}.
+To place a computable real on the plot, it is first approximated with some accuracy (which can be provided as a parameter by the user), generating a range of values around the approximation that bounds the actual value of the real. The approximations are then joined together with a line and the ranges are joined as the shaded areas (\cref{fig:plot_example}). \cref{fig:plot_example2} is a plot of the same program with a higher accuracy, making the shaded area so small it is no longer visible. The code that generated both of them can be found in \cref{app:jaguar_programs}.
 
 \begin{figure}
   \centering
-  \includegraphics[width=0.75\linewidth]{images/plots/example.png}
-  \caption{Plot of a Jaguar program with an accuracy of 4}
+  \includegraphics[width=400px]{images/plots/example.png}
+  \caption{Plot of a Jaguar program with an accuracy of $n=4$}
   \label{fig:plot_example}
 \end{figure}
 
 \begin{figure}
   \centering
-  \includegraphics[width=0.75\linewidth]{images/plots/example2.png}
-  \caption{Plot of a Jaguar program with an accuracy of 9}
+  \includegraphics[width=400px]{images/plots/example2.png}
+  \caption{Plot of a Jaguar program with an accuracy of $n=10$}
   \label{fig:plot_example2}
 \end{figure}
 
-Since time is also a computable real, it too must be approximated before being placed on the plot. This can sometimes generate weird artifacts, such as in \cref{fig:plot_example} where the line loops around at the bouncing points ($t=2$ and $t=3.8$ are the most visible). This happens because the time of the sample before the bounce was approximated to a higher value than the time of the sample after the bounce, making the line go backwards to connect the two. Also note how the line goes below the x-axis, due to the semidecidability of hybrid branches talked about in \cref{sec:hybrid_semidecidability}. These artifacts disappear when accuracy is increased (\cref{fig:plot_example2}).
+Since time is also a computable real, it too must be approximated before being placed on the plot. This can sometimes generate weird artifacts, such as in \cref{fig:plot_example} where the line loops around at the bouncing points ($t=2$, $t=3.8$, etc.). This happens because the time of the sample before the bounce was approximated to a higher value than the time of the sample after the bounce, making the line go backwards to connect the two. Also note how the line goes below the x-axis, due to the semidecidability of hybrid branches talked about in \cref{sec:hybrid_semidecidability}. These artifacts disappear when accuracy is increased (\cref{fig:plot_example2}).
 
 
 
@@ -462,7 +462,7 @@ Since time is also a computable real, it too must be approximated before being p
 
 It was already explained in \cref{sec:semidecidability} how discontinuities (which may arise at the point of concatenation of two hybrid programs) are handled locally, when making individual queries. However, to facilitate a big picture analysis of a program, Jaguar also includes tools for tracking discontinuity points throughout the whole trajectory (shown in the plots as the empty and full points). This is as simple as keeping track of every point at which one or more assignments are made\footnote{The solutions to the differential equations are assumed to be continuous. Since the solver relies on Taylor series, the generated solutions will always be continuous evolutions anyway. No effort was made to detect or simulate mathematical discontinuities.}. Not every assignment effectively generates a discontinuity, since it may not change the state, but checking if the state changed requires comparisons (which, as seen before, leads to semidecidability troubles), so all assignments are tracked. The resulting list of discontinuities is returned alongside the hybrid evolution as the output of a Jaguar program.
 
-Each discontinuity is located between two differential trajectories. To match each discontinuity to its neighboring hybrid branches without directly comparing the time of each (which, again, is semidecidable), each discontinuity and differential trajectory also include order information in the form of a step counter. Basically, alongside the state of the system, Jaguar keeps a counter that starts at zero and increases with both differential statements and assignments. This way, each differential trajectory is associated with a unique step number.
+Each discontinuity is located between two differential trajectories. To match each discontinuity to its neighboring hybrid branches without directly comparing the time of each, each discontinuity and differential trajectory also include order information in the form of a step counter. Basically, alongside the state of the system, Jaguar keeps a counter that starts at zero and increases with both differential statements and assignments. This way, each differential trajectory is associated with a unique step number.
 
 %todo: example program, image of plot (with the step counter added on top) and list of discontinuities
 

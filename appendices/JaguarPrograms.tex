@@ -1,0 +1,37 @@
+\chapter{Jaguar Programs}
+\label[appendix]{app:jaguar_programs}
+
+This appendix contains the Jaguar programs that were omitted from the main document for readability, as well as the commands used to generate their plots. Before running the command, the Jaguar code should be put into the file \textit{input.jag}.
+
+
+\subsubsection{Bouncing Ball}
+
+\begin{lstlisting}
+y := 0; v := 1; g := 1; c := 0.8;
+while true do {
+    y'=v,v'=-g for 2 * v / g;
+    v := -c * v;
+};
+\end{lstlisting}
+
+\begin{lstlisting}[language=bash,caption=Command used to generate \cref{fig:plot_example}]
+jaguar -n ireal -a 4 -c 10 -t 8 -v y,v input.jag
+\end{lstlisting}
+
+\begin{lstlisting}[language=bash,caption=Command used to generate \cref{fig:plot_example2}]
+jaguar -n ireal -a 10 -c 10 -t 8 -v y,v input.jag
+\end{lstlisting}
+
+
+\subsubsection{Inverted Pendulum}
+
+The Jaguar code for the inverted pendulum can be found in \cref{sec:case_study}.
+%For this program, instead of bounding the graphs by time like in the previous example (flag -t), an iteration limit (flag -l) of 800 was introduced, which corresponds exactly to 40 time units. This saves 
+
+\begin{lstlisting}[language=bash,caption=Command used to generate \cref{fig:inverted_pendulum_aern2}]
+jaguar -n aern2 -a 6 -c 8 -t 40 input.jag
+\end{lstlisting}
+
+\begin{lstlisting}[language=bash,caption=Command used to generate \cref{fig:inverted_pendulum_double}]
+jaguar -n double -a 6 -c 8 -t 40 input.jag
+\end{lstlisting}

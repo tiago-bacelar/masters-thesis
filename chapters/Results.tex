@@ -3,9 +3,10 @@
 
 This chapter is dedicated to the benchmarking results of both the exact real arithmetic packages and the hybrid simulator. To understand the obtained results, it is important to build up from the basics, first analyzing the performance of the basic operations and how they interact, before looking at the benchmarks of the simulator. The chapter is divided into \cref{sec:package_benches}, focusing on the basic operations of the five packages; \cref{sec:simulator_benches}, which analyzes benchmarks for the differential equation solver and the hybrid simulator as a whole; and \cref{sec:case_study}, where a practical case study is formulated and analyzed.
 
-Since there are five libraries being compared with one another, a big part of this analysis will be to try to explain where their differences in performance come from, be it from fundamental differences in their respective strategies or from some specific implementation detail. From these comparisons there will emerge a clear best choice for using with the hybrid simulator.
+Since there are five libraries being compared with one another, a big part of this analysis will be to try to explain where their differences in performance come from, be it from fundamental differences in their respective strategies or from some specific implementation detail. These comparisons will then allow us to infer which libraries are the most appropriate to use with the hybrid simulator.
 
-All code was compiled with the Glasgow Haskell Compiler (GHC) 9.10.3 using Stack 3.3.1 and executed on Ubuntu 22.04 running on an AMD Ryzen 5 UM425UA\todo{confirmar} laptop with 8GB RAM. The results were obtained by performing multiple runs of the code samples (at least 10 runs for the slowest tests) with the help of benchmarking library criterion \cite{criterion}. The presented results are the arithmetic averages of the multiple runs. The full code can be found on github \cite{Jaguar} and run with stack, but the source code for each test was also included in the appendix for ease of reference. %todo: cref
+All code was compiled with the Glasgow Haskell Compiler (GHC) 9.10.3 using Stack 3.3.1 and executed on Ubuntu 22.04 running on an AMD Ryzen 5 UM425UA laptop with 8GB RAM. The results were obtained by performing multiple runs of the code samples (at least 10 runs for the slowest tests) with the help of benchmarking library criterion \cite{criterion}. The presented results are the arithmetic averages of the multiple runs. The full code can be found on github \cite{Jaguar} and run with stack, but the source code for each test was also included in the appendix (\cref{app:bench_code}) for ease of reference.
+%todo: confirmar modelo do portatil
 
 \section{Exact Real Arithmetic Benchmarks}
 \label{sec:package_benches}
@@ -78,7 +79,7 @@ $((a + b) + c) + d$
 
 then this approach has the unfortunate consequence of escalating the accuracy requested from each term. In this example, the term $d$ will be evaluated at $n+2$ accuracy, the term $c$ at $n+4$ and terms $a$ and $b$ at $n+6$. The deeper a number is in the nesting of operations, the more accuracy it requires. And because more accurate approximations have bigger precision in modulus of convergence representations ($p \approx n$, therefore $O(p) = O(n)$), adding and dividing them is also slower. The time complexity of division depends on the complexity of the used multiplication algorithm, which will be denoted as a function $M(p)$. So the total time complexity of the sum of the list equals $\sum_{i=1}^{k} O(M(n+2i)) = O(kM(n+k))$, which for the fastest multiplication algorithm $M(p)=p\log{p}$ results in $O((k^2+nk)\log{(n+k)})$. This seems to match the quadratic growth of the three modulus of convergence packages in \cref{fig:list_sum_k} and \cref{fig:list_sum_n}. \textit{ireal} does have a small spike at $k=10000$ for reasons that elude me, but otherwise follows the pattern.
 
-Nested intervals representations don't have this problem because their operations are a zip. It is trickier to calculate an asymptotic complexity for them, since they have much more freedom in the precision and accuracy of their intervals and how intervals are searched, but using same assumptions as before ($O(p) = O(n)$), we can intuitively say that complexity should be around $O(kM(n))$. Looking at \cref{fig:list_sum_k}, both appear to be linear in $k$ as predicted, despite \textit{cdar} gaining a greater constant factor at $k=320$.
+Nested intervals representations don't have this problem because their operations are a zip. It is trickier to calculate an asymptotic complexity for them, since they have much more freedom in the precision and accuracy of their intervals and how intervals are searched, but using same assumptions as before ($O(p) = O(n)$), we can intuitively say that complexity should be around $O(kM(n))$. Looking at \cref{fig:list_sum_k}, both appear to be linear in $k$ as predicted, despite \textit{CDAR} gaining a greater constant factor at $k=320$.
 
 \begin{figure}[h!]
   \centering
@@ -100,33 +101,33 @@ Smart readers may have already realized that, since addition is associative, the
 
 $(a + b) + (c + d)$
 
-This way, the accuracy required from each number will be at most $n+\log_2 k$, and so the total time complexity is merely $\sum_{i=1}^{k} O(M(n + \log k))$ for modulus of convergence representations, which is a massive boost, as shown in \cref{fig:tree_sum}. Nested intervals representations, as expected, aren't affected. Sadly, this can only be done in specific cases like this one and doesn't generalize to non-associative operations.
+This way, the accuracy required from each number will be at most $n+\log_2 k$, and so the total time complexity is merely $\sum_{i=1}^{k} O(M(n + \log k))$ for modulus of convergence representations, which is a massive boost, as shown in \cref{fig:tree_sum_k}. Nested intervals representations, as expected, aren't affected. Sadly, this can only be done in specific cases like this one and doesn't generalize to non-associative operations.
 
 To reiterate, although this simple example uses addition, the insight it provides is applicable in any calculation with a high degree of nesting, and explains why nested intervals representations have the advantage in long, nested computations such as a hybrid simulation. This advantage compounds with the $fromInteger$ optimization, making modulus of convergence representations excruciatingly slow by comparison in all but the simplest hybrid programs, as we will see in the next section.
 
 \begin{figure}[h!]
   \centering
-  \includegraphics[width=400px]{images/benches/tree_sum.png}
+  \includegraphics[width=400px]{images/benches/tree_sum_k.png}
   \caption{Benchmarks for sum of a tree of $k$ elements at an accuracy of $n=1000$, scaled logarithmically}
-  \label{fig:tree_sum}
+  \label{fig:tree_sum_k}
 \end{figure}
 
 \pagebreak
 
-While the basic arithmetic operations are implemented similarly in all packages, more complicated operations such as trigonometric functions can be calculated using various methods, and different packages choose different methods, some more efficient than others. \cref{fig:cos} shows the performance of each package when calculating the cosine of numbers between $0$ to $6.3$, after which the pattern repeats since cosine is periodic.
+While the basic arithmetic operations are implemented similarly in all packages, more complicated operations such as trigonometric functions can be calculated using various methods, and different packages choose different methods, some more efficient than others. \cref{fig:sin} shows the performance of each package when calculating the sine of numbers between $-\pi$ and $\pi$, after which the pattern repeats since sine is periodic.
 
-While these differences in performance should definitely be taken into account when choosing the most appropriate package for some specific application, they are not fundamental to each package's representation strategy. These differences come from different methods of calculating cosine, not from the underlying strategy, and it would be entirely possible to optimize the slowest packages by switching to a faster method (though it may be true that the \textit{optimal} method is somehow dependent on or influenced by the package's representation strategy such that one strategy leads to a faster optimal implementation of cosine over another).
+While these differences in performance should definitely be taken into account when choosing the most appropriate package for some specific application, they are not fundamental to each package's representation strategy. These differences come from different methods of calculating sine, not from the underlying strategy, and it would be entirely possible to optimize the slowest packages by switching to a faster method (though it may be true that the \textit{optimal} method is somehow dependent on the package's representation strategy, such that one strategy leads to a faster optimal implementation of sine over another).
 
 \begin{figure}[h!]
   \centering
-  \includegraphics[width=400px]{images/benches/cos.png}
-  \caption{Benchmarks for $cos(x)$ at an accuracy of $n=1000$, scaled logarithmically in the y-axis}
-  \label{fig:cos}
+  \includegraphics[width=400px]{images/benches/sin.png}
+  \caption{Benchmarks for $sin(x)$ at an accuracy of $n=1000$, scaled logarithmically in the y-axis}
+  \label{fig:sin}
 \end{figure}
 
 \pagebreak
 
-The last major difference in performance between packages is explained by memoization. As mentioned in \cref{sec:technical_considerations}, memoization is an optimization technique that avoids performing repeated calculations by storing their value in a variable or data structure. In the context of exact real arithmetic this can be done in two different ways: type 1, in-order memoization, and type 2, out-of-order memoization. Of the analyzed packages, \textit{cdar} and \textit{aern2-real} implement type 1 while \textit{exact-real} and \textit{ireal} implement type 2.
+The last major difference in performance between packages is explained by memoization. As mentioned in \cref{sec:technical_considerations}, memoization is an optimization technique that avoids performing repeated calculations by storing their value in a variable or data structure. In the context of exact real arithmetic this can be done in two different ways: type 1, in-order memoization, and type 2, out-of-order memoization. Of the analyzed packages, \textit{CDAR} and \textit{aern2-real} implement type 1 while \textit{exact-real} and \textit{ireal} implement type 2.
 
 In all benchmarks shown so far, memoization hasn't had the opportunity to influence results because all calculations are only used once. We can optimize one of the previous tests, the sum of a tree, to make use of memoization by using the observation that all elements of the list are the same, and therefore sums of the same number of terms should have the same result. The resulting code is very similar to the usual implementation of exponentiation, which uses the same observation to optimize repeated multiplications:
 
@@ -154,7 +155,7 @@ dp_sum x k = case k `mod` 2 of
 
 Unlike previous tests, where $k$ operations are needed to add the $k$ elements together, this test only takes between $\lfloor \log_2 k \rfloor$ and $2 \lfloor \log_2 k \rfloor$ exact real arithmetic operations\footnote{$dp\_sum$ performs either 1 or 2 operations if $k$ is even or odd, respectively, and then recursively calls itself with $k$ divided by $2$. This is equivalent to counting the number of ones and zeroes in the binary representation of $k$ (ignoring the first bit, which is always a one), each adding 2 and 1 operations, respectively. Therefore, the total number of operations must be between $\lfloor \log_2 k \rfloor$ (all bits except the first are zeroes) and $2 \lfloor \log_2 k \rfloor$ (all bits are ones).} by reusing the value $\text{x}$ multiple times per step. If the package supports memoization, the complexity of the test is logarithmic on $k$. If it doesn't, however, each $\text{x}$ is unrolled into its own calculation, which then recursively unrolls further, effectively recreating the structure of the tree this code attempted to optimize.
 
-The results are shown in \cref{fig:dp_sum_k} and \cref{fig:dp_sum_n}. As we would expect, only the packages that implement memoization show improvements, while \textit{ERA}'s performance stayed the same from \cref{fig:tree_sum}. It is also interesting how \textit{exact-real} and \textit{ireal} follow the same pattern in \cref{fig:dp_sum_k}, since they have the same memoization type and similar implementation. If the reader is confused as to how their runtime isn't monotonic in $k$ (e.g. $k=1000$ has a greater runtime than $k=3200$), this is because the number of operations performed is not proportional to $\log_2 k$, but oscillates between $\lfloor \log_2 k \rfloor$ and $2 \lfloor \log_2 k \rfloor$. It just so happens that $k=1000$ needs more operations than $k=3200$, and, as we have seen, modulus of convergence representations are highly sensitive to the number of operations when these aren't nested properly.
+The results are shown in \cref{fig:dp_sum_k} and \cref{fig:dp_sum_n}. As we would expect, only the packages that implement memoization show improvements, while \textit{ERA}'s performance stayed the same from \cref{fig:tree_sum}. It is also interesting how \textit{exact-real} and \textit{ireal} follow the same pattern in \cref{fig:dp_sum_k}, since they have the same memoization type and similar implementation. If the reader is confused as to how their runtime isn't monotonic in $k$ (\textit{e.g.} $k=1000$ has a greater runtime than $k=3200$), this is because the number of operations performed is not proportional to $\log_2 k$, but oscillates between $\lfloor \log_2 k \rfloor$ and $2 \lfloor \log_2 k \rfloor$. It just so happens that $k=1000$ needs more operations than $k=3200$, and, as we have seen, modulus of convergence representations are highly sensitive to the number of operations when these aren't nested properly.
 
 %try to show a difference in performance between type 1 and type 2 ? (is there even a difference?)
 
@@ -182,7 +183,7 @@ There are two sources of complexity in hybrid programs: instantaneous changes (v
   \label{fig:hybrid_list_sum}
 \end{figure}
 
-For this specific hybrid program, the parameters of the simulation (comparison accuracy and iteration limit) don't really matter, since there are no comparisons and no risk of zeno behavior. However, the query accuracy does matter. Since each wait has a duration of 1, the query accuracy can be safely set to 2, which guarantees an error of $2^{1-n}=2^{1-2}=0.5$, smaller than each step. Therefore, queries always result in at most two possible branches: the branch before a wait statement and the one during the wait. Since the wait statement doesn't change the state, either branch contains the correct answer.
+For this specific hybrid program, the parameters of the simulation (comparison accuracy and iteration limit) don't really matter, since there are no comparisons and no risk of zeno behavior. However, the query accuracy does matter. Since each wait has a duration of 1, the query accuracy can be safely set to 2, which guarantees a $\delta$ of $2^{1-n}=2^{1-2}=0.5$, smaller than each step. Therefore, queries always result in at most two possible branches. Since our queries will be made at integer values of $t$, the correct branch must be second one (or first and only when $t=0$).
 
 Even from this simple example it is obvious how slow modulus of convergence representations really are. This hybrid program is noticeably slower than the equivalent benchmark in \cref{fig:list_sum_k}. This can be explained by simulator overhead: besides calculating the variables, Jaguar also needs to keep track of the simulated time. Indeed, even if no other operations are performed, simply adding together the times of the wait statements is already enough to produce a quadratic time complexity for modulus of convergence representations. The following program does just that, and the resulting runtimes are shown in \cref{fig:hybrid_wait_loop}.
 
@@ -203,7 +204,7 @@ Even from this simple example it is obvious how slow modulus of convergence repr
 
 Differential statements are a bit harder to analyze. Recall from \cref{sec:solver} how Jaguar calculates differential statements: if the Taylor series/polynomial of the solution to the differential equation is finite and has 5 or fewer terms, the solution is given exactly by that polynomial, and so querying the state of the hybrid system only requires evaluating the polynomial. Therefore, if there are multiple such differential statements in a program, each one essentially acts like an assignment, setting each variable to the corresponding polynomial evaluated with the duration of the differential equation.
 
-If, on the other hand, the Taylor series is infinite, or has more than 5 terms, Jaguar uses the \textit{limit} of the partial sums of the series to calculate the solution. For a single variable and a fixed step size of $h$, this operation is roughly equivalent to the following Haskell code:
+If, on the other hand, the Taylor series is infinite or has more than 5 terms, Jaguar uses the \textit{limit} of the partial sums of the series to calculate the solution. For a single variable and a fixed step size of $h$, this operation is roughly equivalent to the following Haskell code:
 
 \begin{lstlisting}[language=Haskell,caption=Simplification of the differential equation solver for solutions with an infinite Taylor series,label=eq:solver]
   solve :: (CompReal r) => [r] -> Int -> r -> r
@@ -214,7 +215,6 @@ In the code above, $as$ are the Taylor coefficients (which depend only on the di
 
 The monomials are then summed together to obtain the list of reals for the limit. At this point, an attentive reader might naturally assume that modulus of convergence representations are also at a disadvantage, since a large number of additions is performed sequentially. But actually, instead of using $scanl1$, the solver performs these additions as a tree. As a result, this summation (and the solver as a whole) has similar asymptotic complexity for nested intervals and modulus of convergence representations.
 
-%todo: run ERA for n=10000 (will take around 3/4 hours)
 \begin{figure}[h!]
   \centering
   \includegraphics[width=400px]{images/benches/expODE_n.png}
@@ -222,11 +222,13 @@ The monomials are then summed together to obtain the list of reals for the limit
   \label{fig:expODE_n}
 \end{figure}
 
-\cref{fig:expODE_n} shows the times of solving the differential equation $x'(t) = x(t)$ with initial value $x(0)=1$ at $t=0.4$. This requires a single variable step, which is slightly more complex than the fixed step simplification in \cref{eq:solver}, but the core idea is the same. As expected, all libraries except \textit{ERA} have similar performances close to $O(n^2)$, though an exact complexity is hard to calculate from the code.
+\cref{fig:expODE_n} shows the times of solving the differential equation $x'(t) = x(t)$ with initial value $x(0)=1$ at $t=0.4$. This requires a single variable step, which is slightly more complex than the fixed step simplification in \cref{eq:solver}, but the core idea is the same. As expected, all libraries except \textit{ERA} have similar performances, around $O(n^2)$, though an exact complexity is hard to calculate from the code.
 
 
 %K time steps
-To evaluate the differential equation at a further time $t$ (or perform multiple differential operations), the result of the $limit$ is taken as the new initial value and passed into another $limit$. For the previous example ($x'(t) = x(t)$), fixed steps have a length of $0.5$, so calculating the solution for $t=1.2$, for instance, requires two fixed steps and one variable step of length $0.2$. Since longer variable steps are slower than shorter ones, the overall runtime as $t$ increases is a somewhat periodic series of bumps, slowly trending upwards as the number of fixed steps grows. \cref{fig:expODE_t} shows the results of such a test; benchmarks for \textit{ERA} were not included because they were taking too long to generate, and the ones that didn't (for lower $t$'s) were warping the y-axis too much. It is not entirely clear to me why \textit{exact-real} has such a different performance from \textit{ireal} in this test, though after some profiling it seems to be related to the specifics of how they each memoize results (\textit{exact-real} spends a lot more time packing/unpacking the memoized values).
+To evaluate the differential equation at a further time $t$ (or perform multiple differential operations), the result of the $limit$ is taken as the new initial value and passed into another $limit$. For the previous example ($x'(t) = x(t)$), fixed steps have a length of $0.5$, so calculating the solution for $t=1.2$, for instance, requires two fixed steps and one variable step of length $0.2$. Since longer variable steps are slower than shorter ones, the overall runtime as $t$ increases is a somewhat periodic series of bumps, slowly trending upwards as the number of fixed steps grows. \cref{fig:expODE_t} shows the results of such a test; benchmarks for \textit{ERA} were not included because they were taking too long to generate, and the ones that didn't (for lower $t$'s) were warping the y-axis too much. It is not entirely clear to me why \textit{exact-real} has such a different performance from \textit{ireal} in this test, though after some profiling it seems to be related to the specifics of how they each memoize results. For the runs I analyzed, \textit{exact-real} spends most of its runtime packing/unpacking the memoized values, while the runtime of \textit{ireal} and the other libraries is spent performing multiplications and additions.
+
+In conclusion, from all the tests and benchmarks presented thus far, the nested intervals libraries \textit{CDAR} and \textit{aern2-real} are the most appropriate to use with the hybrid simulator for arbitrary programs, though \textit{ireal} and \textit{exact-real} might also be able to run some simpler programs. \textit{aern2-real} also shows some advantage over \textit{CDAR} in specific situations (dyadic $fromRational$ and some inputs of trigonometric functions)
 
 \begin{figure}[h!]
   \centering
@@ -237,17 +239,73 @@ To evaluate the differential equation at a further time $t$ (or perform multiple
 
 \pagebreak
 
-\section{Case Study}
+\section{Case Study: Inverted Pendulum Balancing}
+\label{sec:case_study}
 
-This section serves as a showcase of the hybrid simulator for a concrete problem: TODO
-%given a unit circle centered on the origin and some initial position inside the circle, calculate the path of a light ray as it bounces back and forth according to the law of reflection. 
+This section serves as a showcase of the hybrid simulator for a concrete problem: balancing an inverted pendulum. Inverted pendulums are an extremely relevant example for exact real arithmetic since they naturally produce irrational values, and the inherently chaotic nature of pendulums causes even small errors to quickly add up. It is also an interesting problem from the perspective of control theory and a perfect demonstration of the hybrid simulator.
 
-TODO: present problem
+For simplicity, let us consider an inverted pendulum attached to the ground. Unless perfectly positioned, left on its own the pendulum will eventually fall to either side. To prevent this, every so often (20 times per second for instance) we will check if the pendulum's angle from the normal is greater than some value, like $45°$. If so, we apply a force to the pendulum towards the center. If not, the pendulum's motion is only affected by gravity. This repeats for as long as the pendulum is above the ground.
 
-TODO: derive hybrid program (code + parameters)
+To write a hybrid program that describes the inverted pendulum we first need to formalize the system. For the variables of our system, we can use the signed angle of the pendulum from the normal $\theta$ (in radians; positive is counterclockwise, to the left of the normal) and its angular velocity $\omega$ ($\theta'=\omega$). The force of gravity can only act perpendicular to the pendulum, so its effect on the angular velocity should be proportional to the sine of $\theta$. More specifically, the angular acceleration, $\omega'$, is the linear acceleration $a$ divided by the length of the pendulum $l$ (\cref{fig:inverted_pendulum}). So the formula for the angular acceleration is $\omega'=\frac{g}{l}sin(\theta)$, where $g$ is the gravitational constant; but we can treat $\frac{g}{l}=k$ as a constant to simplify the math. Finally, the restitution force, which we will model as instantaneous, will have the effect of instantaneously decreasing (or increasing, if $\theta<0$) the angular velocity by some constant amount $\Delta\omega$.
 
-TODO: show result of some queries and compare with floating point (showing the error grow over time?)
+\begin{figure}
+  \centering
+  \includesvg[width=0.75\linewidth]{images/diagrams/inverted_pendulum.svg}
+  \caption{Diagram of an inverted pendulum, labeled with the relevant physical quantities}
+  \label{fig:inverted_pendulum}
+\end{figure}
 
-TODO: benchmark over time and over accuracy
+Putting it all together, we only need to choose values for the constants and initial values for the variables. For simplicity, I chose $k=1$ and then experimented with different $\Delta\omega$ values, eventually settling on $\Delta\omega=0.25$. As for the initial values, the pendulum starts stationary ($\omega=0$) at a slight deviation from the equilibrium, $\theta=0.1$.
+
+\begin{lstlisting}[caption=Jaguar program that models inverted pendulum balancing with instantaneous restitution]
+  theta:=0.1; w:=0;
+  while theta < pi/2 && theta > -pi/2 do {
+    if theta < -pi/4 then w := w + 0.25;
+    if theta > pi/4 then w := w - 0.25;
+    theta'=w, w'=sin(theta) for 0.05;
+}
+\end{lstlisting}
+
+All that is left is to choose the appropriate simulation parameters. Since all for statements in the program have a duration of $0.05$ there is no risk of zeno behaviour, so we can safely run the program with no iteration limit. Moreover, a query accuracy of $6$ is sufficient to limit the queries to at most two hybrid branches regardless of the query time ($\delta=2^{1-6}=0.03125<0.05$). Like before, for multiples of $0.05$ the second branch, if it exists, is the correct one. As for the comparison accuracy, there isn't a definitive best value here; as long as the value of $\theta$ isn't too close to $\pi/2$ and $\pi/4$ at the time of comparison, the program runs normally. I arbitrarily chose $n=8$, which seems to be enough for the graphs and tests presented below.
+
+%explain behaviour of system (inverted_pendulum_aern2.png)
+So how does this program behave? \cref{fig:inverted_pendulum_aern2} is a plot of the first $40$ time units of the evolution of the system obtained with Jaguar using \textit{aern2-real}. The exact command that generated it can be found in the appendix in \cref{app:jaguar_programs}. The system behaves as expected: the pendulum starts by falling freely to the left until around $t=3$, when $\theta$ becomes greater than $\pi/4$ and the restitution force kicks in, creating the discontinuities in the angular velocity. After seven of these, $\theta$ is once again below $\pi/4$ and the pendulum swings freely again. It ends up not making it over the top and falls again. After seven more boosts, the pendulum is again travelling upwards and this time manages to go over the top to the right side. This repeats many more times; most times the pendulum goes over the top, sometimes faster, others slower. At $t=40$ it is near the top starting to fall to the left once more.
+
+\begin{figure}[p]
+  \centering
+  \includegraphics[width=400px]{images/plots/inverted_pendulum_aern2.png}
+  \caption{Plot of inverted pendulum program run with \textit{aern2-real} ($n=10$)}
+  \label{fig:inverted_pendulum_aern2}
+\end{figure}
+
+%contrast with outputFP40 - equal until around t=35
+We can also run the program using floating-point arithmetic instead of exact real arithmetic. \cref{fig:inverted_pendulum_double} is the output of the program with exactly the same parameters except for the numerical type. The two graphs are identical until $t=35$, when the floating point output is ever so slightly above the \textit{aern2-real}'s version. After that, they completely separate, with the floating point pendulum falling much faster to the left. At $t=40$, the floating point pendulum is at the lowest point of an arc, already receiving upward boosts. These differences are, of course, caused by errors in floating-point arithmetic introduced at each operation. Though present from the start, the differences only accumulate enough to become visible at around $t=35$; after that, the chaotic nature of the system pushes the two slightly different trajectories in distinct directions.
+
+\begin{figure}[p]
+  \centering
+  \includegraphics[width=400px]{images/plots/inverted_pendulum_double.png}
+  \caption{Plot of inverted pendulum program run with doubles}
+  \label{fig:inverted_pendulum_double}
+\end{figure}
+
+%contrast with lince output - equal until around t=27
+We can also compare these results to the output of Lince for the same program, shown in \cref{fig:inverted_pendulum_lince}. It diverges from the other two much sooner, at $t=27$, where the pendulum falls back left instead of going over the top as in Jaguar. Even though Lince also uses double-precision floating point, it uses the Runge-Kutta method to evaluate differential statements, as opposed to Jaguar's approach with forward automatic differentiation and polynomial ODEs' error bounds; so it is not surprising Lince's results diverge sooner.
+
+\begin{figure}
+  \centering
+  \includegraphics[width=1\linewidth]{images/plots/inverted_pendulum_lince.png}
+  \caption{Plot of inverted pendulum program run in Lince}
+  \label{fig:inverted_pendulum_lince}
+\end{figure}
 
 
+Sadly, \textit{aern2-real} is the only library that can run this program until the output diverges from the floating-point runs. As we saw before, the modulus of convergence libraries are naturally slower at running hybrid programs (with \textit{ERA} being even worse for not having memoization); and \textit{CDAR}, the other nested intervals library, runs out of memory (8GB minus operating system) for higher $t$'s and accuracies. For $n=32$, it manages to run until $t=10$ before exhausting the memory. I suspect this is caused by \textit{CDAR}'s implementation of sine, which is woefully slower for negative angles (\cref{fig:sin}); so when the pendulum swings to the right, \textit{CDAR} needs many more computational resources. \textit{aern2-real} itself also runs out of memory at around $t=46$, but until then manages to calculate approximations up to an accuracy of $50$.
+
+As for the runtimes, shown in \cref{fig:inverted_pendulum_t}, all three versions behave approximately linearly with respect to $t$, though, of course, doubles have a much smaller constant factor. Between the two exact real arithmetic libraries, \textit{CDAR} appears to be about three times faster than \textit{aern2-real} until $t=10$, where it has a spike, and fails to run the last two test cases ($t=18$ and $t=32$).
+
+\begin{figure}
+  \centering
+  \includegraphics[width=400px]{images/benches/inverted_pendulum_t.png}
+  \caption{Benchmarks for inverted pendulum program ($n=32$), scaled logarithmically}
+  \label{fig:inverted_pendulum_t}
+\end{figure}

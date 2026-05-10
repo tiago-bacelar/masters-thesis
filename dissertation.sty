@@ -202,14 +202,10 @@ BoldFont=NewsGotTBold.ttf
 \definecolor{backcolour}{rgb}{0.95,0.95,0.92}
 
 \lstdefinelanguage{Jaguar}{
-    morekeywords={b, ble, blt, bne, 
-        ldr, str, 
-        r0, r1, r2, r3, r4, r5, r6, r7, rr8, r9, r10, r11, r12
-        sp  },
+    morekeywords={for,forever,wait,do,while,if,then,else},
     sensitive=false, % keywords are not case-sensitive
     morecomment=[l]{//}, % l is for line comment
-    morecomment=[s]{/*}{*/}, % s is for start and end delimiter
-    morestring=[b]" % defines that strings are enclosed in double quotes
+    morecomment=[s]{/*}{*/} % s is for start and end delimiter
 } % 
 
 \lstdefinestyle{jaguar}{
@@ -217,8 +213,6 @@ BoldFont=NewsGotTBold.ttf
     backgroundcolor=\color{backcolour},
     commentstyle=\color{codegreen},
     keywordstyle=\color{magenta},
-    emph={for,forever,wait,do,while,if,then,else},
-    emphstyle=\color{codeyellow},
     numberstyle=\tiny\color{codegray},
     stringstyle=\color{codepurple},
     basicstyle=\footnotesize,
@@ -236,16 +230,19 @@ BoldFont=NewsGotTBold.ttf
 
 %consts: e, pi, true, false
 %keyords: for, forever, wait, do, while, if, then, else, =, :=
-%funcs: exp, ln, sin, cos, tan
-%operators: + - * / ^ log
+%funcs: exp, ln, sin, cos, tan, sqrt, abs
+%operators: + - * / ^ log min max
 %bool operators: ! || &&
 %comparators: < > <= >= <! >!
 %vars: x x'
 %comments: //  /* */
 
-\lstset{emph={%  
-    downto, for%
-    },emphstyle={\color{red}\bfseries\underbar}%
-}%
+
+\lstdefinelanguage{BNF}{
+  morekeywords={::=},
+  sensitive=false,
+  morecomment=[l]{//},
+  morestring=[b]"
+}
 
 \lstset{style=Jaguar}

@@ -7,7 +7,6 @@ Hybrid systems are commonly defined as processes that possess a mix of both cont
 
 For example, consider a cruise controller. To implement it, we can write a simple program that checks the velocity of a vehicle every second and either accelerates or brakes, eventually hovering around the target velocity. The following program was implemented in Lince \cite{goncharov2020}, an imperative hybrid programming language and simulator:
 
-%todo: meter o case study aqui em vez deste CC? (meter os dois?)
 \begin{lstlisting}[caption=A simplistic model of a cruise controller]
 v:=4;
 while true do {
@@ -17,7 +16,7 @@ while true do {
 
 \begin{figure}
     \centering
-    \includegraphics[width=0.75\linewidth]{images/plots/cc.png}
+    \includegraphics[width=1\linewidth]{images/plots/cc.png}
     \caption{Plot of the velocity over time in the cruise control program}
     \label{fig:cc_plot}
 \end{figure}
@@ -26,14 +25,6 @@ The program starts by assigning the value 4 to variable v. The statement inside 
 
 Among the many difficulties of this paradigm, one is the often overlooked matter of precision and error. When developing proper methods of simulation, the standard way to represent numbers is floating point arithmetic, which treats values as a mantissa and an exponent. This concept can be, and sometimes is, used to represent numbers with an arbitrary precision by using a large size for the mantissa and exponent; but it is usually implemented according to the IEEE 754 standard \cite{IEEE754}, which defines \textit{double-precision floating-point numbers} as having 53 bits for the mantissa and 11 for the exponent, for a total of 64 bits. This is enough for most applications, but especially in chaotic systems, where errors compound, the available precision can be quickly exhausted, and the accuracy of the obtained results is compromised. Lince itself uses double-precision floating-points, abbreviated as doubles in most programming languages, which makes it prone to errors when the values get too small. Take the following program as an example.
 
-%TODO??
-%\begin{exmp}
-%    This is the example.
-%\end{exmp}
-
-%   x:=2;
-%   x'=1-x for 35;
-%   x'=x-1 for 35;
 \begin{lstlisting}[caption=Hybrid program showcasing insufficient precision]
 x:=1;
 x'=-x for 80;
@@ -42,7 +33,7 @@ x'= x for 80;
 
 \begin{figure}
     \centering
-    \includegraphics[width=0.75\linewidth]{images/plots/exp.png}
+    \includegraphics[width=1\linewidth]{images/plots/exp.png}
     \caption{Plot of $x$ over time in the exponential program}
     \label{fig:plot_exp}
 \end{figure}

@@ -1,0 +1,57 @@
+\chapter{Jaguar Syntax}
+\label[appendix]{app:jaguar_syntax}
+
+This appendix contains Jaguars' syntax, in BNF notation.
+
+\begin{lstlisting}[language=BNF,caption=Jaguar's syntax in BNF notation]
+Program ::= var ":=" Expr
+          | For "for" Expr
+          | For "forever"
+          | "wait" Expr
+          | "wait" "forever"
+          | "if" BExpr "then" Program
+          | "if" BExpr "then" Program "else" Program
+          | Program ";" Program
+          | Program ";"
+          | "{" Program "}"
+          | "{" "}"
+
+For     ::= DifEq
+          | For "," DifEq
+      
+DifEq   ::= var "'" "=" Expr
+
+BExpr   ::= BTerm
+          | "!" BExpr
+          | BExpr "&&" BExpr
+          | BExpr "||" BExpr
+          | "(" BExpr ")"
+
+BTerm   ::= "true"
+          | "false"
+          | Expr comp Expr
+      
+Expr    ::= var
+          | int
+          | num
+          | "e"
+          | "pi"
+          | "abs"  "(" Expr ")"
+          | "sqrt" "(" Expr ")"
+          | "exp"  "(" Expr ")"
+          | "ln"   "(" Expr ")"
+          | "sin"  "(" Expr ")"
+          | "cos"  "(" Expr ")"
+          | "tan"  "(" Expr ")"
+          | Expr "+" Expr
+          | Expr "-" Expr
+          | Expr "*" Expr
+          | Expr "/" Expr
+          | Expr "^" int
+          | Expr "^" Expr
+          | "min"  "(" Expr "," Expr ")"
+          | "max"  "(" Expr "," Expr ")"
+          | "log"  "(" Expr "," Expr ")"
+          | "-" Expr
+          | "(" Expr ")"
+\end{lstlisting}

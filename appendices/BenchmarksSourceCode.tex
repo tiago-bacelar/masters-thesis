@@ -1,0 +1,86 @@
+\chapter{Benchmarks Source Code}
+\label[appendix]{app:bench_code}
+
+This appendix contains the Haskell code used for the benchmarks presented in \cref{chap:results}. Tests were compiled with the flag -fno-full-laziness to prevent accidental sharing between test runs.
+
+
+\subsubsection{\textit{fromRational} (\cref{fig:fromRational})}
+\begin{lstlisting}[language=Haskell]
+\n -> approx (fromRational (22%7)) n
+\end{lstlisting}
+
+\subsubsection{\textit{fromInteger} (\cref{fig:fromInteger})}
+\begin{lstlisting}[language=Haskell]
+\n -> approx (fromInteger 1) n
+\end{lstlisting}
+
+\subsubsection{Dyadic \textit{fromRational} (\cref{fig:fromRational_dyad})}
+\begin{lstlisting}[language=Haskell]
+\n -> approx (fromRational (9%64)) n
+\end{lstlisting}
+
+\subsubsection{\textit{cons} (\cref{fig:cons})}
+\begin{lstlisting}[language=Haskell]
+\n -> approx (cons (const 1)) n
+\end{lstlisting}
+
+\subsubsection{\textit{cons} of a series (\cref{fig:cons_series})}
+\begin{lstlisting}[language=Haskell]
+\n -> approx (listCons $ scanl (+) 0 $ iterate (/2) (1%2)) n
+\end{lstlisting}
+
+\subsubsection{\textit{limit} of a series (\cref{fig:limit_series})}
+\begin{lstlisting}[language=Haskell]
+\n -> approx (listLimit $ fromRational <$> scanl (+) 0 $ iterate (/2) (1%2)) n
+\end{lstlisting}
+
+\subsubsection{Sum of a list (by list size) (\cref{fig:list_sum_k})}
+\begin{lstlisting}[language=Haskell]
+\k -> approx (foldl1' (+) [fromRational (22%7) | _ <- [1..k]]) 1000
+\end{lstlisting}
+
+\subsubsection{Sum of a list (by accuracy) (\cref{fig:list_sum_n})}
+\begin{lstlisting}[language=Haskell]
+\n -> approx (foldl1' (+) [fromRational (22%7) | _ <- [1..1000]]) n
+\end{lstlisting}
+
+\subsubsection{Sum of a tree (by tree size) (\cref{fig:tree_sum_k})}
+\begin{lstlisting}[language=Haskell]
+\k -> approx (foldTree1 (+) [fromRational (22%7) | _ <- [1..k]]) 1000
+\end{lstlisting}
+
+\subsubsection{Sine (\cref{fig:sin})}
+\begin{lstlisting}[language=Haskell]
+\x -> approx (sin (fromRational x)) 1000
+\end{lstlisting}
+
+\subsubsection{Memoized sum of a list (by list size) (\cref{fig:dp_sum_k})}
+\begin{lstlisting}[language=Haskell]
+\k -> approx (dp_sum (fromRational (22%7)) k) 1000
+\end{lstlisting}
+
+\subsubsection{Memoized sum of a list (by accuracy) (\cref{fig:dp_sum_n})}
+\begin{lstlisting}[language=Haskell]
+\n -> approx (dp_sum (fromRational (22%7)) 1000) n
+\end{lstlisting}
+
+%hybrid_list_sum
+%Jaguar code already in chapter 4
+
+%hybrid_wait_loop
+%Jaguar code already in chapter 4
+
+%expODE_n
+%ODE already in chapter 4
+
+%expODE_t
+%ODE already in chapter 4
+
+%pendulum_balancing
+%Jaguar code already in chapter 4
+
+
+
+
+%todo: Jaguar code of bouncing ball and cmd line of all Jaguar plots
+

@@ -249,11 +249,11 @@ Each of the surveyed packages implements the concepts above (approximations, com
 \begin{figure}[h]
     \centering
     \includesvg[width=0.5\linewidth]{images/diagrams/CompReal.svg}
-    \caption{Core functionality of \textit{CompReal} (abbreviated as CR)}
+    \caption{Core functionality of \textit{CompReal} (abbreviated as CR). All arrows preserve the real number being represented, so the diagram commutes after mapping values into $\R$}
     \label{fig:comp_real}
 \end{figure}
 
-So what operations should our \textit{CompReals} implement? For a start, since our theory is based on sequences of approximations, our computable reals should support being approximated up to a certain accuracy (as a \textit{Rational}, to generalize any particular approximation datatype the libraries might be using). In \cref{fig:comp_real} this functionality is provided by function \textit{approx}. Formally, some \textit{CompReal} $r$ represents a real number $x$ iff for all $n \in \N$
+So what operations should our \textit{CompReals} implement? For a start, since our theory is based on sequences of approximations, our computable reals should support being approximated up to a certain accuracy (as \textit{Rationals}, to generalize any particular approximation datatype the libraries might be using). In \cref{fig:comp_real} this functionality is provided by function \textit{approx}. Formally, some \textit{CompReal} $r$ represents a real number $x$ iff for all $n \in \N$
 
 \begin{equation*}
   | approx\ r\ n - x | \leq 2^{-n}
@@ -287,14 +287,14 @@ $S_2 = 1 + \frac{1}{2} + \frac{1}{4} = \frac{7}{4}$
 
 The resulting computable real $cons\ S$ must represent the number $2$. Notice that \textit{cons} assumes a constant module of convergence, which in this particular case is satisfied, since the error of each approximation is $R_n = | S_{\infty} - S_n | = \frac{a}{1-r} - a\frac{1-r^{n+1}}{1-r} = |a\frac{r^{n+1}}{1-r}|=2^{-n}$. For other geometric series (or other sequences in general), this condition might not hold, so some terms might have to be filtered out before applying \textit{cons} to ensure the filtered sequence follows the modulus. In any case, using \textit{cons} always requires some known bound to the error of each approximation, either to ensure they follow the modulus or to generate a sequence that does. Also notice that \textit{cons} is actually a partial function, since it is only meaningfully defined if the sequence of approximations is consistent, \textit{i.e.} each approximation doesn't contradict the ones that came before.
 
-$approx$ and $cons$ are not required to be inverse functions; $approx \circ cons$ may change the sequence of rationals, and $cons \circ approx$ may result in a \textit{CompReal} with a different representation. However, they must both represent the same real number.
+$approx$ and $cons$ are not required to be inverse functions; $approx \circ cons$ may change the sequence of rationals, and $cons \circ approx$ may result in a \textit{CompReal} with different internal values (\textit{e.g.} different intervals in a nested intervals representation). However, both compositions preserve the real number being represented.
 
 Obviously, computable reals must also support numerical operations. In addition to the basic arithmetic operations, real numbers are also closed under trigonometric functions, exponentiation (with a positive base), and logarithms (on positive values). It must also be possible to promote any rational value to a computable real -- this is function $fromRational$ in \cref{fig:comp_real}, which can be obtained solely from the constructor as $cons \circ const$. Likewise, other operations such as addition, multiplication, etc can also be obtained from $approx$ and $cons$ -- \cref{fig:sum} is a diagram illustrating such a construction for addition. These restrictions are specified by Haskell's \textit{Floating} type class, which \textit{CompReal} extends.
 
 \begin{figure}[h]
     \centering
     \includesvg[width=0.75\linewidth]{images/diagrams/sum.svg}
-    \caption{A transparent implementation of the numerical sum of two \textit{CompReals} (abbreviated as CR)}
+    \caption{A possible transparent implementation of the sum of two \textit{CompReals} (abbreviated as CR)}
     \label{fig:sum}
 \end{figure}
 
@@ -312,7 +312,7 @@ If we know that this progression of reals follows a fixed modulus of convergence
 
 $[2,5]\ \ [3.1, 4.2]\ \ [3.64, 4.15]\ \ ...$
 
-The resulting sequence of nested intervals is a representation of the real we were trying to calculate, $\pi + 1$. Note that at no point in this process did we reach the value of the limit; we only rearranged the computable reals he had in order to create a new computable real that corresponds to that value, and can then \textit{approx}imate this new computable real to get as close to the limit as wanted.
+The resulting sequence of nested intervals is a representation of the real we were trying to calculate, $\pi + 1$. Note that at no point in this process did we reach the value of the limit; we only rearranged the intervals in order to create a new computable real that corresponds to that value, and can then \textit{approx}imate this new computable real to get as close to the limit as we want.
 
 Like the arithmetic operations, the function \textit{limit} is also obtainable using \textit{approx} and \textit{cons} with the help of an auxiliary function $join : (\Q^\N)^\N \rightarrow \Q^\N$. To better illustrate this construction, here is a sequence of converging real numbers, each with its own sequence of approximations:
 
@@ -360,7 +360,7 @@ Putting everything together we can write some Haskell code for these functionali
     limit f = cons (\n -> approx (f (n+1)) (n+1))
 \end{lstlisting}
 
-An important point to stress is that \textit{CompReal} and $\Q^{\N}$ are \textbf{not} isomorphic. Requiring so from instances of \textit{CompReal} would force them to work internally with \textit{Rational} numbers and remove a lot of freedom from implementations. Also, note that an intensive use of the operations \textit{approx} and \textit{cons} can have serious impacts on performance, which is why these operations should be used judiciously. Thus, even though \textit{limit}, \textit{fromRational} and all numeric operations could be implemented transparently (\textit{i.e.} by manipulating sequences of approximations obtained with \textit{approx} and translating back to \textit{CompReal} using \textit{cons}, as shown in the previous examples), doing so would be terrible for performance. Instead, each instance of \textit{CompReal} implements these functionalities independently, optimized to the specific internal structure of its representation, and using its library's code and functionalities whenever possible.
+An important point to stress is that \textit{CompReal} and $\Q^{\N}$ are \textbf{not} isomorphic. Requiring so from instances of \textit{CompReal} would force them to work internally with \textit{Rational} numbers and remove a lot of freedom from implementations. On a related note, an intensive use of the operations \textit{approx} and \textit{cons} can have serious impacts on performance, which is why these operations should be used judiciously. Thus, even though \textit{limit}, \textit{fromRational} and all numeric operations could be implemented transparently (\textit{i.e.} by manipulating sequences of approximations obtained with \textit{approx} and translating back to \textit{CompReal} using \textit{cons}, as shown in the previous examples), doing so would be terrible for performance. Instead, each instance of \textit{CompReal} implements these functionalities independently, optimized to the specific internal structure of its representation, and using its library's code and functionalities whenever possible.
 
 \subsection{Technical Considerations}
 \label{sec:technical_considerations}
@@ -441,6 +441,8 @@ Even though the accuracy of \textit{CDAR}'s approximations don't follow a predic
 \subsubsection{aern2-real}
 
 \textit{aern2-real} \cite{Aern2} is very similar to \textit{CDAR}, also making use of centered dyadic approximations and lists and following a similar precision pattern. However, it implements a plethora of other utilities and operations, of note: a comparison function between two reals, returning an infinite list of kleeneans (the three-valued logic equivalent of booleans: true, false or indeterminate -- \cref{fig:kleeneans_dom}); parallel branching capabilities receiving a kleenean; handling of partial functions and errors (using another package \textit{collect-errors} \cite{ColErr} of the same author); and the calculation of limits as a built-in operation. Though most of these aren't of use to our particular use case, an efficient implementation of limits is of the utmost importance to the hybrid simulator, and the other features are interesting additions.
+
+\textit{aern2-real} has two other important differences from \textit{CDAR}: it has a different, more optimized implementation of some mathematical functions (trigonometric functions, exponentiation, etc.); and instead of iterating the whole list of nested intervals to find an approximation with a given accuracy, \textit{aern2-real} skips the first few intervals in the list in an attempt to avoid redundant computations. The greater the wanted accuracy, the more intervals it skips. This can sometimes save a lot of time, but can also be slower if too many intervals are skipped.
 
 \subsection{Comparison and Summary}
 
