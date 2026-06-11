@@ -118,9 +118,10 @@ instance CompOrd AnyCReal where
     compMax = mapCReal2 max
 
 instance Powers AnyCReal where
-    pow = powDef atPrecision (\f -> AnyCReal $ ExactReal.crMemoize f) scale
-        where scale x n | n >= 0    = shift x n
-                        | otherwise = shift (x + bit (-n-1)) n
+    --The default implementation is faster than this definition
+    -- pow = powDef atPrecision (\f -> AnyCReal $ ExactReal.crMemoize f) scale
+    --     where scale x n | n >= 0    = shift x n
+    --                     | otherwise = shift (x + bit (-n-1)) n
 
 instance Boundable AnyCReal
 

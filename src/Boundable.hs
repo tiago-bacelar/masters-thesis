@@ -49,6 +49,9 @@ upperBound = snd . bounds
 --ireal and adapted to work with Integer as well as IntegerInterval
 -- (should this be in Powers? yes it should, but sadly there was a dependency
 --  circle going on, and I had to put this function here to break it)
+--I actually found that the default exponentiation with repeated multiplications
+--is usually faster than this implementation, even with the dependency problem,
+--so currently only ERA uses this
 powDef :: (Num r, Powers a, Boundable a) => (r -> Int -> a) -> ((Int -> a) -> r) -> (a -> Int -> a) -> r -> Int -> r
 powDef approx cons scale = aux
     where aux _ 0 = 1

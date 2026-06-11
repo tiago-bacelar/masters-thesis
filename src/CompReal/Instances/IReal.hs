@@ -39,9 +39,10 @@ instance CompOrd IReal.IReal where
     compMin = min
     compMax = max
 
+--The default implementation (repeated multiplications) is faster than powDef
 instance Powers IReal.IReal where
-    pow = powDef IReal.appr IReal.ir IReal.scale
-    --pow = IReal.pow --exactly the same, as the code for powDef is taken from IReal.pow
+    --pow = powDef IReal.appr IReal.ir IReal.scale
+    --pow = IReal.pow --exactly the same as powDef, as the code for powDef is taken from IReal.pow
 
 instance Boundable IReal.IReal
 

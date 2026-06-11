@@ -25,8 +25,8 @@ good _ CDAR.Bottom         = False
 good _ (CDAR.Approx _ 0 _) = True
 good n (CDAR.Approx _ e s) = 1 - s - (lg2 e) > n --TODO: check and fix the comment below
 
---We can't use CDAR.require because it's wrong (returns approximations with 2 more precision
---than required), but this function does essentially the same
+--We can't use CDAR.require because it uses a different definition of accuracy (returns
+--approximations with 2 more accuracy than required), but this function does essentially the same
 goodApprox :: CDAR.CR -> Int -> CDAR.Approx
 goodApprox x n = fromMaybe (error "CDAR.CR bound: expected infinite list in CDAR.CR")
                     $ find (good n) $ getZipList $ CDAR.unCR x
