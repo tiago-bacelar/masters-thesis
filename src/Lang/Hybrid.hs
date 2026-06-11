@@ -134,7 +134,7 @@ instance Monad Query where
     q >>= f = Query $ \n -> runQuery q n >>= (($ n) . runQuery . f)
 
 
---unline Hybrid, the function inside Hyb only needs to be
+--unlike Hybrid, the function inside Hyb only needs to be
 --defined in (0,d) (or (0,inf) if duration is infinite)
 newtype CompHybridT t s m a = CompHybridT { unCHT :: m (Either a (Hybrid t (Query s) a)) }
 type CompHybrid t s a = CompHybridT t s Identity a

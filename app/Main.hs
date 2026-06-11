@@ -11,6 +11,7 @@ import Lang.Parser
 import Lang.Hybrid hiding (Query)
 import Lang.Interpreter
 import Plot
+import Diagrams
 
 import qualified CompReal.Instances.CDAR as CDAR
 import qualified CompReal.Instances.AERN2 as AERN2
@@ -19,6 +20,7 @@ import qualified CompReal.Instances.ExactReal as ExactReal
 import qualified CompReal.Instances.IReal as IReal
 
 import Prelude hiding (lookup)
+import Control.Monad (forM_)
 import Data.Char (toLower)
 import Data.Proxy
 import GHC.Data.Maybe (fromJust, rightToMaybe)
@@ -225,7 +227,7 @@ mainWith (Options   { optFile       = file
 
         let filteredVars = filterIndexes vars
         let filteredSystem = smapCH (id >< filterIndexes) $ fmap (fmap (id >< filterIndexes) . rightToMaybe) system
-        let filteredDiscs = map (\(w,x,y,z) -> (w,x,y,filterIndexes z)) . discs
+        let filteredDiscs = map (\(w,x,y,z) -> (w,x,y,filterIndexes $ map rightToMaybe z)) . discs
 
         plotHybrid plotConfig filteredVars filteredSystem filteredDiscs
         case rangeT plotConfig of
@@ -238,31 +240,75 @@ mainWith (Options   { optFile       = file
 
 
 --for quick testing with ghci
-test :: (SimNum r) => IO ([String], RunnableProgram r)
+test :: (Show r, SimNum r) => IO ([String], RunnableProgram r)
 test = do
     input <- readFile "input.txt"
     case parseJaguar input of
             Failed err -> error ("Parse error: " ++ show err)
             Ok (vars, code) -> return (vars, interpret code)
 
-type TestType = CDAR.CR
+type TestType = ExactReal.AnyCReal
+composition :: MultiComposition
+composition = pendulumBalancingMulti
+
+diag :: IO (TestType -> IO ())
+diag = fmap (uncurry $ toSVG $ unMulti composition) test
+
+diagCompare :: (Real a) => IO (a -> IO ())
+diagCompare = do
+    (vars, prog1) <- test :: IO ([String], RunnableProgram TestType)
+    (_,    prog2) <- test :: IO ([String], RunnableProgram Double)
+    return $ toSVGCompare composition vars prog1 prog2
+
+diagAnimate :: IO ()
+diagAnimate = _test >>= (uncurry $ animateSVG $ unMulti composition)
+    where _test = test :: IO ([String], RunnableProgram TestType)
+
+diagAnimateCompare :: IO ()
+diagAnimateCompare = do
+    (vars, prog1) <- test :: IO ([String], RunnableProgram TestType)
+    (_,    prog2) <- test :: IO ([String], RunnableProgram Double)
+    animateSVGCompare composition vars prog1 prog2
+
+gif :: [TestType] -> IO ()
+gif ts = do
+    (vars, prog) <- test
+    toGIF (unMulti composition) vars prog ts
+
+gifCompare :: (Real a, Show a) => [a] -> IO ()
+gifCompare ts = do
+    (vars, prog1) <- test :: IO ([String], RunnableProgram TestType)
+    (_,    prog2) <- test :: IO ([String], RunnableProgram Double)
+    toGIFCompare composition vars prog1 prog2 ts
+
+
+hyb :: IO (CompHybrid TestType [TestType] (Either (Error (Step, [TestType])) [TestType]))
+hyb = fmap (\(vars,prog) -> smapCH snd $ fmap (fmap snd) $ fst $ run prog (length vars) (Just 20) Nothing) test
 
 play :: IO (TestType -> Int -> [[TestType]])
 play = fmap (\(vars,prog) -> NE.toList .-. runQueryJust . query prog (length vars) (Just 20) Nothing) test
 
-playDiscs :: IO [(TestType, Step, Step, [Maybe (TestType, TestType)])]
+playDiscs :: IO [(TestType, Step, Step, [Either TestType (TestType, TestType)])]
 playDiscs = fmap (\(vars,prog) -> snd (run prog (length vars) (Just 20) Nothing) Nothing) test
+
+printDiscs :: IO ()
+printDiscs = do
+    ds <- playDiscs
+    forM_ ds $ \d -> do
+        putStrLn ""
+        let (t,_,_,es) = d
+        putStrLn $ "t=" ++ show t  
+        forM_ es print
 
 plot :: IO ()
 plot = mainWith Options { optFile       = Just "input.txt"
                         , optNumType    = SomeProxy (Proxy :: Proxy TestType)
-                        , optCompAcc    = Just 20
-                        , optIterations = Just 300
+                        , optCompAcc    = Just 16
+                        , optIterations = Just 1000
                         , optPlotVars   = S.fromList []
-                        , optPlotConfig = defPlotConfig { realAccuracy = 10 }
+                        , optPlotConfig = defPlotConfig { realAccuracy = 8 }
                         , optMode       = Plot
                         }
-
 
 --TODO: query mode (perform queries, set accuracy, etc (plot with current settings???))
 --TODO: interactive plot (janela a parte que da para fazer zoom, mover e tal)

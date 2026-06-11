@@ -37,7 +37,7 @@ data EState s = EState { cmp :: Maybe Int
                        }
 
 initialEState :: Maybe Int -> Maybe Integer -> EState s
-initialEState cmpPrec nIters = EState { cmp = cmpPrec, iters = nIters, curDisc = Nothing }
+initialEState cmpAcc nIters = EState { cmp = cmpAcc, iters = nIters, curDisc = Nothing }
 
 decIters :: EState s -> EState s
 decIters eState = eState { iters = fmap pred (iters eState) }
@@ -51,10 +51,10 @@ skipDisc eState = eState { curDisc = Nothing }
 
 
 --The discontinuities are basically a difference list, but there is a complication
---Say we wanted all discontinuities until step 10. If the system was infinite and
---there were no discontinuities, getting the first element of the list would be bottom
---To solve this, the discontinuities must be a function that take a max step
---and return the list of discontinuities until that step.
+--Say we wanted all discontinuities until step 10. With a regular difference list, if
+--the system was infinite and there were no discontinuities, getting the first element 
+--of the list would be bottom. To solve this, the discontinuities must be a function
+--that take a max step and return the list of discontinuities until that step.
 --If you want to filter by time instead of by step, you can use the hybrid
 --to get the step at a given time first and then filter by step as before
 newtype DifList a = DifList { untilStep :: Maybe Step -> [a] -> [a] }
@@ -190,11 +190,14 @@ interpret (Seq p q) s               = interpret p s >>= interpret q
 
 
 
-run :: (Num r) => RunnableProgram r -> Int -> Maybe Int -> Maybe Integer -> (CompHybrid r (Step, [r]) (Either (Error (Step, [r])) (Step, [r])), Maybe Step -> [(r, Step, Step, [Maybe (r, r)])])
-run p nVars cmpPrec nIters = (smapCH readPState $ (id >< readPState -|- readPState . fst) <$> h, \mS -> [(time s, step s, step s', take nVars $ maybeIndexes [(v, (variables s !! v, variables s' !! v)) | v <- vs]) | (vs, s, s') <- discList mS])
-    where (h, discs) = runWriter $ runCompHybridT $ runE (p $ initialPState nVars) (initialEState cmpPrec nIters)
+run :: (Num r) => RunnableProgram r -> Int -> Maybe Int -> Maybe Integer -> (CompHybrid r (Step, [r]) (Either (Error (Step, [r])) (Step, [r])), Maybe Step -> [(r, Step, Step, [Either r (r,r)])])
+run p nVars cmpAcc nIters = (smapCH readPState $ (id >< readPState -|- readPState . fst) <$> h, \mS -> [(time s, step s, step s', zipIndexesWith (maybe Left (Right .-. (,) . (variables s !!))) vs (variables s')) | (vs, s, s') <- discList mS])
+    where (h, discs) = runWriter $ runCompHybridT $ runE (p $ initialPState nVars) (initialEState cmpAcc nIters)
           discList maxStep = untilStep (discs <> maybe mempty singl (endpointCH h >>= rightToMaybe >>= curDisc . snd)) maxStep []
           readPState s = (step s, variables s)
 
+--TODO: error management? (e.g. when there is an error at t=0, the CompHybrid
+--is instantaneous and this call results in an error. There are also no
+--checks on whether the query time is inside the duration of the CompHybrid)
 query :: (Num r) => RunnableProgram r -> Int -> Maybe Int -> Maybe Integer -> r -> Query [r]
-query p nVars cmpPrec nIters = fmap snd . (evalCH $ fst $ run p nVars cmpPrec nIters)
+query p nVars cmpAcc nIters = fmap snd . (evalCH $ fst $ run p nVars cmpAcc nIters)

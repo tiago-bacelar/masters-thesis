@@ -64,6 +64,9 @@ executables:
     - jaguar
     - Chart
     - Chart-cairo
+    - diagrams-lib
+    - diagrams-svg
+    - diagrams-cairo
 
 tests:
   jaguar-test:

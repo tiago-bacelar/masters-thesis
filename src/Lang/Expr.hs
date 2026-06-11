@@ -20,7 +20,7 @@ module Lang.Expr (
     evalBExprInf) where
 
 import Powers
-import CompOrd hiding (LEQ, GEQ)
+import CompOrd hiding (NEQ, LEQ, GEQ)
 import qualified CompOrd as CompOrd
 
 import Prelude hiding (Ordering(..))
@@ -32,8 +32,8 @@ type Ident = Int
 --TODO: sqrt (and other roots?)
 data Var = T | V Ident deriving (Show, Eq, Ord)
 data Constant = E | PI deriving (Show, Eq, Ord)
-data Function = Neg | Exp | Ln | Sin | Cos | Tan deriving (Show, Eq, Ord)
-data Operator = Add | Sub | Mult | Div | Pow | Log deriving (Show, Eq, Ord)
+data Function = Neg | Exp | Ln | Sin | Cos | Tan | Abs deriving (Show, Eq, Ord)
+data Operator = Add | Sub | Mult | Div | Pow | Log | Min | Max deriving (Show, Eq, Ord)
 data Expr = Var Var
             | Num Rational
             | Const Constant
@@ -42,7 +42,7 @@ data Expr = Var Var
             | NatPow Expr Int
         deriving (Show, Eq, Ord)
 
-data Comparator = LT | GT | LLT | LGT | LEQ | GEQ deriving (Show)
+data Comparator = EQ | NEQ | LT | GT | LLT | LGT | LEQ | GEQ deriving (Show)
 data BTerm = BConst Bool | Comp Comparator Expr Expr deriving (Show)
 data BExpr = Term BTerm | Not BExpr | And BExpr BExpr | Or BExpr BExpr deriving (Show)
 
@@ -58,16 +58,19 @@ evalFunc Ln  = log
 evalFunc Sin = sin
 evalFunc Cos = cos
 evalFunc Tan = tan
+evalFunc Abs = abs
 
-evalOp :: (Floating r) => Operator -> r -> r -> r
+evalOp :: (Floating r, CompOrd r) => Operator -> r -> r -> r
 evalOp Add  = (+)
 evalOp Sub  = (-)
 evalOp Mult = (*)
 evalOp Div  = (/)
 evalOp Pow  = (**)
 evalOp Log  = logBase
+evalOp Min  = compMin
+evalOp Max  = compMax
 
-evalExpr :: (Floating r, Powers r) => Expr -> (Var -> r) -> r
+evalExpr :: (Floating r, Powers r, CompOrd r) => Expr -> (Var -> r) -> r
 evalExpr (Var v) s      = s v
 evalExpr (Const c) _    = evalConst c
 evalExpr (Num r) _      = fromRational r
@@ -78,6 +81,8 @@ evalExpr (NatPow a n) s = pow (evalExpr a s) n
 evalCompAux :: Comparator -> OrderingDomain -> Maybe Bool
 evalCompAux LT  = mCompare (Top P.LT)
 evalCompAux GT  = mCompare (Top P.GT)
+evalCompAux EQ  = mCompare (Top P.EQ)
+evalCompAux NEQ = mCompare (Middle CompOrd.NEQ)
 evalCompAux LEQ = mCompare (Middle CompOrd.LEQ)
 evalCompAux GEQ = mCompare (Middle CompOrd.GEQ)
 evalCompAux LLT = Just . extendedBy (Top P.LT)
@@ -89,6 +94,8 @@ evalComp c x y = evalCompAux c . domCompare x y
 evalCompInf :: (CompOrd r) => Comparator -> r -> r -> Bool
 evalCompInf LT  = lesserInf
 evalCompInf GT  = greaterInf
+evalCompInf EQ  = equalInf
+evalCompInf NEQ = differentInf
 evalCompInf LEQ = lesserEqInf
 evalCompInf GEQ = greaterEqInf
 evalCompInf LLT = lesserInf

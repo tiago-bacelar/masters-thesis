@@ -20,6 +20,7 @@ module SnocList (
     lFunc,
     lFuncOrLast,
     singleton,
+    fromNE,
     fromList,
     toList,
     foldr,
@@ -51,6 +52,7 @@ import Prelude hiding (foldr, head, last, take, drop, zip, zipWith, zip3, zipWit
 import qualified Prelude as P
 import Data.List (unsnoc, find)
 import Data.Maybe (fromMaybe)
+import qualified Data.List.NonEmpty as NE
 
 
 data SnocList a = SnocList [a] a deriving (P.Functor, P.Foldable, P.Traversable)
@@ -66,6 +68,9 @@ lFuncOrLast f g ~(SnocList xs y) = SnocList (f xs) (g y)
 
 singleton :: a -> SnocList a
 singleton y = SnocList [] y
+
+fromNE :: NE.NonEmpty a -> SnocList a
+fromNE = fromList . NE.toList
 
 fromList :: [a] -> SnocList a
 fromList = maybe (error "fromList: expected non-empty list") (uncurry SnocList) . unsnoc

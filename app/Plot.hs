@@ -19,7 +19,7 @@ import Graphics.Rendering.Chart.Easy hiding (points, both)
 import Graphics.Rendering.Chart.Backend.Cairo
 import Prelude hiding (lines)
 import Control.Applicative (ZipList(..))
-import Control.Monad (when)
+import Control.Monad (when, forM_)
 import Data.Ratio ((%))
 import Data.List (transpose, sortOn)
 import qualified Data.List.NonEmpty as NE
@@ -52,7 +52,7 @@ defPlotConfig = PlotConfig  { outputPath    = "output.png"
 
 
 setLayout rT rX = do
-    layout_title .= "System Evolution"
+    --layout_title .= "System Evolution"
     layout_x_axis . laxis_title .= "time"
     when (isJust rT) $ layout_x_axis . laxis_generate .= scaledAxis def (fromRational >< fromRational $ fromJust rT)
     when (isJust rX) $ layout_y_axis . laxis_generate .= scaledAxis def (fromRational >< fromRational $ fromJust rX)
@@ -171,7 +171,7 @@ class Plottable a b where
 
         toFile def (outputPath config) $ do
             setLayout (rangeT config) (rangeX config)
-            sequence_ $ (<$> zip3 vars (system ++ repeat []) (discsByVar ++ repeat [])) $ \(var, evol, ds) -> do
+            forM_ (zip3 vars (system ++ repeat []) (discsByVar ++ repeat [])) $ \(var, evol, ds) -> do
                 color <- takeColor
                 lines var color $ map (map (toDouble >< toDouble)) $ segments (map (id >< NE.toList) evol) ds
                 hollowPoints color [(toDouble t, toDouble x) | (t,(_,x),_) <- ds]
@@ -201,7 +201,7 @@ instance {-# OVERLAPPABLE #-} (CompReal a, CompReal b) => Plottable a b where
 
         toFile def (outputPath config) $ do
             setLayout (rangeT config) (rangeX config)
-            sequence_ $ (<$> zip3 vars (system ++ repeat []) (discsByVar ++ repeat [])) $ \(var, evol, ds) -> do
+            forM_ (zip3 vars (system ++ repeat []) (discsByVar ++ repeat [])) $ \(var, evol, ds) -> do
                 color <- takeColor
                 let segs = segments [(Left t, rr) | (t,rr) <- map (id >< NE.toList) evol] [(Right t, l, r) | (t,l,r) <- ds]
                 joinRects var color [[(either boundS (boundDouble n) t, boundDouble n v) | (t,v) <- vs] | vs <- segs]

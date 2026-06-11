@@ -3,7 +3,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 
 
-module Solver.Poly (Poly, constPoly, varPoly, toPoly, evalPoly, degree, norm, compNorm) where
+module Solver.Poly (Poly(..), constPoly, varPoly, toPoly, evalPoly, isConstPoly, fromConstPoly, degree, norm, compNorm) where
 
 import Utils
 import Powers
@@ -52,6 +52,10 @@ evalPoly p xs = mySum [c * myProduct (map (uncurry pow) $ filter ((/=0) . snd) $
           mySum l = foldTree1 (+) l
           myProduct [] = 1
           myProduct l = numCoef $ foldTree1 (*) l
+
+isConstPoly :: Poly r -> Bool
+isConstPoly (Poly [([], _)]) = True
+isConstPoly _ = False
 
 --returns the value of a constant polynomial
 --raises an error if the polynomial isn't constant
@@ -298,6 +302,10 @@ polyGen (NatPow ex n) rec = shortConst (rec ex) (`pow` n) $ \aux -> do
     returnNotConst $ do
         (v,d) <- aux
         return (pow v n, scalePoly (fromIntegral n) (d * pow v (n-1)))
+polyGen (Func Abs _) _ = error "Abs not supported in differential expressions"
+polyGen (Op Min _ _) _ = error "Min not supported in differential expressions"
+polyGen (Op Max _ _) _ = error "Max not supported in differential expressions"
+
 
 --turns a system of ODEs into a system of plynomial ODEs.
 --if the input has n variables, the output will start with those n and may contain others afterwards

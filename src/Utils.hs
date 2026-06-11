@@ -52,6 +52,11 @@ count x = length . filter (x ==)
 lengthGreaterThan :: Int -> [a] -> Bool
 lengthGreaterThan n = not . null . drop n
 
+dropNE :: Int -> NE.NonEmpty a -> NE.NonEmpty a
+dropNE 0 (x :| _)       = x :| []
+dropNE _ (x :| [])      = x :| []
+dropNE n (_ :| x : xs)  = dropNE (n-1) (x :| xs)
+
 interleave :: [a] -> [a] -> [a]
 interleave (x:xs) (y:ys) = x : y : interleave xs ys
 interleave xs [] = xs
@@ -119,12 +124,20 @@ getIndexes (i:is)   = aux (i : difs)
                                 (y:ys)  -> y : aux ds (y:ys)
 
 
---list must be ordered by index and mustn't contain repeated indexes
+--indexes must be strictly increasing
 maybeIndexes :: (Num a, Eq a) => [(a,b)] -> [Maybe b]
 maybeIndexes xs = rec 0 xs
     where rec _ [] = repeat Nothing
           rec n ((i, x) : t) | n == i    = Just x  : rec (n + 1) t
                              | otherwise = Nothing : rec (n + 1) ((i, x) : t)
+
+--indexes must be strictly increasing
+zipIndexesWith :: (Num a, Eq a) => (Maybe a -> b -> c) -> [a] -> [b] -> [c]
+zipIndexesWith f = rec 0
+    where rec _ [] _ = []
+          rec _ _ [] = []
+          rec n (i:is) (x:xs) | n == i    = f (Just i) x : rec (n + 1) is xs
+                              | otherwise = f Nothing  x : rec (n + 1) (i:is) xs
 
 
 leftDiagonals :: [[a]] -> [[a]]
@@ -167,7 +180,7 @@ scanlTree1 _ []     = error "scanlTree1: expected non-empty list"
 
 
 --for reading/writing decimal numbers
-newtype Decimal = Decimal { toRat :: Rational } deriving (Num, Fractional, Enum)
+newtype Decimal = Decimal { toRat :: Rational } deriving (Eq, Ord, Num, Fractional, Enum)
 instance Read Decimal where
     readsPrec _ = map (Decimal >< id) . readSigned readFloat
 instance Show Decimal where

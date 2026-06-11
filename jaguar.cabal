@@ -77,6 +77,7 @@ library
 executable jaguar-exe
   main-is: Main.hs
   other-modules:
+      Diagrams
       Plot
       Paths_jaguar
   autogen-modules:
@@ -96,6 +97,9 @@ executable jaguar-exe
     , cdar
     , collect-errors
     , containers
+    , diagrams-cairo
+    , diagrams-lib
+    , diagrams-svg
     , exact-real
     , ghc
     , ireal

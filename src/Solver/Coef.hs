@@ -1,7 +1,7 @@
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE TupleSections #-}
 
-module Solver.Coef (Coef, numCoef, evalCoef, coefRealPow) where
+module Solver.Coef (Coef(..), numCoef, evalCoef, coefRealPow) where
 
 import Utils
 import CompOrd

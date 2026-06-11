@@ -41,6 +41,8 @@ import Data.List (sortOn)
       '/'       { TokenOp Div }
       '^'       { TokenOp Pow }
       log       { TokenOp Log }
+      min       { TokenOp Min }
+      max       { TokenOp Max }
       '('       { TokenOP }
       ')'       { TokenCP }
       '\''      { TokenDeriv }
@@ -119,20 +121,22 @@ BTerm       :: { BTerm }
 
 
 Expr :: { Expr }
-    : var                   { Var $1 }
-    | int                   { Num (fromInteger $1) }
-    | num                   { Num $1 }
-    | const                 { Const $1 }
-    | func Expr             { Func $1 $2 }
-    | Expr '+' Expr         { Op Add $1 $3 }
-    | Expr '-' Expr         { Op Sub $1 $3 }
-    | Expr '*' Expr         { Op Mult $1 $3 }
-    | Expr '/' Expr         { Op Div $1 $3 }
-    | Expr '^' Expr         { Op Pow $1 $3 }
-    | Expr '^' int %prec NP {% if $3 > toInteger (maxBound :: Int) then failP ("Integer overflow: " ++ show $3 ++ " isn't a valid exponent") else if $3 == 0 then failP "0 isn't a valid exponent" else returnP $ NatPow $1 (fromInteger $3) }
-    | Expr log Expr         { Op Log $3 $1 }
-    | '-' Expr %prec NEG    { Func Neg $2 }
-    | '(' Expr ')'          { $2 }
+    : var                       { Var $1 }
+    | int                       { Num (fromInteger $1) }
+    | num                       { Num $1 }
+    | const                     { Const $1 }
+    | Expr '+' Expr             { Op Add $1 $3 }
+    | Expr '-' Expr             { Op Sub $1 $3 }
+    | Expr '*' Expr             { Op Mult $1 $3 }
+    | Expr '/' Expr             { Op Div $1 $3 }
+    | Expr '^' Expr             { Op Pow $1 $3 }
+    | Expr '^' int %prec NP     {% if $3 > toInteger (maxBound :: Int) then failP ("Integer overflow: " ++ show $3 ++ " isn't a valid exponent") else if $3 == 0 then failP "0 isn't a valid exponent" else returnP $ NatPow $1 (fromInteger $3) }
+    | func '(' Expr ')'         { Func $1 $3 }
+    | log '(' Expr ',' Expr ')' { Op Log $5 $3 }
+    | min '(' Expr ',' Expr ')' { Op Min $3 $5 }
+    | max '(' Expr ',' Expr ')' { Op Max $3 $5 }
+    | '-' Expr %prec NEG        { Func Neg $2 }
+    | '(' Expr ')'              { $2 }
 
 {
 
@@ -219,6 +223,8 @@ lexer cont s =
         ')':cs           -> cont TokenCP cs . moveColumn 1
         '\'':cs          -> cont TokenDeriv cs . moveColumn 1
         ',':cs           -> cont TokenComma cs . moveColumn 1
+        '=':'=':cs       -> cont (TokenComp EQ) cs . moveColumn 2
+        '!':'=':cs       -> cont (TokenComp NEQ) cs . moveColumn 2
         '<':'=':cs       -> cont (TokenComp LEQ) cs . moveColumn 2
         '>':'=':cs       -> cont (TokenComp GEQ) cs . moveColumn 2
         '<':'!':cs       -> cont (TokenComp LLT) cs . moveColumn 2
@@ -256,7 +262,10 @@ lexFloat s =
 lexAlpha :: (Token -> P a) -> String -> P a
 lexAlpha cont "e"       = cont $ TokenConst E
 lexAlpha cont "pi"      = cont $ TokenConst PI
+lexAlpha cont "min"     = cont $ TokenOp Min
+lexAlpha cont "max"     = cont $ TokenOp Max
 lexAlpha cont "log"     = cont $ TokenOp Log
+lexAlpha cont "abs"     = cont $ TokenFunc Abs
 lexAlpha cont "exp"     = cont $ TokenFunc Exp
 lexAlpha cont "ln"      = cont $ TokenFunc Ln
 lexAlpha cont "sin"     = cont $ TokenFunc Sin

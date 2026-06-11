@@ -13,7 +13,9 @@ import Boundable
 import Solver.Coef
 import Solver.Poly
 import Solver.FAD
+--import Solver.LinearSolver
 
+import Data.Bits
 import Data.List (unfoldr)
 import Data.Either (isLeft)
 
@@ -36,8 +38,8 @@ odeDerivs f x0 = map fromDif x
 
 
 solvePoly :: forall r. (Fractional r, Powers r, CompOrd r, Limit r r, Boundable r) => [(r, Poly r)] -> r -> [r]
-solvePoly ps = ans . numCoef
-    where (x0, exs) = {-traceX "exs" $-} unzip ps
+solvePoly ps = {- solveLinear ps `orElse` -} (ans . numCoef)
+    where (x0, exs) = unzip ps
           _exs = map (evalCoef .-. evalPoly . fmap con) exs
           f x = map ($ x) _exs
           --If the taylor series was known to be finite, this would be enough:
@@ -47,31 +49,32 @@ solvePoly ps = ans . numCoef
           --For the theory, check out https://www.sciencedirect.com/science/article/pii/S089812210600352X
           m = max 2 $ maximum $ map degree exs
           bN = compNorm exs
-          _M = {-traceX "_M" $-} fromIntegral (m - 1) * bN
+          _M = fromIntegral (m - 1) * bN
 
-          r = 0.5 --must be strictly between 0 and 1. I chose 0.5 to make the accuracy double each step
-          dt = {-traceX "dt" $-} fromRational r / (compMax 0.001 _M) --max is used in case _M is zero
+          r = 0.5 --must be strictly between 0 and 1. I chose 0.5 to make the accuracy increase by 1 each step
+          dt = fromRational r / (compMax 0.001 _M) --max is used in case _M is zero
 
 
           --alpha r = floor (log_2 (1 / r))
           alpha :: Coef r -> Int
-          alpha = lg2 . max 2 . lowerBound . recip . compMax 0.001 . abs --max in case r is zero
+          alpha = lg2 . max 2 . lowerBound . recip . compMax 0.001 --max in case r is zero
 
-          --beta r a = ceil (log_2 (max |a| 1 / (1 - r)))
-          --for r <= 0.5, this is equivalent to 1 + ceil (log_2 (max |a| 1))
+          --beta a = ceil (log_2 (max |a| 1))
+          --for r <= 0.5, beta also equals ceil (log_2 (max |a| 1) / (1 - r)) - 1
           beta :: r -> Int
-          beta = (1+) . lg2 . max 1 . pred . (2*) . upperBound . abs
+          beta = lg2 . max 1 . pred . (`shiftL` 1) . upperBound . abs
 
           --if a term has less than 5 derivatives, shortcuts to a polynomial
           --TODO: shortcut after any finite number of derivs, not just <=5
-          --      (and without forcing some number of derivs like here)
+          --      (and without forcing some number of derivs like here. somehow)
           stepDT :: [r] -> [Either (Coef r -> r) r]
           stepDT xi = zipWith (\k0 -> fmap (listLimit . SL.toList . SL.dropOrLast k0 . SL.fromList . scanlTree1 (+) . zipWith (*) genTermsDT)) k0s terms
             where terms = map (\ds -> if lengthGreaterThan 5 ds then Right ds else Left (infStep ds)) $ odeDerivs f xi
                   infStep ds = foldTree1 (+) . zipWith (*) ds . generalTerms . evalCoef
-                  k0s = {-traceX "k0 DT" $-} map beta xi
+                  k0s = map beta xi
           genTermsDT = generalTerms $ evalCoef dt
           
+          --this function will be called for deltas between -dt and dt, which means an r between 0 and 0.5
           stepDelta :: [r] -> Coef r -> [r]
           stepDelta xi = ans2
             where ds = odeDerivs f xi
@@ -79,8 +82,10 @@ solvePoly ps = ans . numCoef
                   ans2 delta = zipWith (listLimit .-. SL.toList .-. SL.getIndexesOrLast) kss terms
                     where genTerms = generalTerms $ evalCoef delta
                           terms = map (SL.fromList . scanlTree1 (+) . zipWith (*) genTerms) ds
-                          alp = alpha (delta * _M)
+                          alp = alpha (abs (delta * _M))
                           kss = map (\b -> [max 0 $ (n + b + 1) `div` alp - 1 | n <- [0..]]) bs
+                          --this math is a bit too lax, but I wanted to avoid calculating with fractions
+                          --so I converted everything to Integers and worked with upper/lower bounds instead
 
           --whenever possible, we avoid extra operations. Hence the pattern match here
           stepInf :: Coef r -> Integer -> (Coef r -> r) -> r
@@ -102,10 +107,10 @@ solvePoly ps = ans . numCoef
                           s' = zipWith (\eFX eFY -> either Left (const $ either (Left . (i,)) Right eFY) eFX) s (stepDT xi)
 
           ans :: Coef r -> [r]
-          ans t = finalStep $ SL.findOrLast (\(i,_,_) -> maybe True (/=LT) $ asTop $ domCompare i s' 1) $ SL.dropOrLast skip steps
+          ans t = finalStep $ SL.findOrLast (\(i,_,_) -> extendedBy (Middle GEQ) (domCompare i s' 4)) $ SL.dropOrLast skip steps --the domCompare can use any accuracy >=1, I chose 4
             where s = 2 * t * _M
                   s' = s - 1
-                  skip = fromInteger $ max 0 $ lowerBound s
+                  skip = fromInteger $ max 0 $ lowerBound s - 1
                   finalStep (i, yi, zi) = zipWith (\z -> maybe z (uncurry $ stepInf t)) (zi dt2) yi
-                    where dt2 = {-traceX "dt2" $-} t - i * dt --dt2 is picked so that r<=0.5 (even if that requires a negative delta)
+                    where dt2 = t - i * dt --dt2 is picked so that r<=0.5 (even if that requires a negative delta)
 
