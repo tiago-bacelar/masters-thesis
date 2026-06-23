@@ -1,18 +1,19 @@
-\chapter{Jaguar Programs}
+\chapter{Jaguar Run Instructions}
 \label[appendix]{app:jaguar_programs}
 
-This appendix contains the Jaguar programs that were omitted from the main document for readability, as well as the commands used to generate their plots. Before running the command, the Jaguar code should be put into the file \textit{input.jag}.
+This appendix contains installation instructions for Jaguar, as well as the commands used to run the Jaguar programs in the main document.
 
+To install Jaguar, first install the Stack build tool for Haskell (\url{haskellstack.org}). Then clone the Jaguar repository from GitHub (\url{https://github.com/tiago-bacelar/jaguar}) and build the project with Stack:
 
-\subsubsection{Bouncing Ball}
-
-\begin{lstlisting}
-y := 0; v := 1; g := 1; c := 0.8;
-while true do {
-    y'=v,v'=-g for 2 * v / g;
-    v := -c * v;
-};
+\begin{lstlisting}[language=bash]
+stack install
 \end{lstlisting}
+
+You should now be able to run Jaguar from the command line. Jaguar takes an input file with a Jaguar program and runs it using the specified command line arguments. Run \lstinline{jaguar --help} to see all available arguments.
+
+Before running the following commands the corresponding Jaguar code should be put into a file \textit{input.jag} in the current directory.
+
+\subsubsection{Bouncing Ball (\cref{sec:visualizer})}
 
 \begin{lstlisting}[language=bash,caption=Command used to generate \cref{fig:plot_example}]
 jaguar -n ireal -a 4 -c 10 -t 8 -v y,v input.jag
@@ -23,15 +24,14 @@ jaguar -n ireal -a 10 -c 10 -t 8 -v y,v input.jag
 \end{lstlisting}
 
 
-\subsubsection{Inverted Pendulum}
+\subsubsection{Inverted Pendulum (\cref{sec:case_study})}
 
-The Jaguar code for the inverted pendulum can be found in \cref{sec:case_study}.
-%For this program, instead of bounding the graphs by time like in the previous example (flag -t), an iteration limit (flag -l) of 800 was introduced, which corresponds exactly to 40 time units. This saves 
+%For this program, instead of bounding the graphs by time like in the previous example (flag -t), an iteration limit (flag -l) of 800 was introduced, which corresponds exactly to 40 time units. This saves time for some reason (probably a bug honestly, i should look into it)
 
 \begin{lstlisting}[language=bash,caption=Command used to generate \cref{fig:inverted_pendulum_aern2}]
-jaguar -n aern2 -a 6 -c 8 -t 40 input.jag
+jaguar -n aern2 -a 8 -c 8 -t 40 input.jag
 \end{lstlisting}
 
 \begin{lstlisting}[language=bash,caption=Command used to generate \cref{fig:inverted_pendulum_double}]
-jaguar -n double -a 6 -c 8 -t 40 input.jag
+jaguar -n double -a 8 -c 8 -t 40 input.jag
 \end{lstlisting}
